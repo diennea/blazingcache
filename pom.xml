@@ -17,6 +17,11 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <libs.netty4>4.0.31.Final</libs.netty4>
+        <libs.junit>4.12</libs.junit>
+        <libs.jackson.mapper>1.9.11</libs.jackson.mapper>
+        <libs.zookeeper>3.4.6</libs.zookeeper>
+        <libs.curator>2.8.0</libs.curator>        
     </properties>
     <modules>
       <module>./blazingcache-core</module>
