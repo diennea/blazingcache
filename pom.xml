@@ -4,7 +4,7 @@
     <groupId>blazingcache</groupId>
     <artifactId>blazingcache</artifactId>
     <version>0.0.0-ALFA</version>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
     <name>BlazingCache</name>
     <licenses>
         <license>
@@ -18,4 +18,7 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
     </properties>
+    <modules>
+      <module>./blazingcache-core</module>
+    </modules>
 </project>
