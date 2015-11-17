@@ -23,7 +23,46 @@
         <libs.zookeeper>3.4.6</libs.zookeeper>
         <libs.curator>2.8.0</libs.curator>        
     </properties>
+    <build>
+        <pluginManagement>
+            <plugins>                        
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>2.19</version>
+                    <configuration>                                        
+                        <forkCount>1</forkCount>
+                        <reuseForks>false</reuseForks>
+                    </configuration>
+                </plugin>                       
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.3</version>
+                    <configuration>
+                        <encoding>${project.build.sourceEncoding}</encoding>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>2.7</version>
+                    <configuration>
+                        <encoding>${project.build.sourceEncoding}</encoding>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
     <modules>
-      <module>./blazingcache-core</module>
+        <module>./blazingcache-core</module>
     </modules>
+    <distributionManagement>        
+        <repository>        
+            <!-- temporary with are hosted at Majordodo house -->    
+            <id>dev.majordodo.org</id>
+            <name>Majordodo Public Repository</name>
+            <url>https://dev.majordodo.org/nexus/content/repositories/releases/</url>
+        </repository>        
+    </distributionManagement>  
 </project>
