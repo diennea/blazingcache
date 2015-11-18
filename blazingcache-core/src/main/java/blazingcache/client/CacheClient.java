@@ -40,6 +40,7 @@ import blazingcache.network.SendResultCallback;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.ServerNotAvailableException;
 import blazingcache.network.ServerRejectedConnectionException;
+import java.util.Arrays;
 
 /**
  * Client
@@ -98,8 +99,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public ServerLocator getBrokerLocator() {
         return brokerLocator;
     }
-    
-    
 
     public void start() {
         this.coreThread.start();
@@ -245,15 +244,15 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         cache.values().stream().sorted(
                 new Comparator<CacheEntry>() {
 
-                    @Override
-                    public int compare(CacheEntry o1, CacheEntry o2) {
-                        long diff = o1.lastGetTime - o2.lastGetTime;
-                        if (diff == 0) {
-                            return 0;
-                        }
-                        return diff > 0 ? 1 : -1;
-                    }
+            @Override
+            public int compare(CacheEntry o1, CacheEntry o2) {
+                long diff = o1.lastGetTime - o2.lastGetTime;
+                if (diff == 0) {
+                    return 0;
                 }
+                return diff > 0 ? 1 : -1;
+            }
+        }
         ).forEachOrdered(accumulator);
         LOGGER.severe("found " + evictable.size() + " evictable entries");
 
@@ -399,7 +398,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 entry = new CacheEntry(key, System.currentTimeMillis(), expiretime, data, expiretime);
                 cache.put(key, entry);
                 return entry;
-            } else {                
+            } else {
                 return null;
             }
         } catch (TimeoutException err) {
@@ -485,13 +484,26 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return false;
         }
         try {
+            CacheEntry entry = new CacheEntry(key, System.nanoTime(), expireTime, data, expireTime);
+            CacheEntry prev = cache.put(key, entry);
             Message response = _chanel.sendMessageWithReply(Message.PUT_ENTRY(clientId, key, data, expireTime), invalidateTimeout);
             if (response.type != Message.TYPE_ACK) {
                 throw new CacheException("error while putting key " + key + " (" + response + ")");
             }
-            CacheEntry entry = new CacheEntry(key, System.nanoTime(), expireTime, data, expireTime);
-            cache.put(key, entry);
-            actualMemory.addAndGet(data.length);
+            // race condition: if two clients perform a put on the same entry maybe after the network trip we get another value, different from the expected one.
+            // it is better to invalidate the entry for alll
+            CacheEntry afterNetwork = cache.get(key);
+            if (afterNetwork != null) {
+                if (Arrays.equals(afterNetwork.getSerializedData(), data)) {
+                    if (prev != null) {
+                        actualMemory.addAndGet(-prev.getSerializedData().length);
+                    }
+                    actualMemory.addAndGet(data.length);
+                } else {
+                    LOGGER.log(Level.SEVERE, "detected conflict on put of " + key + ", invalidating entry");
+                    invalidate(key);
+                }
+            }
             return true;
         } catch (TimeoutException timedOut) {
             throw new CacheException("error while putting for key " + key + ":" + timedOut, timedOut);
