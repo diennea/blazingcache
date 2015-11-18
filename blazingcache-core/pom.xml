@@ -4,10 +4,9 @@
     <parent>
         <groupId>blazingcache</groupId>
         <artifactId>blazingcache</artifactId>
-        <version>0.0.0-ALFA</version>
+        <version>0.0.0-BETA1</version>
     </parent>
-    <artifactId>blazingcache-core</artifactId>
-    <version>0.0.0-ALFA</version>
+    <artifactId>blazingcache-core</artifactId>    
     <packaging>jar</packaging>
     <name>BlazingCache :: Core</name>
     <licenses>
