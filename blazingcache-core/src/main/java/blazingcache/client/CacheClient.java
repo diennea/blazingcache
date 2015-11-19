@@ -172,8 +172,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     }
 
                 } catch (InterruptedException exit) {
-                    CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "exit loop " + exit, exit);
-                    break;
+                    CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
+                    continue;
                 } catch (ServerNotAvailableException | ServerRejectedConnectionException retry) {
                     CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "no broker available:" + retry);
                 }
@@ -183,8 +183,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "not connected, waiting 5000 ms");
                         Thread.sleep(5000);
                     } catch (InterruptedException exit) {
-                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "exit loop " + exit, exit);
-                        break;
+                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
                     }
                     continue;
                 }
@@ -192,8 +191,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     try {
                         ensureMaxMemoryLimit();
                     } catch (InterruptedException exit) {
-                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "exit loop " + exit, exit);
-                        break;
+                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
+                        continue;
                     }
                 }
                 try {
@@ -201,8 +200,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     CONNECTION_MANAGER_LOGGER.log(Level.FINEST, "connected");
                     Thread.sleep(5000);
                 } catch (InterruptedException exit) {
-                    LOGGER.log(Level.SEVERE, "exit loop " + exit, exit);
-                    break;
+                    LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
+                    continue;
                 }
 
             }
