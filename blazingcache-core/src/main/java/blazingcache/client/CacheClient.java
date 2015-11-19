@@ -139,10 +139,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 channel = null;
             }
         }
-        LOGGER.log(Level.SEVERE, "connecting, clientId=" + this.clientId);
+        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connecting, clientId=" + this.clientId);
         disconnect();
         channel = brokerLocator.connect(this, this);
-        LOGGER.log(Level.SEVERE, "connected, channel:" + channel);
+        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connected, channel:" + channel);
     }
 
     public void disconnect() {
@@ -159,6 +159,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
+    private static final Logger CONNECTION_MANAGER_LOGGER = Logger.getLogger(CacheClient.ConnectionManager.class.getName());
+
     private final class ConnectionManager implements Runnable {
 
         @Override
@@ -170,18 +172,18 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     }
 
                 } catch (InterruptedException exit) {
-                    LOGGER.log(Level.SEVERE, "exit loop " + exit);
+                    CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "exit loop " + exit, exit);
                     break;
                 } catch (ServerNotAvailableException | ServerRejectedConnectionException retry) {
-                    LOGGER.log(Level.SEVERE, "no broker available:" + retry);
+                    CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "no broker available:" + retry);
                 }
 
                 if (channel == null) {
                     try {
-                        LOGGER.log(Level.SEVERE, "not connected, waiting 5000 ms");
+                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "not connected, waiting 5000 ms");
                         Thread.sleep(5000);
                     } catch (InterruptedException exit) {
-                        LOGGER.log(Level.SEVERE, "exit loop " + exit);
+                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "exit loop " + exit, exit);
                         break;
                     }
                     continue;
@@ -190,21 +192,21 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     try {
                         ensureMaxMemoryLimit();
                     } catch (InterruptedException exit) {
-                        LOGGER.log(Level.SEVERE, "exit loop " + exit);
+                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "exit loop " + exit, exit);
                         break;
                     }
                 }
                 try {
                     // TODO: wait for IO error or stop condition before reconnect 
-                    LOGGER.log(Level.FINEST, "connected");
+                    CONNECTION_MANAGER_LOGGER.log(Level.FINEST, "connected");
                     Thread.sleep(5000);
                 } catch (InterruptedException exit) {
-                    LOGGER.log(Level.SEVERE, "exit loop " + exit);
+                    LOGGER.log(Level.SEVERE, "exit loop " + exit, exit);
                     break;
                 }
 
             }
-            LOGGER.log(Level.SEVERE, "shutting down " + clientId);
+            CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "shutting down " + clientId);
 
             Channel _channel = channel;
             if (_channel != null) {
@@ -369,12 +371,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     public void stop() {
+        LOGGER.log(Level.SEVERE, "stopping", new Exception("stopping").fillInStackTrace());
         stopped = true;
         try {
             coreThread.interrupt();
             coreThread.join();
         } catch (InterruptedException ex) {
-
+            LOGGER.log(Level.SEVERE, "stop interrupted", ex);
         }
     }
 
