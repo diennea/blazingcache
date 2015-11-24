@@ -30,8 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import blazingcache.client.CacheClient;
-import blazingcache.client.CacheEntry;
 
 /**
  * Gestione listeners
@@ -93,6 +91,24 @@ public class CacheStatus {
             } else {
                 return new HashSet<>(clients);
             }
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public int getTotalEntryCount() {
+        lock.readLock().lock();
+        try {
+            return clientsForKey.size();
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public Set<String> getKeys() {
+        lock.readLock().lock();
+        try {
+            return new HashSet<>(clientsForKey.keySet());
         } finally {
             lock.readLock().unlock();
         }

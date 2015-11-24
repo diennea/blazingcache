@@ -131,6 +131,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return clientId;
     }
 
+    public boolean isConnected() {
+        return channel != null;
+    }
+
+    public int getCacheSize() {
+        return this.cache.size();
+    }
+
     private void connect() throws InterruptedException, ServerNotAvailableException, ServerRejectedConnectionException {
         if (channel != null) {
             try {

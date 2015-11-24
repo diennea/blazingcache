@@ -7,4 +7,21 @@
                 <goal>deploy</goal>
             </goals>
         </action>
+        <action>
+            <actionName>CUSTOM-change version</actionName>
+            <displayName>change version</displayName>
+            <goals>
+                <goal>versions:set</goal>
+            </goals>
+            <properties>
+                <newVersion>0.0.0-BETA4</newVersion>
+            </properties>
+        </action>
+        <action>
+            <actionName>CUSTOM-versions:commit</actionName>
+            <displayName>versions:commit</displayName>
+            <goals>
+                <goal>versions:commit</goal>
+            </goals>
+        </action>
     </actions>
