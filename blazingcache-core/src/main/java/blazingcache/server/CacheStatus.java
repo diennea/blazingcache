@@ -28,10 +28,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import blazingcache.client.CacheClient;
-import blazingcache.client.CacheEntry;
 
 /**
  * Gestione listeners
@@ -98,6 +97,24 @@ public class CacheStatus {
         }
     }
 
+    public int getTotalEntryCount() {
+        lock.readLock().lock();
+        try {
+            return clientsForKey.size();
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public Set<String> getKeys() {
+        lock.readLock().lock();
+        try {
+            return new HashSet<>(clientsForKey.keySet());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
     public List<String> getKeysForClient(String client) {
         lock.readLock().lock();
         try {
@@ -132,7 +149,7 @@ public class CacheStatus {
                     keysForClient.remove(client);
                 }
             }
-            LOGGER.severe("removeKeyForClient key=" + key + " client=" + client + " -> keysForClient " + keysForClient);
+            LOGGER.log(Level.FINEST, "removeKeyForClient key={0} client={1} -> keysForClient {2}", new Object[]{key, client, keysForClient});
         } finally {
             lock.writeLock().unlock();
         }

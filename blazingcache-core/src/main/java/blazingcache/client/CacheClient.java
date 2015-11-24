@@ -58,6 +58,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final String sharedSecret;
     private volatile boolean stopped = false;
     private Channel channel;
+    private long connectionTimestamp;
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
@@ -131,6 +132,18 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return clientId;
     }
 
+    public boolean isConnected() {
+        return channel != null;
+    }
+
+    public long getConnectionTimestamp() {
+        return connectionTimestamp;
+    }
+
+    public int getCacheSize() {
+        return this.cache.size();
+    }
+
     private void connect() throws InterruptedException, ServerNotAvailableException, ServerRejectedConnectionException {
         if (channel != null) {
             try {
@@ -142,13 +155,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connecting, clientId=" + this.clientId);
         disconnect();
         channel = brokerLocator.connect(this, this);
+        connectionTimestamp = System.currentTimeMillis();
         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connected, channel:" + channel);
     }
 
     public void disconnect() {
-
         try {
             this.cache.clear();
+            connectionTimestamp = 0;
             Channel c = channel;
             if (c != null) {
                 channel = null;
@@ -282,7 +296,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     @Override
     public void messageReceived(Message message) {
-        LOGGER.log(Level.SEVERE, clientId + " messageReceived " + message);
+        LOGGER.log(Level.FINER, "{0} messageReceived {1}", new Object[]{clientId, message});
         switch (message.type) {
             case Message.TYPE_INVALIDATE: {
                 String key = (String) message.parameters.get("key");
