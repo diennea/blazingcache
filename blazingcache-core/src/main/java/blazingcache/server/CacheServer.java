@@ -245,6 +245,7 @@ public class CacheServer implements AutoCloseable {
                     }
                 });
                 done = true;
+                break;
             }
         }
         if (!done) {
