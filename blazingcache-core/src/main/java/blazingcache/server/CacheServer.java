@@ -166,7 +166,7 @@ public class CacheServer implements AutoCloseable {
         if (sourceClientId != null) {
             clientsForKey.remove(sourceClientId);
         }
-        LOGGER.log(Level.SEVERE, "putEntry from " + sourceClientId + ", key=" + key + ", clientsForKey:" + clientsForKey);
+        LOGGER.log(Level.FINEST, "putEntry from {0}, key={1}, clientsForKey:{2}", new Object[]{sourceClientId, key, clientsForKey});
         cacheStatus.registerKeyForClient(key, sourceClientId, expiretime);
         if (clientsForKey.isEmpty()) {
             onFinish.onResult(key, null);
@@ -191,7 +191,7 @@ public class CacheServer implements AutoCloseable {
         if (sourceClientId != null) {
             clientsForKey.remove(sourceClientId);
         }
-        LOGGER.log(Level.SEVERE, "invalidateKey " + key + " from " + sourceClientId + " interested clients " + clientsForKey);
+        LOGGER.log(Level.SEVERE, "invalidateKey {0} from {1} interested clients {2}", new Object[]{key, sourceClientId, clientsForKey});
         if (clientsForKey.isEmpty()) {
             onFinish.onResult(key, null);
             return;

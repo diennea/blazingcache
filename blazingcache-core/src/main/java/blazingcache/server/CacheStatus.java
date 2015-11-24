@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -148,7 +149,7 @@ public class CacheStatus {
                     keysForClient.remove(client);
                 }
             }
-            LOGGER.severe("removeKeyForClient key=" + key + " client=" + client + " -> keysForClient " + keysForClient);
+            LOGGER.log(Level.FINEST, "removeKeyForClient key={0} client={1} -> keysForClient {2}", new Object[]{key, client, keysForClient});
         } finally {
             lock.writeLock().unlock();
         }

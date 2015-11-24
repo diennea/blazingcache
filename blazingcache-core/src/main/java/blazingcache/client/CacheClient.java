@@ -296,7 +296,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     @Override
     public void messageReceived(Message message) {
-        LOGGER.log(Level.SEVERE, clientId + " messageReceived " + message);
+        LOGGER.log(Level.FINER, "{0} messageReceived {1}", new Object[]{clientId, message});
         switch (message.type) {
             case Message.TYPE_INVALIDATE: {
                 String key = (String) message.parameters.get("key");
