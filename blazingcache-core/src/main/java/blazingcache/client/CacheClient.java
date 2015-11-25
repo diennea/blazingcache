@@ -51,7 +51,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     private static final Logger LOGGER = Logger.getLogger(CacheClient.class.getName());
 
-    private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
     private final ServerLocator brokerLocator;
     private final Thread coreThread;
     private final String clientId;
@@ -162,6 +162,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public void disconnect() {
         try {
             this.cache.clear();
+            actualMemory.set(0);
             connectionTimestamp = 0;
             Channel c = channel;
             if (c != null) {
@@ -273,16 +274,20 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
         CountDownLatch count = new CountDownLatch(evictable.size());
         for (CacheEntry entry : evictable) {
-            LOGGER.severe("evict " + entry.getKey() + " size " + entry.getSerializedData().length + " bytes lastAccessDate " + entry.getLastGetTime());
-            CacheEntry removed = cache.remove(entry.getKey());
+            String key = entry.getKey();
+            LOGGER.severe("evict " + key + " size " + entry.getSerializedData().length + " bytes lastAccessDate " + entry.getLastGetTime());
+            CacheEntry removed = cache.remove(key);
             if (removed != null) {
                 actualMemory.addAndGet(-removed.getSerializedData().length);
                 Channel _channel = channel;
                 if (_channel != null) {
-                    _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, entry.getKey()), new ReplyCallback() {
+                    _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, key), new ReplyCallback() {
 
                         @Override
                         public void replyReceived(Message originalMessage, Message message, Throwable error) {
+                            if (error != null) {
+                                LOGGER.log(Level.SEVERE, "error while unregistering entry " + key, error);
+                            }
                             count.countDown();
                         }
                     });
@@ -302,12 +307,12 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 String key = (String) message.parameters.get("key");
                 LOGGER.log(Level.SEVERE, clientId + " invalidate " + key + " from " + message.clientId);
                 CacheEntry removed = cache.remove(key);
+                if (removed != null) {
+                    actualMemory.addAndGet(-removed.getSerializedData().length);
+                }
                 Channel _channel = channel;
                 if (_channel != null) {
                     _channel.sendReplyMessage(message, Message.ACK(clientId));
-                }
-                if (removed != null) {
-                    actualMemory.addAndGet(-removed.getSerializedData().length);
                 }
             }
             break;
@@ -333,7 +338,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
                 LOGGER.log(Level.SEVERE, clientId + " put " + key + " from " + message.clientId);
-                cache.put(key, new CacheEntry(key, System.nanoTime(), expiretime, data, expiretime));
+                CacheEntry previous = cache.put(key, new CacheEntry(key, System.nanoTime(), expiretime, data, expiretime));
+                if (previous != null) {
+                    actualMemory.addAndGet(-previous.getSerializedData().length);
+                }
                 actualMemory.addAndGet(data.length);
                 Channel _channel = channel;
                 if (_channel != null) {
@@ -345,7 +353,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 String key = (String) message.parameters.get("key");
 
                 CacheEntry entry = cache.get(key);
-                LOGGER.log(Level.SEVERE, clientId + " fetch " + key + " from " + message.clientId + " -> " + entry);
+                LOGGER.log(Level.SEVERE, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
                 Channel _channel = channel;
                 if (_channel != null) {
                     if (entry != null) {
@@ -412,7 +420,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
                 entry = new CacheEntry(key, System.currentTimeMillis(), expiretime, data, expiretime);
-                cache.put(key, entry);
+                CacheEntry prev = cache.put(key, entry);
+                if (prev != null) {
+                    actualMemory.addAndGet(-prev.getSerializedData().length);
+                }
+                actualMemory.addAndGet(entry.getSerializedData().length);
                 return entry;
             } else {
                 return null;
@@ -502,6 +514,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         try {
             CacheEntry entry = new CacheEntry(key, System.nanoTime(), expireTime, data, expireTime);
             CacheEntry prev = cache.put(key, entry);
+            if (prev != null) {
+                actualMemory.addAndGet(-prev.getSerializedData().length);
+            }
+            actualMemory.addAndGet(data.length);
             Message response = _chanel.sendMessageWithReply(Message.PUT_ENTRY(clientId, key, data, expireTime), invalidateTimeout);
             if (response.type != Message.TYPE_ACK) {
                 throw new CacheException("error while putting key " + key + " (" + response + ")");
@@ -510,12 +526,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             // it is better to invalidate the entry for alll
             CacheEntry afterNetwork = cache.get(key);
             if (afterNetwork != null) {
-                if (Arrays.equals(afterNetwork.getSerializedData(), data)) {
-                    if (prev != null) {
-                        actualMemory.addAndGet(-prev.getSerializedData().length);
-                    }
-                    actualMemory.addAndGet(data.length);
-                } else {
+                if (!Arrays.equals(afterNetwork.getSerializedData(), data)) {
                     LOGGER.log(Level.SEVERE, "detected conflict on put of " + key + ", invalidating entry");
                     invalidate(key);
                 }
