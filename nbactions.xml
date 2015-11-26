@@ -14,7 +14,7 @@
                 <goal>versions:set</goal>
             </goals>
             <properties>
-                <newVersion>0.0.0-BETA6</newVersion>
+                <newVersion>0.0.0-BETA7</newVersion>
             </properties>
         </action>
         <action>

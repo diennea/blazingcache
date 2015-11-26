@@ -221,7 +221,9 @@ public class CacheServer implements AutoCloseable {
     public void fetchEntry(String key, String clientId, SimpleCallback<Message> onFinish) {
         LOGGER.log(Level.SEVERE, "client " + clientId + " fetchEntry " + key);
         Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
-        clientsForKey.remove(key);
+        if (clientId != null) {
+            clientsForKey.remove(clientId);
+        }
         if (clientsForKey.isEmpty()) {
             onFinish.onResult(Message.ERROR(clientId, new Exception("no client for key " + key)), null);
             return;
