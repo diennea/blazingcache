@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>blazingcache</groupId>
     <artifactId>blazingcache</artifactId>
-    <version>0.0.0-BETA8</version>
+    <version>0.0.0-BETA9</version>
     <packaging>pom</packaging>
     <name>BlazingCache</name>
     <licenses>

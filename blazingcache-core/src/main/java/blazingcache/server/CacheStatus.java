@@ -57,7 +57,7 @@ public class CacheStatus {
     }
 
     public void registerKeyForClient(String key, String client, long expiretime) {
-        LOGGER.severe("registerKeyForClient key=" + key + " client=" + client);
+        LOGGER.log(Level.FINEST, "registerKeyForClient key={0} client={1}", new Object[]{key, client});
         lock.writeLock().lock();
         try {
             Set<String> clients = clientsForKey.get(key);
@@ -130,7 +130,7 @@ public class CacheStatus {
     }
 
     public void removeKeyForClient(String key, String client) {
-        LOGGER.severe("removeKeyForClient key=" + key + " client=" + client);
+        LOGGER.log(Level.FINEST, "removeKeyForClient key={0} client={1}", new Object[]{key, client});
         lock.writeLock().lock();
         try {
             Set<String> clients = clientsForKey.get(key);
@@ -148,15 +148,15 @@ public class CacheStatus {
                 if (keys.isEmpty()) {
                     keysForClient.remove(client);
                 }
-            }
-            LOGGER.log(Level.FINEST, "removeKeyForClient key={0} client={1} -> keysForClient {2}", new Object[]{key, client, keysForClient});
+            }            
         } finally {
             lock.writeLock().unlock();
         }
+        LOGGER.log(Level.FINEST, "removeKeyForClient key={0} client={1} -> keysForClient {2}", new Object[]{key, client, keysForClient});
     }
 
     public void removeKeyByPrefixForClient(String prefix, String client) {
-        LOGGER.severe("removeKeyByPrefixForClient prefix=" + prefix + " client=" + client);
+        LOGGER.log(Level.FINEST, "removeKeyByPrefixForClient prefix={0} client={1}", new Object[]{prefix, client});
         lock.writeLock().lock();
         try {
 
