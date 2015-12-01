@@ -88,7 +88,7 @@ public class ZKCacheServerLocator extends GenericNettyBrokerLocator {
             if (ownedZk) {
                 CountDownLatch connection = new CountDownLatch(1);
                 try {
-                    LOGGER.severe("creating temp ZK client for discovery");
+                    LOGGER.finest("creating temp ZK client for discovery");
                     ZooKeeper client = new ZooKeeper(zkAddress, zkSessiontimeout, new Watcher() {
 
                         @Override
@@ -96,12 +96,12 @@ public class ZKCacheServerLocator extends GenericNettyBrokerLocator {
                             if (event.getState() == Event.KeeperState.SyncConnected || event.getState() == Event.KeeperState.ConnectedReadOnly) {
                                 connection.countDown();
                             }
-                            LOGGER.severe("process ZL event " + event.getState() + " " + event.getType() + " " + event.getPath());
+                            LOGGER.severe("process ZK event " + event.getState() + " " + event.getType() + " " + event.getPath());
                         }
                     });
                     try {
                         connection.await(connectTimeout, TimeUnit.MILLISECONDS);
-                        LOGGER.severe("zk client is " + client);
+                        LOGGER.finest("ZK client is " + client);
                         // se la connessione non sarà stabilita in tempo o c'è qualche problem troveremo un ConnectionLoss ad esempio                                        
                         data = client.getData(leaderPath, false, null);
                     } finally {
