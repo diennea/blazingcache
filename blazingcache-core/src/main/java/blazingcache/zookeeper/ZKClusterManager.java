@@ -64,7 +64,7 @@ public class ZKClusterManager implements AutoCloseable {
 
         @Override
         public void process(WatchedEvent we) {
-            LOGGER.log(Level.SEVERE, "ZK event: " + we);
+            LOGGER.log(Level.SEVERE, "CacheServer ZK event: " + we);
             switch (we.getState()) {
                 case Expired:
                     onSessionExpired();

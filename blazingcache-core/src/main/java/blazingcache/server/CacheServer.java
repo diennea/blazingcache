@@ -223,7 +223,7 @@ public class CacheServer implements AutoCloseable {
         if (clientId != null) {
             clientsForKey.remove(clientId);
         }
-        LOGGER.log(Level.SEVERE, "client {0} fetchEntry {1} ask to {2}", new Object[]{clientId, key, clientsForKey});
+        LOGGER.log(Level.FINE, "client {0} fetchEntry {1} ask to {2}", new Object[]{clientId, key, clientsForKey});
         if (clientsForKey.isEmpty()) {
             onFinish.onResult(Message.ERROR(clientId, new Exception("no client for key " + key)), null);
             return;
@@ -236,7 +236,7 @@ public class CacheServer implements AutoCloseable {
 
                     @Override
                     public void onResult(Message result, Throwable error) {
-                        LOGGER.log(Level.SEVERE, "client " + remoteClientId + " answer to fetch :" + result, error);
+                        LOGGER.log(Level.FINE, "client " + remoteClientId + " answer to fetch :" + result, error);
                         if (result.type == Message.TYPE_ACK) {
                             // da questo momento consideriamo che il client abbia la entry in memoria
                             // anche se di fatto potrebbe succedere che il messaggio di risposta non arrivi mai

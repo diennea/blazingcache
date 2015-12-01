@@ -243,7 +243,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return;
         }
         long to_release = -delta;
-        LOGGER.severe("trying to release " + to_release + " bytes");
+        LOGGER.log(Level.SEVERE, "trying to release {0} bytes", to_release);
         List<CacheEntry> evictable = new ArrayList<>();
         java.util.function.Consumer<CacheEntry> accumulator = new java.util.function.Consumer<CacheEntry>() {
             long releasedMemory = 0;
@@ -251,7 +251,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             @Override
             public void accept(CacheEntry t) {
                 if (releasedMemory < to_release) {
-                    LOGGER.severe("evaluating " + t.getKey() + " " + t.getLastGetTime() + " size " + t.getSerializedData().length);
+                    LOGGER.log(Level.FINEST, "evaluating {0} {1} size {2}", new Object[]{t.getKey(), t.getLastGetTime(), t.getSerializedData().length});
                     evictable.add(t);
                     releasedMemory += t.getSerializedData().length;
                 }
@@ -318,7 +318,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             break;
             case Message.TYPE_INVALIDATE_BY_PREFIX: {
                 String prefix = (String) message.parameters.get("prefix");
-                LOGGER.log(Level.SEVERE, clientId + " invalidateByPrefix " + prefix + " from " + message.clientId);
+                LOGGER.log(Level.SEVERE, "{0} invalidateByPrefix {1} from {2}", new Object[]{clientId, prefix, message.clientId});
                 Collection<String> keys = cache.keySet().stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
                 keys.forEach((key) -> {
                     CacheEntry removed = cache.remove(key);
@@ -337,7 +337,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 String key = (String) message.parameters.get("key");
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
-                LOGGER.log(Level.SEVERE, clientId + " put " + key + " from " + message.clientId);
+                LOGGER.log(Level.SEVERE, "{0} put {1} from {2}", new Object[]{clientId, key, message.clientId});
                 CacheEntry previous = cache.put(key, new CacheEntry(key, System.nanoTime(), expiretime, data, expiretime));
                 if (previous != null) {
                     actualMemory.addAndGet(-previous.getSerializedData().length);
