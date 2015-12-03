@@ -216,6 +216,7 @@ public class CacheServer implements AutoCloseable {
     public void unregisterEntry(String key, String clientId, SimpleCallback<String> onFinish) {
         LOGGER.log(Level.SEVERE, "client " + clientId + " evicted entry " + key);
         cacheStatus.removeKeyForClient(key, clientId);
+        onFinish.onResult(null, null);
     }
 
     public void fetchEntry(String key, String clientId, SimpleCallback<Message> onFinish) {        
