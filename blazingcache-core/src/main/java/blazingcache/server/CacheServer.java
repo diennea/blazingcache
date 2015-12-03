@@ -190,12 +190,12 @@ public class CacheServer implements AutoCloseable {
         Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
         if (sourceClientId != null) {
             clientsForKey.remove(sourceClientId);
-        }
-        LOGGER.log(Level.SEVERE, "invalidateKey {0} from {1} interested clients {2}", new Object[]{key, sourceClientId, clientsForKey});
+        }        
         if (clientsForKey.isEmpty()) {
             onFinish.onResult(key, null);
             return;
         }
+        LOGGER.log(Level.SEVERE, "invalidateKey {0} from {1} interested clients {2}", new Object[]{key, sourceClientId, clientsForKey});
         BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateKey " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, onFinish, (clientId, error) -> {
             cacheStatus.removeKeyForClient(key, clientId);
         });
