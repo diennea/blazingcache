@@ -272,31 +272,37 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         ).forEachOrdered(accumulator);
         LOGGER.severe("found " + evictable.size() + " evictable entries");
 
-        CountDownLatch count = new CountDownLatch(evictable.size());
-        for (CacheEntry entry : evictable) {
-            String key = entry.getKey();
-            LOGGER.severe("evict " + key + " size " + entry.getSerializedData().length + " bytes lastAccessDate " + entry.getLastGetTime());
-            CacheEntry removed = cache.remove(key);
-            if (removed != null) {
-                actualMemory.addAndGet(-removed.getSerializedData().length);
-                Channel _channel = channel;
-                if (_channel != null) {
-                    _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, key), new ReplyCallback() {
+        if (!evictable.isEmpty()) {
+            CountDownLatch count = new CountDownLatch(evictable.size());
+            for (CacheEntry entry : evictable) {
+                String key = entry.getKey();
+                LOGGER.severe("evict " + key + " size " + entry.getSerializedData().length + " bytes lastAccessDate " + entry.getLastGetTime());
+                CacheEntry removed = cache.remove(key);
+                if (removed != null) {
+                    actualMemory.addAndGet(-removed.getSerializedData().length);
+                    Channel _channel = channel;
+                    if (_channel != null) {
+                        _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, key), new ReplyCallback() {
 
-                        @Override
-                        public void replyReceived(Message originalMessage, Message message, Throwable error) {
-                            if (error != null) {
-                                LOGGER.log(Level.SEVERE, "error while unregistering entry " + key, error);
+                            @Override
+                            public void replyReceived(Message originalMessage, Message message, Throwable error) {
+                                if (error != null) {
+                                    LOGGER.log(Level.SEVERE, "error while unregistering entry " + key, error);
+                                }
+                                count.countDown();
                             }
-                            count.countDown();
-                        }
-                    });
+                        });
+                    } else {
+                        count.countDown();
+                    }
                 } else {
                     count.countDown();
                 }
             }
+            LOGGER.severe("waiting for evict ack from server");
+            count.await();            
+            LOGGER.severe("eviction finished");
         }
-        count.await();
     }
 
     @Override
