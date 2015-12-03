@@ -257,19 +257,24 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 }
             }
         };
-        cache.values().stream().sorted(
-                new Comparator<CacheEntry>() {
+        try {
+            cache.values().stream().sorted(
+                    new Comparator<CacheEntry>() {
 
-            @Override
-            public int compare(CacheEntry o1, CacheEntry o2) {
-                long diff = o1.lastGetTime - o2.lastGetTime;
-                if (diff == 0) {
-                    return 0;
+                @Override
+                public int compare(CacheEntry o1, CacheEntry o2) {
+                    long diff = o1.lastGetTime - o2.lastGetTime;
+                    if (diff == 0) {
+                        return 0;
+                    }
+                    return diff > 0 ? 1 : -1;
                 }
-                return diff > 0 ? 1 : -1;
             }
+            ).forEachOrdered(accumulator);
+        } catch (Exception dataChangedDuringSort) {
+            LOGGER.severe("dataChangedDuringSort: " + dataChangedDuringSort);
+            return;
         }
-        ).forEachOrdered(accumulator);
         LOGGER.severe("found " + evictable.size() + " evictable entries");
 
         if (!evictable.isEmpty()) {
@@ -300,7 +305,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 }
             }
             LOGGER.severe("waiting for evict ack from server");
-            count.await();            
+            count.await();
             LOGGER.severe("eviction finished");
         }
     }
