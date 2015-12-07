@@ -94,11 +94,8 @@ public final class Message {
 
     @Override
     public String toString() {
-        if (replyMessageId != null) {
-            return typeToString(type) + ", parameters=" + parameters + ", id=" + messageId + ", replyMessageId=" + replyMessageId;
-        } else {
-            return typeToString(type) + ", parameters=" + parameters + ", id=" + messageId;
-        }
+        return typeToString(type) + ", " + parameters;
+
     }
 
     public static final int TYPE_ACK = 1;
