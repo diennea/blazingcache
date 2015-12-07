@@ -44,7 +44,7 @@ public class CacheServer implements AutoCloseable {
     private volatile boolean stopped;
     private ZKClusterManager clusterManager;
     private Thread expireManager;
-    private NettyChannelAcceptor server;
+    private final NettyChannelAcceptor server;
     private final static Logger LOGGER = Logger.getLogger(CacheServer.class.getName());
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
@@ -55,11 +55,19 @@ public class CacheServer implements AutoCloseable {
         this.leader = true;
     }
 
-    public void setupSsl(File certificateFile, String password, File certificateChain, List<String> sslCiphers) {        
+    public void setupSsl(File certificateFile, String password, File certificateChain, List<String> sslCiphers) {
         this.server.setSslCertChainFile(certificateChain);
         this.server.setSslCertChainFile(certificateFile);
         this.server.setSslCertPassword(password);
         this.server.setSslCiphers(sslCiphers);
+    }
+
+    public int getWorkerThreads() {
+        return server.getWorkerThreads();
+    }
+
+    public void setWorkerThreads(int workerThreads) {
+        this.server.setWorkerThreads(workerThreads);
     }
 
     public CacheStatus getCacheStatus() {
