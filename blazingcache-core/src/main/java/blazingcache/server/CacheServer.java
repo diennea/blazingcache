@@ -55,10 +55,11 @@ public class CacheServer implements AutoCloseable {
         this.leader = true;
     }
 
-    public void setupSsl(File certificateFile, String password, File certificateChain) {
+    public void setupSsl(File certificateFile, String password, File certificateChain, List<String> sslCiphers) {        
         this.server.setSslCertChainFile(certificateChain);
         this.server.setSslCertChainFile(certificateFile);
         this.server.setSslCertPassword(password);
+        this.server.setSslCiphers(sslCiphers);
     }
 
     public CacheStatus getCacheStatus() {
@@ -190,7 +191,7 @@ public class CacheServer implements AutoCloseable {
         Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
         if (sourceClientId != null) {
             clientsForKey.remove(sourceClientId);
-        }        
+        }
         if (clientsForKey.isEmpty()) {
             onFinish.onResult(key, null);
             return;
@@ -219,7 +220,7 @@ public class CacheServer implements AutoCloseable {
         onFinish.onResult(null, null);
     }
 
-    public void fetchEntry(String key, String clientId, SimpleCallback<Message> onFinish) {        
+    public void fetchEntry(String key, String clientId, SimpleCallback<Message> onFinish) {
         Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
         if (clientId != null) {
             clientsForKey.remove(clientId);
