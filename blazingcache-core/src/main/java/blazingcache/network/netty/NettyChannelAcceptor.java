@@ -31,13 +31,15 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
-import io.netty.handler.ssl.JdkSslServerContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import java.io.File;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Accepts connections from workers
@@ -46,6 +48,8 @@ import java.util.concurrent.Executors;
  */
 public class NettyChannelAcceptor implements AutoCloseable {
 
+    private static final Logger LOGGER = Logger.getLogger(NettyChannelAcceptor.class.getName());
+
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private int port = 7000;
@@ -53,10 +57,20 @@ public class NettyChannelAcceptor implements AutoCloseable {
     private boolean ssl;
     private ServerSideConnectionAcceptor acceptor;
     private SslContext sslCtx;
+    private List<String> sslCiphers;
     private File sslCertChainFile;
     private File sslCertFile;
     private String sslCertPassword;
+    private int workerThreads = 16;
     private final ExecutorService callbackExecutor = Executors.newCachedThreadPool();
+
+    public int getWorkerThreads() {
+        return workerThreads;
+    }
+
+    public void setWorkerThreads(int workerThreads) {
+        this.workerThreads = workerThreads;
+    }
 
     public boolean isSsl() {
         return ssl;
@@ -90,6 +104,14 @@ public class NettyChannelAcceptor implements AutoCloseable {
         this.sslCertPassword = sslCertPassword;
     }
 
+    public List<String> getSslCiphers() {
+        return sslCiphers;
+    }
+
+    public void setSslCiphers(List<String> sslCiphers) {
+        this.sslCiphers = sslCiphers;
+    }
+
     public int getPort() {
         return port;
     }
@@ -116,21 +138,28 @@ public class NettyChannelAcceptor implements AutoCloseable {
 
     public void start() throws Exception {
         if (ssl) {
-
             if (sslCertFile == null) {
+                LOGGER.log(Level.SEVERE, "start SSL with self-signed auto-generated certificate");
+                if (sslCiphers != null) {
+                    LOGGER.log(Level.SEVERE, "required sslCiphers " + sslCiphers);
+                }
                 SelfSignedCertificate ssc = new SelfSignedCertificate();
                 try {
-                    sslCtx = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build();
+                    sslCtx = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).ciphers(sslCiphers).build();
                 } finally {
                     ssc.delete();
                 }
             } else {
-                sslCtx = SslContextBuilder.forServer(sslCertChainFile, sslCertFile, sslCertPassword).build();
+                LOGGER.log(Level.SEVERE, "start SSL with certificate " + sslCertFile.getAbsolutePath() + " chain file " + sslCertChainFile.getAbsolutePath());
+                if (sslCiphers != null) {
+                    LOGGER.log(Level.SEVERE, "required sslCiphers " + sslCiphers);
+                }
+                sslCtx = SslContextBuilder.forServer(sslCertChainFile, sslCertFile, sslCertPassword).ciphers(sslCiphers).build();
             }
 
         }
-        bossGroup = new NioEventLoopGroup();
-        workerGroup = new NioEventLoopGroup();
+        bossGroup = new NioEventLoopGroup(workerThreads);
+        workerGroup = new NioEventLoopGroup(workerThreads);
         ServerBootstrap b = new ServerBootstrap();
         b.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
