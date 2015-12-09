@@ -15,7 +15,7 @@ public class ChannelBenchTest {
 
     @Test
     public void test() throws Exception {
-        try (NettyChannelAcceptor acceptor = new NettyChannelAcceptor("localhost", 1111, false)) {
+        try (NettyChannelAcceptor acceptor = new NettyChannelAcceptor("localhost", 1111, true)) {
             acceptor.setAcceptor(new ServerSideConnectionAcceptor() {
 
                 @Override
@@ -41,7 +41,7 @@ public class ChannelBenchTest {
                 }
             });
             acceptor.start();
-            try (NettyCacheServerLocator locator = new NettyCacheServerLocator("localhost", 1111, false)) {
+            try (NettyCacheServerLocator locator = new NettyCacheServerLocator("localhost", 1111, true)) {
                 try (Channel client = locator.connect(new ChannelEventListener() {
 
                     @Override
