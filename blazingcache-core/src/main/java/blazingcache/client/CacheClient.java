@@ -174,52 +174,59 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
-    private static final Logger CONNECTION_MANAGER_LOGGER = Logger.getLogger(CacheClient.ConnectionManager.class.getName());
+    private static final Logger CONNECTION_MANAGER_LOGGER = Logger.getLogger(CacheClient.ConnectionManager.class.getName().replace("$", "."));
 
     private final class ConnectionManager implements Runnable {
 
         @Override
         public void run() {
+
             while (!stopped) {
                 try {
-                    if (channel == null || !channel.isValid()) {
-                        connect();
-                    }
-
-                } catch (InterruptedException exit) {
-                    CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
-                    continue;
-                } catch (ServerNotAvailableException | ServerRejectedConnectionException retry) {
-                    CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "no broker available:" + retry);
-                }
-
-                if (channel == null) {
                     try {
-                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "not connected, waiting 5000 ms");
-                        Thread.sleep(5000);
-                    } catch (InterruptedException exit) {
-                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
-                    }
-                    continue;
-                }
-                if (maxMemory > 0) {
-                    try {
-                        ensureMaxMemoryLimit();
+                        if (channel == null || !channel.isValid()) {
+                            connect();
+                        }
+
                     } catch (InterruptedException exit) {
                         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
                         continue;
+                    } catch (ServerNotAvailableException | ServerRejectedConnectionException retry) {
+                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "no broker available:" + retry);
                     }
-                }
-                try {
-                    // TODO: wait for IO error or stop condition before reconnect 
-                    CONNECTION_MANAGER_LOGGER.log(Level.FINEST, "connected");
-                    Thread.sleep(5000);
-                } catch (InterruptedException exit) {
-                    LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
+
+                    if (channel == null) {
+                        try {
+                            CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "not connected, waiting 5000 ms");
+                            Thread.sleep(5000);
+                        } catch (InterruptedException exit) {
+                            CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
+                        }
+                        continue;
+                    }
+                    if (maxMemory > 0) {
+                        try {
+                            ensureMaxMemoryLimit();
+                        } catch (InterruptedException exit) {
+                            CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
+                            continue;
+                        }
+                    }
+                    try {
+                        // TODO: wait for IO error or stop condition before reconnect 
+                        CONNECTION_MANAGER_LOGGER.log(Level.FINEST, "connected");
+                        Thread.sleep(5000);
+                    } catch (InterruptedException exit) {
+                        LOGGER.log(Level.SEVERE, "interrupted loop " + exit, exit);
+                        continue;
+                    }
+
+                } catch (Throwable t) {
+                    CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "unhandled error", t);
                     continue;
                 }
-
             }
+
             CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "shutting down " + clientId);
 
             Channel _channel = channel;
