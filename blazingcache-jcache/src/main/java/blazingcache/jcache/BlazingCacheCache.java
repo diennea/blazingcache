@@ -89,7 +89,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     @Override
     public V get(K key) {
         String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
-
+        System.out.println("get: "+client.getStatus());
         try {
             CacheEntry result;
             if (usefetch) {

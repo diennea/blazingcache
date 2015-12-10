@@ -114,7 +114,7 @@ public class BlazingCacheProvider implements CachingProvider {
     public Properties getDefaultProperties() {
         Properties res = new Properties();
         res.put("blazingcache.usefetch", "true");
-        res.put("blazingcache.mode", "local");
+        res.put("blazingcache.mode", "static");
         return res;
     }
 
