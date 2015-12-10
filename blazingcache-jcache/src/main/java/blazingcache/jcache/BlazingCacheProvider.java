@@ -17,9 +17,12 @@ package blazingcache.jcache;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.cache.CacheException;
 import javax.cache.CacheManager;
 import javax.cache.configuration.OptionalFeature;
 import javax.cache.spi.CachingProvider;
@@ -31,64 +34,167 @@ import javax.cache.spi.CachingProvider;
  */
 public class BlazingCacheProvider implements CachingProvider {
 
+    /**
+     * The CacheManagers scoped by ClassLoader and URI.
+     */
+    private WeakHashMap<ClassLoader, HashMap<URI, BlazingCacheManager>> cacheManagersByClassLoader = new WeakHashMap<>();
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public CacheManager getCacheManager(URI uri, ClassLoader classLoader, Properties properties) {
-        String key = uri.toASCIIString();
-        BlazingCacheManager bl = managers.get(key);
-        if (bl != null) {
-            return bl;
+    public synchronized CacheManager getCacheManager(URI uri, ClassLoader classLoader, Properties properties) {
+        URI managerURI = uri == null ? getDefaultURI() : uri;
+        ClassLoader managerClassLoader = classLoader == null ? getDefaultClassLoader() : classLoader;
+        Properties managerProperties = properties == null ? getDefaultProperties() : properties;
+
+        HashMap<URI, BlazingCacheManager> cacheManagersByURI = cacheManagersByClassLoader.get(managerClassLoader);
+
+        if (cacheManagersByURI == null) {
+            cacheManagersByURI = new HashMap<URI, BlazingCacheManager>();
         }
-        bl = new BlazingCacheManager(this, uri, classLoader, properties);
-        managers.put(key, bl);
-        return bl;
-    }
 
-    @Override
-    public ClassLoader getDefaultClassLoader() {
-        return this.getClass().getClassLoader();
-    }
+        BlazingCacheManager cacheManager = cacheManagersByURI.get(managerURI);
 
-    @Override
-    public URI getDefaultURI() {
-        try {
-            return new URI("blazingcache://vm");
-        } catch (URISyntaxException err) {
-            throw new RuntimeException(err);
+        if (cacheManager == null) {
+            cacheManager = new BlazingCacheManager(this, uri, classLoader, managerProperties);
+
+            cacheManagersByURI.put(managerURI, cacheManager);
         }
+
+        if (!cacheManagersByClassLoader.containsKey(managerClassLoader)) {
+            cacheManagersByClassLoader.put(managerClassLoader, cacheManagersByURI);
+        }
+
+        return cacheManager;
     }
 
-    @Override
-    public Properties getDefaultProperties() {
-        Properties res = new Properties();
-        res.put("blazingcache.usefetch", "true");
-        res.put("blazingcache.mode", "local");
-        return res;
-    }
-
-    private final Map<String, BlazingCacheManager> managers = new ConcurrentHashMap<>();
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public CacheManager getCacheManager(URI uri, ClassLoader classLoader) {
         return getCacheManager(uri, classLoader, getDefaultProperties());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public CacheManager getCacheManager() {
-        return getCacheManager(getDefaultURI(), getDefaultClassLoader());
+        return getCacheManager(getDefaultURI(), getDefaultClassLoader(), null);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public void close() {
-
+    public ClassLoader getDefaultClassLoader() {
+        return getClass().getClassLoader();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public void close(ClassLoader classLoader) {
-
+    public URI getDefaultURI() {
+        try {
+            return new URI(this.getClass().getName());
+        } catch (URISyntaxException e) {
+            throw new CacheException(
+                    "Failed to create the default URI for the javax.cache Reference Implementation",
+                    e);
+        }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public void close(URI uri, ClassLoader classLoader) {
+    public Properties getDefaultProperties() {
+        Properties res = new Properties();
+        res.put("blazingcache.usefetch", "true");
+        res.put("blazingcache.mode", "static");
+        return res;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void close() {
+        WeakHashMap<ClassLoader, HashMap<URI, BlazingCacheManager>> managersByClassLoader = this.cacheManagersByClassLoader;
+        this.cacheManagersByClassLoader = new WeakHashMap<ClassLoader, HashMap<URI, BlazingCacheManager>>();
+
+        for (ClassLoader classLoader : managersByClassLoader.keySet()) {
+            for (CacheManager cacheManager : managersByClassLoader.get(classLoader).values()) {
+                cacheManager.close();
+            }
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void close(ClassLoader classLoader) {
+        ClassLoader managerClassLoader = classLoader == null ? getDefaultClassLoader() : classLoader;
+
+        HashMap<URI, BlazingCacheManager> cacheManagersByURI = cacheManagersByClassLoader.remove(managerClassLoader);
+
+        if (cacheManagersByURI != null) {
+            for (CacheManager cacheManager : cacheManagersByURI.values()) {
+                cacheManager.close();
+            }
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void close(URI uri, ClassLoader classLoader) {
+        URI managerURI = uri == null ? getDefaultURI() : uri;
+        ClassLoader managerClassLoader = classLoader == null ? getDefaultClassLoader() : classLoader;
+
+        HashMap<URI, BlazingCacheManager> cacheManagersByURI = cacheManagersByClassLoader.get(managerClassLoader);
+        if (cacheManagersByURI != null) {
+            CacheManager cacheManager = cacheManagersByURI.remove(managerURI);
+
+            if (cacheManager != null) {
+                cacheManager.close();
+            }
+
+            if (cacheManagersByURI.size() == 0) {
+                cacheManagersByClassLoader.remove(managerClassLoader);
+            }
+        }
+    }
+
+    /**
+     * Releases the CacheManager with the specified URI and ClassLoader from
+     * this CachingProvider. This does not close the CacheManager. It simply
+     * releases it from being tracked by the CachingProvider.
+     * <p>
+     * This method does nothing if a CacheManager matching the specified
+     * parameters is not being tracked.
+     * </p>
+     *
+     * @param uri the URI of the CacheManager
+     * @param classLoader the ClassLoader of the CacheManager
+     */
+    public synchronized void releaseCacheManager(URI uri, ClassLoader classLoader) {
+        URI managerURI = uri == null ? getDefaultURI() : uri;
+        ClassLoader managerClassLoader = classLoader == null ? getDefaultClassLoader() : classLoader;
+
+        HashMap<URI, BlazingCacheManager> cacheManagersByURI = cacheManagersByClassLoader.get(managerClassLoader);
+        if (cacheManagersByURI != null) {
+            cacheManagersByURI.remove(managerURI);
+
+            if (cacheManagersByURI.size() == 0) {
+                cacheManagersByClassLoader.remove(managerClassLoader);
+            }
+        }
     }
 
     @Override

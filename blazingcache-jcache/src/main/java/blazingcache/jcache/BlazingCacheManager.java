@@ -64,8 +64,8 @@ public class BlazingCacheManager implements CacheManager {
             String valuesSerializerClass = properties.getProperty("blazingcache.jcache.keyserializer", "blazingcache.jcache.StandardValuesSerializer");
             this.keysSerializer = (Serializer<Object, String>) Class.forName(keySerializerClass, true, classLoader).newInstance();
             this.valuesSerializer = (Serializer<Object, byte[]>) Class.forName(valuesSerializerClass, true, classLoader).newInstance();
-            String clientId = properties.getProperty("blazingcache.clientId", "");
-            String secret = properties.getProperty("blazingcache.secret", "");
+            String clientId = properties.getProperty("blazingcache.clientId", "client");
+            String secret = properties.getProperty("blazingcache.secret", "blazingcache");
             if (clientId.isEmpty()) {
                 try {
                     clientId = InetAddress.getLocalHost().getCanonicalHostName();
@@ -74,7 +74,7 @@ public class BlazingCacheManager implements CacheManager {
                 }
             }
             ServerLocator locator;
-            String mode = properties.getProperty("blazingcache.mode", "zk");
+            String mode = properties.getProperty("blazingcache.mode", "static");
             switch (mode) {
                 case "zk":
                     String connect = properties.getProperty("blazingcache.zookeeper.connectstring", "localhost");
@@ -87,7 +87,7 @@ public class BlazingCacheManager implements CacheManager {
                 case "static":
                     String host = properties.getProperty("blazingcache.server.host", "localhost");
                     int port = Integer.parseInt(properties.getProperty("blazingcache.server.port", "1025"));
-                    boolean ssl = Boolean.parseBoolean(properties.getProperty("blazingcache.server.ssl", "true"));
+                    boolean ssl = Boolean.parseBoolean(properties.getProperty("blazingcache.server.ssl", "false"));
                     locator = new NettyCacheServerLocator(host, port, ssl);
                     this.client = new CacheClient(clientId, secret, locator);
                     this.cacheServer = null;
@@ -104,7 +104,12 @@ public class BlazingCacheManager implements CacheManager {
                 cacheServer.start();
             }
             client.start();
-            client.waitForConnection(10000);
+            boolean ok = client.waitForConnection(10000);
+            if (!ok) {
+                System.out.println("Connection could not established");
+            } else {
+                System.out.println("Connection OK");
+            }
         } catch (Exception err) {
             throw new CacheException(err);
         }

@@ -15,6 +15,9 @@
  */
 package blazingcache.jcache;
 
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.SimpleFormatter;
 import javax.cache.Cache;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
@@ -24,6 +27,7 @@ import static javax.cache.expiry.Duration.ONE_HOUR;
 import javax.cache.spi.CachingProvider;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNull;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -32,7 +36,25 @@ import org.junit.Test;
  * @author enrico.olivelli
  */
 public class JSRExamplesTest {
+ @Before
+    public void setupLogger() throws Exception {
+        Level level = Level.SEVERE;
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
 
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                System.err.println("uncaughtException from thread " + t.getName() + ": " + e);
+                e.printStackTrace();
+            }
+        });
+        java.util.logging.LogManager.getLogManager().reset();
+        ConsoleHandler ch = new ConsoleHandler();
+        ch.setLevel(level);
+        SimpleFormatter f = new SimpleFormatter();
+        ch.setFormatter(f);
+        java.util.logging.Logger.getLogger("").setLevel(level);
+        java.util.logging.Logger.getLogger("").addHandler(ch);
+    }
     @Test
     public void testJSRExample1() {
         //resolve a cache manager
