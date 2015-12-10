@@ -40,7 +40,6 @@ import java.util.stream.Stream;
 public class ServerMain implements AutoCloseable {
 
     private CacheServer cacheServer;
-    private NettyChannelAcceptor server;
     private final Properties configuration;
     private final PidFileLocker pidFileLocker;
 
@@ -57,15 +56,6 @@ public class ServerMain implements AutoCloseable {
 
     @Override
     public void close() {
-        if (server != null) {
-            try {
-                server.close();
-            } catch (Exception ex) {
-                Logger.getLogger(ServerMain.class.getName()).log(Level.SEVERE, null, ex);
-            } finally {
-                server = null;
-            }
-        }
 
         if (cacheServer != null) {
             try {
@@ -169,27 +159,27 @@ public class ServerMain implements AutoCloseable {
 //            pidFileLocker.check();
 //            return null;
 //        });
+        System.out.println("Listening for clients connections on " + host + ":" + port + " ssl=" + ssl);
+        cacheServer.setWorkerThreads(workerthreads);
+        //cacheServer.setupSsl(certificateFile, certpassword, certificateChain, sslCiphers);
         cacheServer.start();
 
-        System.out.println("Listening for clients connections on " + host + ":" + port + " ssl=" + ssl);
-        this.server = new NettyChannelAcceptor(host, port, ssl);
-        this.server.setWorkerThreads(workerthreads);
-        server.setHost(host);
-        server.setPort(port);
-        server.setSsl(ssl);
-        if (!certfile.isEmpty()) {
-            server.setSslCertFile(new File(certfile));
-        }
-        if (!certchainfile.isEmpty()) {
-            server.setSslCertChainFile(new File(certchainfile));
-        }
-        if (certpassword != null) {
-            server.setSslCertPassword(certpassword);
-        }
-        if (sslciphers != null && !sslciphers.isEmpty()) {
-            server.setSslCiphers(Stream.of(sslciphers.split(",")).map(s -> s.trim()).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
-        }
-        server.start();
+//        server.setHost(host);
+//        server.setPort(port);
+//        server.setSsl(ssl);
+//        if (!certfile.isEmpty()) {
+//            server.setSslCertFile(new File(certfile));
+//        }
+//        if (!certchainfile.isEmpty()) {
+//            server.setSslCertChainFile(new File(certchainfile));
+//        }
+//        if (certpassword != null) {
+//            server.setSslCertPassword(certpassword);
+//        }
+//        if (sslciphers != null && !sslciphers.isEmpty()) {
+//            server.setSslCiphers(Stream.of(sslciphers.split(",")).map(s -> s.trim()).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
+//        }
+//        server.start();
 
         System.out.println("Server starter");
     }
