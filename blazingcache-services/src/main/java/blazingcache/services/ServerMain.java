@@ -20,15 +20,19 @@
 package blazingcache.services;
 
 import blazingcache.network.ServerHostData;
-import blazingcache.network.netty.NettyChannelAcceptor;
 import blazingcache.server.CacheServer;
 import java.io.File;
 import java.io.FileReader;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -42,7 +46,7 @@ public class ServerMain implements AutoCloseable {
     private CacheServer cacheServer;
     private final Properties configuration;
     private final PidFileLocker pidFileLocker;
-
+    private final ScheduledExecutorService pidCheckerThread = Executors.newSingleThreadScheduledExecutor();
     private static ServerMain runningInstance;
 
     public CacheServer getServer() {
@@ -53,9 +57,15 @@ public class ServerMain implements AutoCloseable {
         this.configuration = configuration;
         this.pidFileLocker = new PidFileLocker(Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath());
     }
+    private volatile AtomicBoolean closeCalled = new AtomicBoolean(false);
 
     @Override
     public void close() {
+        System.out.println("Shutting down");
+        if (closeCalled.getAndSet(true)) {
+            System.out.println("Close already called");
+            return;
+        }
 
         if (cacheServer != null) {
             try {
@@ -67,7 +77,8 @@ public class ServerMain implements AutoCloseable {
             }
         }
         pidFileLocker.close();
-        running.countDown();
+        pidCheckerThread.shutdown();
+        RUNNING.countDown();
     }
 
     public static void main(String... args) {
@@ -106,18 +117,19 @@ public class ServerMain implements AutoCloseable {
             runningInstance = new ServerMain(configuration);
             runningInstance.start();
             runningInstance.join();
-
+            
+            System.out.println("BlazingCache Server Stopped");
         } catch (Throwable t) {
             t.printStackTrace();
             System.exit(1);
         }
     }
 
-    private final static CountDownLatch running = new CountDownLatch(1);
+    private final static CountDownLatch RUNNING = new CountDownLatch(1);
 
     public void join() {
         try {
-            running.await();
+            RUNNING.await();
         } catch (InterruptedException discard) {
         }
     }
@@ -126,12 +138,12 @@ public class ServerMain implements AutoCloseable {
         pidFileLocker.lock();
         String host = configuration.getProperty("server.host", "127.0.0.1");
         int port = Integer.parseInt(configuration.getProperty("server.port", "1025"));
-        boolean ssl = Boolean.parseBoolean(configuration.getProperty("server.ssl", "true"));
+        boolean ssl = Boolean.parseBoolean(configuration.getProperty("server.ssl", "false"));
         String certfile = configuration.getProperty("server.ssl.certificatefile", "");
         String certchainfile = configuration.getProperty("server.ssl.certificatechainfile", "");
         String certpassword = configuration.getProperty("server.ssl.certificatefilepassword", null);
         String sslciphers = configuration.getProperty("server.ssl.ciphers", "");
-        String sharedsecret = configuration.getProperty("sharedsecret", "blazing");
+        String sharedsecret = configuration.getProperty("sharedsecret", "blazingcache");
         String clusteringmode = configuration.getProperty("clustering.mode", "singleserver");
         int workerthreads = Integer.parseInt(configuration.getProperty("io.worker.threads", "16"));
 
@@ -148,40 +160,48 @@ public class ServerMain implements AutoCloseable {
             case "clustered": {
                 String zkAddress = configuration.getProperty("zk.address", "localhost:1281");
                 int zkSessionTimeout = Integer.parseInt(configuration.getProperty("zk.sessiontimeout", "40000"));
-                String zkPath = configuration.getProperty("zk.path", "/majordodo");
+                String zkPath = configuration.getProperty("zk.path", "/blazingcache");
                 cacheServer.setupCluster(zkAddress, zkSessionTimeout, zkPath, data);
                 break;
             }
             default:
                 throw new RuntimeException("bad value for clustering.mode property, only valid values are singleserver|clustered");
         }
-//        broker.setExternalProcessChecker(() -> {
-//            pidFileLocker.check();
-//            return null;
-//        });
+
         System.out.println("Listening for clients connections on " + host + ":" + port + " ssl=" + ssl);
         cacheServer.setWorkerThreads(workerthreads);
-        //cacheServer.setupSsl(certificateFile, certpassword, certificateChain, sslCiphers);
+
+        File sslCertFile = null;
+        File sslCertChainFile = null;
+        List<String> ciphers = null;
+
+        if (!certfile.isEmpty()) {
+            sslCertFile = new File(certfile);
+        }
+        if (!certchainfile.isEmpty()) {
+            sslCertChainFile = new File(certchainfile);
+        }
+
+        if (sslciphers != null && !sslciphers.isEmpty()) {
+            ciphers = Stream.of(sslciphers.split(",")).map(s -> s.trim()).filter(s -> !s.isEmpty()).collect(Collectors.toList());
+        }
+        if (!certfile.isEmpty() || sslciphers != null) {
+            cacheServer.setupSsl(sslCertChainFile, certpassword, sslCertFile, ciphers);
+        }
+
         cacheServer.start();
 
-//        server.setHost(host);
-//        server.setPort(port);
-//        server.setSsl(ssl);
-//        if (!certfile.isEmpty()) {
-//            server.setSslCertFile(new File(certfile));
-//        }
-//        if (!certchainfile.isEmpty()) {
-//            server.setSslCertChainFile(new File(certchainfile));
-//        }
-//        if (certpassword != null) {
-//            server.setSslCertPassword(certpassword);
-//        }
-//        if (sslciphers != null && !sslciphers.isEmpty()) {
-//            server.setSslCiphers(Stream.of(sslciphers.split(",")).map(s -> s.trim()).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
-//        }
-//        server.start();
+        System.out.println("BlazingCache Server starter");
 
-        System.out.println("Server starter");
+        pidCheckerThread.scheduleWithFixedDelay(() -> {
+            try {
+                pidFileLocker.check();
+            } catch (Exception err) {
+                err.printStackTrace();
+                close();
+            }
+        }, 30, 30, TimeUnit.SECONDS);
+
     }
 
     public void waitForLeadership() throws Exception {
