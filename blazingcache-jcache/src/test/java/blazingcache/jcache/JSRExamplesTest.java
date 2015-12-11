@@ -15,6 +15,7 @@
  */
 package blazingcache.jcache;
 
+import java.util.Properties;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.SimpleFormatter;
@@ -59,7 +60,9 @@ public class JSRExamplesTest {
     public void testJSRExample1() {
         //resolve a cache manager
         CachingProvider cachingProvider = Caching.getCachingProvider();
-        CacheManager cacheManager = cachingProvider.getCacheManager();
+        Properties p = new Properties();
+        p.put("blazingcache.mode", "local");
+        CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(),p);
 //configure the cache
         MutableConfiguration<String, Integer> config
                 = new MutableConfiguration<String, Integer>()
