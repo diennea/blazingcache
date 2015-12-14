@@ -58,6 +58,7 @@
     <modules>
         <module>./blazingcache-core</module>
         <module>./blazingcache-jcache</module>
+        <module>./blazingcache-services</module>
     </modules>
     <distributionManagement>        
         <repository>        
