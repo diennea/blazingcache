@@ -19,11 +19,11 @@
  */
 package blazingcache.client;
 
+import blazingcache.client.events.CacheClientEventListener;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
@@ -59,6 +59,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private volatile boolean stopped = false;
     private Channel channel;
     private long connectionTimestamp;
+    private CacheClientEventListener listener = new CacheClientEventListener();
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
@@ -72,6 +73,17 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     public void setMaxMemory(long maxMemory) {
         this.maxMemory = maxMemory;
+    }
+
+    public CacheClientEventListener getListener() {
+        return listener;
+    }
+
+    public void setListener(CacheClientEventListener listener) {
+        if (listener == null) {
+            throw new NullPointerException();
+        }
+        this.listener = listener;
     }
 
     private final AtomicLong actualMemory = new AtomicLong();
@@ -157,6 +169,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         channel = brokerLocator.connect(this, this);
         connectionTimestamp = System.currentTimeMillis();
         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connected, channel:" + channel);
+        listener.clientConnected(channel);
     }
 
     public void disconnect() {
@@ -169,6 +182,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 channel = null;
                 c.close();
             }
+            listener.clientDisconnected();
         } finally {
             channel = null;
         }
@@ -323,10 +337,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         switch (message.type) {
             case Message.TYPE_INVALIDATE: {
                 String key = (String) message.parameters.get("key");
-                LOGGER.log(Level.SEVERE, clientId + " invalidate " + key + " from " + message.clientId);
+                LOGGER.log(Level.FINEST, clientId + " invalidate " + key + " from " + message.clientId);
                 CacheEntry removed = cache.remove(key);
                 if (removed != null) {
                     actualMemory.addAndGet(-removed.getSerializedData().length);
+                    listener.entryInvalidated(removed);
                 }
                 Channel _channel = channel;
                 if (_channel != null) {
@@ -336,12 +351,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             break;
             case Message.TYPE_INVALIDATE_BY_PREFIX: {
                 String prefix = (String) message.parameters.get("prefix");
-                LOGGER.log(Level.SEVERE, "{0} invalidateByPrefix {1} from {2}", new Object[]{clientId, prefix, message.clientId});
+                LOGGER.log(Level.FINEST, "{0} invalidateByPrefix {1} from {2}", new Object[]{clientId, prefix, message.clientId});
                 Collection<String> keys = cache.keySet().stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
                 keys.forEach((key) -> {
                     CacheEntry removed = cache.remove(key);
                     if (removed != null) {
                         actualMemory.addAndGet(-removed.getSerializedData().length);
+                        listener.entryInvalidated(removed);
                     }
                 });
                 Channel _channel = channel;
@@ -355,8 +371,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 String key = (String) message.parameters.get("key");
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
-                LOGGER.log(Level.SEVERE, "{0} put {1} from {2}", new Object[]{clientId, key, message.clientId});
-                CacheEntry previous = cache.put(key, new CacheEntry(key, System.nanoTime(), data, expiretime));
+                LOGGER.log(Level.FINEST, "{0} put {1} from {2}", new Object[]{clientId, key, message.clientId});
+                CacheEntry cacheEntry = new CacheEntry(key, System.nanoTime(), data, expiretime);
+                CacheEntry previous = cache.put(key, cacheEntry);
                 if (previous != null) {
                     actualMemory.addAndGet(-previous.getSerializedData().length);
                 }
@@ -371,7 +388,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 String key = (String) message.parameters.get("key");
 
                 CacheEntry entry = cache.get(key);
-                LOGGER.log(Level.SEVERE, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
+                LOGGER.log(Level.FINEST, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
                 Channel _channel = channel;
                 if (_channel != null) {
                     if (entry != null) {
@@ -426,6 +443,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.log(Level.SEVERE, "fetch failed " + key + ", not connected");
             return null;
         }
+        listener.beforeFetch(key);
         CacheEntry entry = cache.get(key);
         if (entry != null) {
             entry.lastGetTime = System.nanoTime();
@@ -473,6 +491,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         CacheEntry removed = cache.remove(key);
         if (removed != null) {
             actualMemory.addAndGet(-removed.getSerializedData().length);
+            listener.entryInvalidated(removed);
         }
 
         while (!stopped) {
@@ -483,7 +502,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             } else {
                 try {
                     Message response = _channel.sendMessageWithReply(Message.INVALIDATE(clientId, key), invalidateTimeout);
-                    LOGGER.log(Level.SEVERE, "invalidate " + key + ", -> " + response);
+                    LOGGER.log(Level.FINEST, "invalidate " + key + ", -> " + response);
                     return;
                 } catch (TimeoutException error) {
                     LOGGER.log(Level.SEVERE, "invalidate " + key + ", timeout " + error);
@@ -501,6 +520,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             CacheEntry removed = cache.remove(key);
             if (removed != null) {
                 actualMemory.addAndGet(-removed.getSerializedData().length);
+                listener.entryInvalidated(removed);
             }
         });
 
@@ -512,7 +532,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             } else {
                 try {
                     Message response = _channel.sendMessageWithReply(Message.INVALIDATE_BY_PREFIX(clientId, prefix), invalidateTimeout);
-                    LOGGER.log(Level.SEVERE, "invalidateByPrefix " + prefix + ", -> " + response);
+                    LOGGER.log(Level.FINEST, "invalidateByPrefix " + prefix + ", -> " + response);
                     return;
                 } catch (TimeoutException error) {
                     LOGGER.log(Level.SEVERE, "invalidateByPrefix " + prefix + ", timeout " + error);
@@ -531,6 +551,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
         try {
             CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime);
+            listener.beforePut(entry);
             CacheEntry prev = cache.put(key, entry);
             if (prev != null) {
                 actualMemory.addAndGet(-prev.getSerializedData().length);
