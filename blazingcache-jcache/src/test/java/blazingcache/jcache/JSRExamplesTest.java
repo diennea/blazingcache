@@ -60,8 +60,7 @@ public class JSRExamplesTest {
     public void testJSRExample1() {
         //resolve a cache manager
         CachingProvider cachingProvider = Caching.getCachingProvider();
-        Properties p = new Properties();
-        p.put("blazingcache.mode", "local");
+        Properties p = new Properties();        
         CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(),p);
 //configure the cache
         MutableConfiguration<String, Integer> config

@@ -46,9 +46,8 @@ public class BlazingCacheManager implements CacheManager {
     private final ClassLoader classLoader;
     private final Properties properties;
     private volatile boolean closed;
-    private final CacheClient client;    
+    private final CacheClient client;
     private final boolean usefetch;
-    private final CacheServer cacheServer;
     private final Serializer<Object, String> keysSerializer;
     private final Serializer<Object, byte[]> valuesSerializer;
     private final Map<String, BlazingCacheCache> caches = new HashMap<>();
@@ -74,7 +73,7 @@ public class BlazingCacheManager implements CacheManager {
                 }
             }
             ServerLocator locator;
-            String mode = properties.getProperty("blazingcache.mode", "static");
+            String mode = properties.getProperty("blazingcache.mode", "local");            
             switch (mode) {
                 case "zk":
                     String connect = properties.getProperty("blazingcache.zookeeper.connectstring", "localhost");
@@ -82,7 +81,6 @@ public class BlazingCacheManager implements CacheManager {
                     String path = properties.getProperty("blazingcache.zookeeper.path", "/cache");
                     locator = new ZKCacheServerLocator(connect, timeout, path);
                     this.client = new CacheClient(clientId, secret, locator);
-                    this.cacheServer = null;
                     break;
                 case "static":
                     String host = properties.getProperty("blazingcache.server.host", "localhost");
@@ -90,18 +88,13 @@ public class BlazingCacheManager implements CacheManager {
                     boolean ssl = Boolean.parseBoolean(properties.getProperty("blazingcache.server.ssl", "false"));
                     locator = new NettyCacheServerLocator(host, port, ssl);
                     this.client = new CacheClient(clientId, secret, locator);
-                    this.cacheServer = null;
                     break;
                 case "local":
-                    this.cacheServer = new CacheServer(secret, new ServerHostData("localhost", 1025, "", false, new HashMap<>()));
-                    locator = new NettyCacheServerLocator("localhost", 1025, false);
+                    locator = new blazingcache.network.mock.MockServerLocator();
                     this.client = new CacheClient(clientId, secret, locator);
                     break;
                 default:
                     throw new RuntimeException("unsupported blazingcache.mode=" + mode);
-            }
-            if (cacheServer != null) {
-                cacheServer.start();
             }
             client.start();
             boolean ok = client.waitForConnection(10000);
@@ -179,12 +172,6 @@ public class BlazingCacheManager implements CacheManager {
         if (client != null) {
             try {
                 client.close();
-            } catch (Exception err) {
-            }
-        }
-        if (cacheServer != null) {
-            try {
-                cacheServer.close();
             } catch (Exception err) {
             }
         }
