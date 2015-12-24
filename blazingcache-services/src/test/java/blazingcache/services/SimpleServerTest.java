@@ -21,8 +21,7 @@ public class SimpleServerTest {
 
         try (ServerMain main = new ServerMain(pp);) {
             main.start();
-            try (CacheClient client = new CacheClient("test", "blazing", new NettyCacheServerLocator("localhost", 1025, true));) {
-
+            try (CacheClient client = new CacheClient("test", "blazingcache", new NettyCacheServerLocator("localhost", 1025, false));) {
                 client.start();
                 assertTrue(client.waitForConnection(10000));
                 client.put("test", "ciao".getBytes(), -1);

@@ -356,7 +356,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
                 LOGGER.log(Level.SEVERE, "{0} put {1} from {2}", new Object[]{clientId, key, message.clientId});
-                CacheEntry previous = cache.put(key, new CacheEntry(key, System.nanoTime(), expiretime, data, expiretime));
+                CacheEntry previous = cache.put(key, new CacheEntry(key, System.nanoTime(), data, expiretime));
                 if (previous != null) {
                     actualMemory.addAndGet(-previous.getSerializedData().length);
                 }
@@ -437,7 +437,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (message.type == Message.TYPE_ACK) {
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
-                entry = new CacheEntry(key, System.currentTimeMillis(), expiretime, data, expiretime);
+                entry = new CacheEntry(key, System.nanoTime(), data, expiretime);
                 CacheEntry prev = cache.put(key, entry);
                 if (prev != null) {
                     actualMemory.addAndGet(-prev.getSerializedData().length);
@@ -530,7 +530,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return false;
         }
         try {
-            CacheEntry entry = new CacheEntry(key, System.nanoTime(), expireTime, data, expireTime);
+            CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime);
             CacheEntry prev = cache.put(key, entry);
             if (prev != null) {
                 actualMemory.addAndGet(-prev.getSerializedData().length);

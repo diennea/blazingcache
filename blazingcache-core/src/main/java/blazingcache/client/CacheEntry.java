@@ -28,16 +28,14 @@ public final class CacheEntry {
 
     private final String key;
     public long lastGetTime;
-    private final long lastAccessTimeNanos;
     private final byte[] serializedData;
     private final long expiretime;
 
-    public CacheEntry(String key, long lastGetTimeNanos, long expireTime, byte[] serializedData,long expiretime) {
+    public CacheEntry(String key, long lastGetTimeNanos, byte[] serializedData, long expiretime) {
         this.key = key;
         this.lastGetTime = lastGetTimeNanos;
-        this.lastAccessTimeNanos = expireTime;
         this.serializedData = serializedData;
-        this.expiretime=expiretime;
+        this.expiretime = expiretime;
     }
 
     public String getKey() {
@@ -46,10 +44,6 @@ public final class CacheEntry {
 
     public long getLastGetTime() {
         return lastGetTime;
-    }
-
-    public long getLastGetTimeNanos() {
-        return lastAccessTimeNanos;
     }
 
     public byte[] getSerializedData() {
@@ -62,10 +56,7 @@ public final class CacheEntry {
 
     @Override
     public String toString() {
-        return "CacheEntry{" + "key=" + key + ", lastGetTime=" + lastGetTime + ", lastAccessTimeNanos=" + lastAccessTimeNanos + ", serializedData=" + serializedData + ", expiretime=" + expiretime + '}';
+        return "CacheEntry{" + "key=" + key + ", lastGetTime=" + lastGetTime + ", serializedData=" + serializedData + ", expiretime=" + expiretime + '}';
     }
-
-    
-    
 
 }
