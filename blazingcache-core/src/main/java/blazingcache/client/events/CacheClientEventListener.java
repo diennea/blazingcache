@@ -32,13 +32,11 @@ public class CacheClientEventListener {
     public void entryInvalidated(CacheEntry removed) {
     }
 
-    public void beforeFetch(String key) {
+    public CacheEntry readThroughOnGetMiss(String key) {
+        return null;
     }
 
-    public void beforeGet(String key) {
-    }
-
-    public void beforePut(CacheEntry entry) {
+    public void writeThrough(CacheEntry entry) {
     }
 
     public void clientConnected(Channel channel) {

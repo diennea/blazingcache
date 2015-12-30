@@ -16,6 +16,8 @@
 package blazingcache.jcache;
 
 import blazingcache.client.CacheClient;
+import blazingcache.client.CacheEntry;
+import blazingcache.client.events.CacheClientEventListener;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.netty.NettyCacheServerLocator;
@@ -73,7 +75,7 @@ public class BlazingCacheManager implements CacheManager {
                 }
             }
             ServerLocator locator;
-            String mode = properties.getProperty("blazingcache.mode", "local");            
+            String mode = properties.getProperty("blazingcache.mode", "local");
             switch (mode) {
                 case "zk":
                     String connect = properties.getProperty("blazingcache.zookeeper.connectstring", "localhost");
@@ -106,6 +108,14 @@ public class BlazingCacheManager implements CacheManager {
         } catch (Exception err) {
             throw new CacheException(err);
         }
+    }
+
+    private BlazingCacheCache getCacheByKey(String key) {
+        String cacheName = BlazingCacheCache.getCacheName(key);
+        if (cacheName != null) {
+            return caches.get(cacheName);
+        }
+        return null;
     }
 
     @Override
