@@ -40,6 +40,7 @@ import blazingcache.network.ServerLocator;
 import blazingcache.network.ServerNotAvailableException;
 import blazingcache.network.ServerRejectedConnectionException;
 import java.util.Arrays;
+import java.util.Set;
 
 /**
  * Client
@@ -558,6 +559,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             throw new CacheException("error while putting for key " + key + ":" + timedOut, timedOut);
         }
 
+    }
+    
+    public Set<String> getLocalKeySetByPrefix(String prefix){
+        return cache.keySet().stream().filter(k -> k.startsWith(prefix)).collect(Collectors.toSet());
     }
 
 }

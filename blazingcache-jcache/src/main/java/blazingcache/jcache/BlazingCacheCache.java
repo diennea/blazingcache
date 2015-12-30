@@ -18,6 +18,8 @@ package blazingcache.jcache;
 import blazingcache.client.CacheClient;
 import blazingcache.client.CacheEntry;
 import blazingcache.client.CacheException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -25,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.cache.Cache;
 import javax.cache.CacheManager;
 import javax.cache.configuration.CacheEntryListenerConfiguration;
@@ -32,6 +35,7 @@ import javax.cache.configuration.CompleteConfiguration;
 import javax.cache.configuration.Configuration;
 import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.integration.CacheLoader;
+import javax.cache.integration.CacheWriter;
 import javax.cache.integration.CompletionListener;
 import javax.cache.processor.EntryProcessor;
 import javax.cache.processor.EntryProcessorException;
@@ -54,7 +58,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     private volatile boolean closed;
     private final long defaultTtl;
     private final CacheLoader<K, V> cacheLoader;
+    private final CacheWriter<K, V> cacheWriter;
     private final boolean isReadThrough;
+    private final boolean isWriteThrough;
 
     public BlazingCacheCache(String cacheName, CacheClient client, CacheManager cacheManager, Serializer<Object, String> keysSerializer, Serializer<Object, byte[]> valuesSerializer, boolean usefetch, Configuration<K, V> configuration) {
         this.cacheName = cacheName;
@@ -79,14 +85,25 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             } else {
                 cacheLoader = null;
             }
+            if (cc.getCacheWriterFactory() != null) {
+                cacheWriter = (CacheWriter<K, V>) cc.getCacheWriterFactory().create();
+            } else {
+                cacheWriter = null;
+            }
             isReadThrough = cc.isReadThrough();
+            isWriteThrough = cc.isWriteThrough();
         } else {
             defaultTtl = -1;
             cacheLoader = null;
+            cacheWriter = null;
             isReadThrough = false;
+            isWriteThrough = false;
         }
         if (isReadThrough && cacheLoader == null) {
             throw new IllegalArgumentException("cache isReadThrough=" + isReadThrough + " cacheLoader=" + cacheLoader);
+        }
+        if (isWriteThrough && cacheWriter == null) {
+            throw new IllegalArgumentException("cache isWriteThrough=" + isWriteThrough + " cacheWriter=" + cacheWriter);
         }
 
     }
@@ -103,7 +120,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
     }
 
-    public V getNoFetch(K key) {
+    private V getNoFetch(K key) {
         String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
 
         CacheEntry result = client.get(serializedKey);
@@ -116,6 +133,10 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
     @Override
     public V get(K key) {
+        return get(key, true);
+    }
+
+    private V get(K key, boolean allowLoader) {
         String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
         try {
             CacheEntry result;
@@ -127,7 +148,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             if (result != null) {
                 return (V) valuesSerializer.deserialize(result.getSerializedData());
             } else {
-                if (cacheLoader != null && isReadThrough) {
+                if (allowLoader && cacheLoader != null && isReadThrough) {
                     V loaded = cacheLoader.load(key);
                     if (loaded != null) {
                         client.put(keysSerializer.serialize(key), valuesSerializer.serialize(loaded), defaultTtl);
@@ -165,7 +186,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
     @Override
     public void loadAll(Set<? extends K> keys, boolean replaceExistingValues, CompletionListener completionListener) {
-        if (cacheLoader == null || keys ==null || keys.isEmpty()) {
+        if (cacheLoader == null || keys == null || keys.isEmpty()) {
             completionListener.onCompletion();
             return;
         }
@@ -208,6 +229,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         try {
             String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
             client.put(serializedKey, valuesSerializer.serialize(value), defaultTtl);
+            if (isWriteThrough) {
+                cacheWriter.write(new BlazingCacheEntry<>(key, value));
+            }
         } catch (InterruptedException err) {
             Thread.currentThread().interrupt();
             throw new javax.cache.CacheException(err);
@@ -222,6 +246,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
             V actual = getNoFetch(key);
             client.put(serializedKey, valuesSerializer.serialize(value), defaultTtl);
+            if (isWriteThrough) {
+                cacheWriter.write(new BlazingCacheEntry<>(key, value));
+            }
             return actual;
         } catch (InterruptedException err) {
             Thread.currentThread().interrupt();
@@ -233,21 +260,48 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
     @Override
     public void putAll(Map<? extends K, ? extends V> map) {
-        for (Map.Entry<? extends K, ? extends V> entry : map.entrySet()) {
-            put(entry.getKey(), entry.getValue());
+        try {
+            Collection<Cache.Entry<? extends K, ? extends V>> entries = new ArrayList<>();
+            for (Map.Entry<? extends K, ? extends V> entry : map.entrySet()) {
+                K key = entry.getKey();
+                V value = entry.getValue();
+                String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+                client.put(serializedKey, valuesSerializer.serialize(value), defaultTtl);
+                entries.add(new BlazingCacheEntry<>(key, value));
+            }
+            if (isWriteThrough) {
+                cacheWriter.writeAll(entries);
+            }
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            throw new javax.cache.CacheException(err);
+        } catch (CacheException err) {
+            throw new javax.cache.CacheException(err);
         }
     }
 
     @Override
     public boolean putIfAbsent(K key, V value) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        if (!containsKey(key)) {
+            put(key, value);
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override
     public boolean remove(K key) {
+        return remove(key, true);
+    }
+
+    private boolean remove(K key, boolean allowWriteThrough) {
         try {
             String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
             client.invalidate(serializedKey);
+            if (allowWriteThrough && isWriteThrough) {
+                cacheWriter.delete(key);
+            }
             return false;
         } catch (InterruptedException err) {
             Thread.currentThread().interrupt();
@@ -262,6 +316,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             V actual = getNoFetch(key);
             if (Objects.equals(actual, oldValue)) {
                 client.invalidate(serializedKey);
+                if (isWriteThrough) {
+                    cacheWriter.delete(key);
+                }
                 return true;
             }
             return false;
@@ -277,6 +334,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
             V actual = getNoFetch(key);
             client.invalidate(serializedKey);
+            if (isWriteThrough) {
+                cacheWriter.delete(key);
+            }
             return actual;
         } catch (InterruptedException err) {
             Thread.currentThread().interrupt();
@@ -286,30 +346,64 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
     @Override
     public boolean replace(K key, V oldValue, V newValue) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        if (containsKey(key) && Objects.equals((Object) get(key, false), oldValue)) {
+            put(key, newValue);
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override
     public boolean replace(K key, V value) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        if (containsKey(key)) {
+            put(key, value);
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override
     public V getAndReplace(K key, V value) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        if (containsKey(key)) {
+            V oldValue = get(key, false);
+            put(key, value);
+            return oldValue;
+        } else {
+            return null;
+        }
     }
 
     @Override
     public void removeAll(Set<? extends K> keys) {
         for (K key : keys) {
-            remove(key);
+            remove(key, false);
+        }
+        if (isWriteThrough) {
+            cacheWriter.deleteAll(keys);
         }
     }
 
     @Override
     public void removeAll() {
         try {
+            Set<K> localKeys;
+            if (isWriteThrough) {
+                int prefixLen = (cacheName + "#").length();
+                localKeys = client
+                        .getLocalKeySetByPrefix(cacheName + "#")
+                        .stream()
+                        .map(s -> {
+                            return (K) keysSerializer.deserialize(s.substring(prefixLen));
+                        }).collect(Collectors.toSet());
+            } else {
+                localKeys = null;
+            }
             client.invalidateByPrefix(cacheName + "#");
+            if (localKeys != null && isWriteThrough) {
+                cacheWriter.deleteAll(localKeys);
+            }
         } catch (InterruptedException err) {
             Thread.currentThread().interrupt();
             throw new javax.cache.CacheException(err);

@@ -15,8 +15,10 @@
  */
 package blazingcache.jcache;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Base64;
 import javax.cache.CacheException;
@@ -32,7 +34,10 @@ public class StandardKeySerializer implements Serializer<Object, String> {
     public String serialize(Object value) {
         if (value instanceof String) {
             // BlazingCache is made for string keys!
-            return (String) value;
+            String key = (String) value;
+            if (!key.startsWith("$")) {
+                return key;
+            }
         }
         try {
             ByteArrayOutputStream oo = new ByteArrayOutputStream();
@@ -46,8 +51,18 @@ public class StandardKeySerializer implements Serializer<Object, String> {
     }
 
     @Override
-    public Object deserialize(String cachedValue) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public Object deserialize(String keyOnCacheClient) {
+        if (!keyOnCacheClient.startsWith("$")) {
+            return keyOnCacheClient;
+        }
+        try {
+            byte[] decoded = Base64.getDecoder().decode(keyOnCacheClient.substring(1));
+            ByteArrayInputStream oo = new ByteArrayInputStream(decoded);
+            ObjectInputStream o = new ObjectInputStream(oo);
+            return o.readUnshared();
+        } catch (IOException | ClassNotFoundException err) {
+            throw new CacheException(err);
+        }
     }
 
 }
