@@ -473,9 +473,49 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
+    private static class EntryIterator<K, V> implements Iterator<Cache.Entry<K, V>> {
+
+        private K currentKey;
+        private final Iterator<K> keysIterator;
+        private final BlazingCacheCache<K, V> parent;
+
+        public EntryIterator(Iterator<K> keysIterator, BlazingCacheCache<K, V> parent) {
+            this.keysIterator = keysIterator;
+            this.parent = parent;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return keysIterator.hasNext();
+        }
+
+        @Override
+        public Entry<K, V> next() {
+            currentKey = keysIterator.next();
+            return new BlazingCacheEntry<>(currentKey, parent.getNoFetch(currentKey));
+        }
+
+        @Override
+        public void remove() {
+            if (currentKey == null) {
+                throw new IllegalStateException();
+            }
+            parent.remove(currentKey);
+        }
+    }
+
     @Override
     public Iterator<Entry<K, V>> iterator() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        int prefixLen = (cacheName + "#").length();
+        Set<K> localKeys = client
+                .getLocalKeySetByPrefix(cacheName + "#")
+                .stream()
+                .map(s -> {
+                    return (K) keysSerializer.deserialize(s.substring(prefixLen));
+                }).collect(Collectors.toSet());
+        Iterator<K> keysIterator = localKeys.iterator();
+        return new EntryIterator(keysIterator, this);
+
     }
 
 }
