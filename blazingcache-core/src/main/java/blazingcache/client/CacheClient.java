@@ -411,8 +411,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         stop();
     }
 
-    public void stop() {
-        LOGGER.log(Level.SEVERE, "stopping", new Exception("stopping").fillInStackTrace());
+    public void stop() {        
+        LOGGER.log(Level.SEVERE, "stopping");
         stopped = true;
         try {
             coreThread.interrupt();
