@@ -66,50 +66,47 @@ public class IteratorTest {
     public void testIterator() {
         CachingProvider cachingProvider = Caching.getCachingProvider();
         Properties p = new Properties();
-        CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p);
-
-        MutableConfiguration<String, String> config
-                = new MutableConfiguration<String, String>()
-                .setTypes(String.class, String.class);
-
-        Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
-        Map<String, String> expected = new HashMap<>();
-        for (int i = 0; i < 10; i++) {
-            expected.put("key" + i, "value" + i);
-        }
-        for (Iterator<Cache.Entry<String, String>> it = cache.iterator(); it.hasNext();) {
-            Cache.Entry<String, String> entry = it.next();
-            BlazingCacheEntry<String, String> unwrapped = entry.unwrap(BlazingCacheEntry.class);
-            assertNotNull(unwrapped);
-            assertEquals(entry.getValue(), expected.get(entry.getKey()));
-        }
-        for (Iterator<Cache.Entry<String, String>> it = cache.iterator(); it.hasNext();) {
-            Cache.Entry<String, String> entry = it.next();
-            BlazingCacheEntry<String, String> unwrapped = entry.unwrap(BlazingCacheEntry.class);
-            assertNotNull(unwrapped);
-            assertEquals(entry.getValue(), expected.get(entry.getKey()));
-            it.remove();
-        }
-        for (String key : expected.keySet()) {
-            assertNull(cache.get(key));
-        }
-        // empty iterator        
-        for (Iterator<Cache.Entry<String, String>> it = cache.iterator(); it.hasNext();) {
-            fail();
-        }
-        try {
-            Iterator<Cache.Entry<String, String>> it = cache.iterator();
-            it.next();
-            fail();
-        } catch (NoSuchElementException expectedError) {
-        }
-        try {
-            Iterator<Cache.Entry<String, String>> it = cache.iterator();
-            it.remove();
-            fail();
-        } catch (IllegalStateException expectedError) {
-        }
-
-    }
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<String, String> config
+                    = new MutableConfiguration<String, String>()
+                            .setTypes(String.class, String.class);
+            Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
+            Map<String, String> expected = new HashMap<>();
+            for (int i = 0; i < 10; i++) {
+                expected.put("key" + i, "value" + i);
+            }
+            for (Iterator<Cache.Entry<String, String>> it = cache.iterator(); it.hasNext();) {
+                Cache.Entry<String, String> entry = it.next();
+                BlazingCacheEntry<String, String> unwrapped = entry.unwrap(BlazingCacheEntry.class);
+                assertNotNull(unwrapped);
+                assertEquals(entry.getValue(), expected.get(entry.getKey()));
+            }
+            for (Iterator<Cache.Entry<String, String>> it = cache.iterator(); it.hasNext();) {
+                Cache.Entry<String, String> entry = it.next();
+                BlazingCacheEntry<String, String> unwrapped = entry.unwrap(BlazingCacheEntry.class);
+                assertNotNull(unwrapped);
+                assertEquals(entry.getValue(), expected.get(entry.getKey()));
+                it.remove();
+            }
+            for (String key : expected.keySet()) {
+                assertNull(cache.get(key));
+            }
+            // empty iterator
+            for (Iterator<Cache.Entry<String, String>> it = cache.iterator(); it.hasNext();) {
+                fail();
+            }
+            try {
+                Iterator<Cache.Entry<String, String>> it = cache.iterator();
+                it.next();
+                fail();
+            } catch (NoSuchElementException expectedError) {
+            }
+            try {
+                Iterator<Cache.Entry<String, String>> it = cache.iterator();
+                it.remove();
+                fail();
+            } catch (IllegalStateException expectedError) {
+            }
+        }    }
 
 }

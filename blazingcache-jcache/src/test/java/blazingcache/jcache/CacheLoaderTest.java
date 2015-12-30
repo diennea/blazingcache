@@ -84,107 +84,103 @@ public class CacheLoaderTest {
 
     @Test
     public void testReadThrough() {
-        //resolve a cache manager
+
         CachingProvider cachingProvider = Caching.getCachingProvider();
         Properties p = new Properties();
-        CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p);
-//configure the cache
-        MutableConfiguration<String, String> config
-                = new MutableConfiguration<String, String>()
-                .setTypes(String.class, String.class)
-                .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
-                .setReadThrough(true);
-
-//create the cache
-        Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
-//cache operations
-        String key = "key";
-        String result = cache.get(key);
-        assertEquals("LOADED_" + key, result);
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<String, String> config
+                    = new MutableConfiguration<String, String>()
+                            .setTypes(String.class, String.class)
+                            .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
+                            .setReadThrough(true);
+            
+            Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
+            
+            String key = "key";
+            String result = cache.get(key);
+            assertEquals("LOADED_" + key, result);
+        }
     }
 
     @Test
     public void testNoReadThrough() {
-        //resolve a cache manager
+
         CachingProvider cachingProvider = Caching.getCachingProvider();
         Properties p = new Properties();
-        CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p);
-//configure the cache
-        MutableConfiguration<String, String> config
-                = new MutableConfiguration<String, String>()
-                .setTypes(String.class, String.class)
-                .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
-                .setReadThrough(false);
-
-//create the cache
-        Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
-//cache operations
-        String key = "key";
-        String result = cache.get(key);
-        assertNull(result);
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<String, String> config
+                    = new MutableConfiguration<String, String>()
+                            .setTypes(String.class, String.class)
+                            .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
+                            .setReadThrough(false);
+            
+            Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
+            
+            String key = "key";
+            String result = cache.get(key);
+            assertNull(result);
+        }
     }
 
     @Test
     public void testLoadallReplaceExisting() throws Exception {
-        //resolve a cache manager
+
         CachingProvider cachingProvider = Caching.getCachingProvider();
         Properties p = new Properties();
-        CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p);
-//configure the cache
-        MutableConfiguration<String, String> config
-                = new MutableConfiguration<String, String>()
-                .setTypes(String.class, String.class)
-                .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
-                .setReadThrough(false);
-
-        Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
-        cache.put("one", "to_be_replaced");
-        Set<String> keys = new HashSet<>();
-        keys.add("one");
-        keys.add("two");
-        keys.add("three");
-        CompletionListenerFuture future = new CompletionListenerFuture();
-        cache.loadAll(keys, true, future);
-        future.get();
-
-        for (String key : keys) {
-            String result = cache.get(key);
-            assertEquals("LOADED_" + key, result);
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<String, String> config
+                    = new MutableConfiguration<String, String>()
+                            .setTypes(String.class, String.class)
+                            .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
+                            .setReadThrough(false);
+            
+            Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
+            cache.put("one", "to_be_replaced");
+            Set<String> keys = new HashSet<>();
+            keys.add("one");
+            keys.add("two");
+            keys.add("three");
+            CompletionListenerFuture future = new CompletionListenerFuture();
+            cache.loadAll(keys, true, future);
+            future.get();
+            
+            for (String key : keys) {
+                String result = cache.get(key);
+                assertEquals("LOADED_" + key, result);
+            }
         }
-
     }
 
     @Test
     public void testLoadallNoReplaceExisting() throws Exception {
-        //resolve a cache manager
+
         CachingProvider cachingProvider = Caching.getCachingProvider();
         Properties p = new Properties();
-        CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p);
-//configure the cache
-        MutableConfiguration<String, String> config
-                = new MutableConfiguration<String, String>()
-                .setTypes(String.class, String.class)
-                .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
-                .setReadThrough(false);
-
-        Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
-        cache.put("one", "not_to_be_replaced");
-        Set<String> keys = new HashSet<>();
-        keys.add("one");
-        keys.add("two");
-        keys.add("three");
-        CompletionListenerFuture future = new CompletionListenerFuture();
-        cache.loadAll(keys, false, future);
-        future.get();
-
-        for (String key : keys) {
-            String result = cache.get(key);
-            if (key.equals("one")) {
-                assertEquals("not_to_be_replaced", result);
-            } else {
-                assertEquals("LOADED_" + key, result);
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<String, String> config
+                    = new MutableConfiguration<String, String>()
+                            .setTypes(String.class, String.class)
+                            .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
+                            .setReadThrough(false);
+            
+            Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
+            cache.put("one", "not_to_be_replaced");
+            Set<String> keys = new HashSet<>();
+            keys.add("one");
+            keys.add("two");
+            keys.add("three");
+            CompletionListenerFuture future = new CompletionListenerFuture();
+            cache.loadAll(keys, false, future);
+            future.get();
+            
+            for (String key : keys) {
+                String result = cache.get(key);
+                if (key.equals("one")) {
+                    assertEquals("not_to_be_replaced", result);
+                } else {
+                    assertEquals("LOADED_" + key, result);
+                }
             }
         }
-
     }
 }

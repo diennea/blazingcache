@@ -16,12 +16,8 @@
 package blazingcache.jcache;
 
 import blazingcache.client.CacheClient;
-import blazingcache.client.CacheEntry;
-import blazingcache.client.events.CacheClientEventListener;
-import blazingcache.network.ServerHostData;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.netty.NettyCacheServerLocator;
-import blazingcache.server.CacheServer;
 import blazingcache.zookeeper.ZKCacheServerLocator;
 import java.net.InetAddress;
 import java.net.URI;
@@ -33,7 +29,6 @@ import javax.cache.Cache;
 import javax.cache.CacheException;
 import javax.cache.CacheManager;
 import javax.cache.configuration.Configuration;
-import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.spi.CachingProvider;
 
 /**
@@ -110,14 +105,6 @@ public class BlazingCacheManager implements CacheManager {
         }
     }
 
-    private BlazingCacheCache getCacheByKey(String key) {
-        String cacheName = BlazingCacheCache.getCacheName(key);
-        if (cacheName != null) {
-            return caches.get(cacheName);
-        }
-        return null;
-    }
-
     @Override
     public CachingProvider getCachingProvider() {
         return provider;
@@ -140,45 +127,100 @@ public class BlazingCacheManager implements CacheManager {
 
     @Override
     public <K, V, C extends Configuration<K, V>> Cache<K, V> createCache(String cacheName, C configuration) throws IllegalArgumentException {
+        checkClosed();
+        if (cacheName == null || configuration == null) {
+            throw new NullPointerException();
+        }
         BlazingCacheCache c = new BlazingCacheCache(cacheName, client, this, keysSerializer, valuesSerializer, usefetch, configuration);
+        caches.put(cacheName, c);
         return c;
+    }
+
+    private void checkClosed() {
+        if (closed) {
+            throw new IllegalStateException("this CacheManager is closed");
+        }
     }
 
     @Override
     public <K, V> Cache<K, V> getCache(String cacheName, Class<K> keyType, Class<V> valueType) {
-        return caches.get(cacheName);
+        checkClosed();
+        if (keyType == null || valueType == null) {
+            throw new NullPointerException();
+        }
+        if (cacheName == null) {
+            throw new NullPointerException();
+        }
+        Cache<K, V> res = caches.get(cacheName);
+        Configuration configuration = res.getConfiguration(Configuration.class);
+        if ((!keyType.equals(configuration.getKeyType()))
+                || !valueType.equals(configuration.getValueType())) {
+            throw new ClassCastException();
+        }
+        return res;
     }
 
     @Override
     public <K, V> Cache<K, V> getCache(String cacheName) {
-        return caches.get(cacheName);
+        checkClosed();
+        if (cacheName == null) {
+            throw new NullPointerException();
+        }
+        Cache<K, V> res = caches.get(cacheName);
+        Configuration configuration = res.getConfiguration(Configuration.class);
+        if ((configuration.getKeyType() != null && !configuration.getKeyType().equals(Object.class))
+                || (configuration.getValueType() != null && !configuration.getValueType().equals(Object.class))) {
+            throw new IllegalArgumentException();
+        }
+        return res;
     }
-
+    
+        
     @Override
     public Iterable<String> getCacheNames() {
+        checkClosed();
         return caches.keySet();
     }
 
     @Override
     public void destroyCache(String cacheName) {
+        checkClosed();
+        if (cacheName == null) {
+            throw new NullPointerException();
+        }
         BlazingCacheCache removed = caches.remove(cacheName);
         if (removed != null) {
-            removed.clear();
+            removed.close();
         }
     }
 
     @Override
     public void enableManagement(String cacheName, boolean enabled) {
+        checkClosed();
+        if (cacheName == null) {
+            throw new NullPointerException();
+        }
         // noop
     }
 
     @Override
     public void enableStatistics(String cacheName, boolean enabled) {
+        checkClosed();
+        if (cacheName == null) {
+            throw new NullPointerException();
+        }
         // noop
     }
 
     @Override
     public void close() {
+        if (closed) {
+            return;
+        }
+        for (BlazingCacheCache cache : caches.values()) {
+            cache.close();
+        }
+        caches.clear();
         if (client != null) {
             try {
                 client.close();
@@ -186,6 +228,7 @@ public class BlazingCacheManager implements CacheManager {
             }
         }
         closed = true;
+        provider.releaseCacheManager(uri, classLoader);
     }
 
     @Override

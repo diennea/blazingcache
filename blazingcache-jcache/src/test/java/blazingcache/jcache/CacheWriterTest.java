@@ -93,86 +93,87 @@ public class CacheWriterTest {
     public void testWriteThrough() {
         CachingProvider cachingProvider = Caching.getCachingProvider();
         Properties p = new Properties();
-        CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p);
-
-        MockCacheWriter external = new MockCacheWriter();
-        MutableConfiguration<String, String> config
-                = new MutableConfiguration<String, String>()
-                .setTypes(String.class, String.class)
-                .setCacheWriterFactory(new FactoryBuilder.SingletonFactory<>(external))
-                .setWriteThrough(true);
-
-        Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
-        String key = "key";
-        cache.put(key, "some_datum");
-
-        {
-            String result = external.database.get(key);
-            assertEquals("some_datum", result);
-        }
-
-        cache.remove(key);
-        {
-            String result = external.database.get(key);
-            assertNull(result);
-        }
-
-        cache.putIfAbsent(key, "datum2");
-        {
-            String result = external.database.get(key);
-            assertEquals("datum2", result);
-        }
-
-        cache.replace(key, "datum3");
-        {
-            String result = external.database.get(key);
-            assertEquals("datum3", result);
-        }
-
-        cache.replace(key, "datum_no", "datum4");
-        {
-            String result = external.database.get(key);
-            assertEquals("datum3", result);
-        }
-
-        cache.replace(key, "datum3", "datum4");
-        {
-            String result = external.database.get(key);
-            assertEquals("datum4", result);
-        }
-
-        Map<String, String> newValues = new HashMap<>();
-        newValues.put("a", "a_value");
-        newValues.put("b", "b_value");
-        newValues.put("c", "c_value");
-        cache.putAll(newValues);
-
-        for (Map.Entry<String, String> entry : newValues.entrySet()) {
-            assertEquals(entry.getValue(), external.database.get(entry.getKey()));
-        }
-
-        cache.removeAll(newValues.keySet());
-
-        for (Map.Entry<String, String> entry : newValues.entrySet()) {
-            assertNull(external.database.get(entry.getKey()));
-        }
-
-        cache.putAll(newValues);
-        for (Map.Entry<String, String> entry : newValues.entrySet()) {
-            assertEquals(entry.getValue(), external.database.get(entry.getKey()));
-        }
-        cache.removeAll();
-        for (Map.Entry<String, String> entry : newValues.entrySet()) {
-            assertNull(external.database.get(entry.getKey()));
-        }
-        cache.putAll(newValues);
-        for (Map.Entry<String, String> entry : newValues.entrySet()) {
-            assertEquals(entry.getValue(), external.database.get(entry.getKey()));
-        }
-        // clear does not call the configured CacheWriter
-        cache.clear();
-        for (Map.Entry<String, String> entry : newValues.entrySet()) {
-            assertEquals(entry.getValue(), external.database.get(entry.getKey()));
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MockCacheWriter external = new MockCacheWriter();
+            MutableConfiguration<String, String> config
+                    = new MutableConfiguration<String, String>()
+                            .setTypes(String.class, String.class)
+                            .setCacheWriterFactory(new FactoryBuilder.SingletonFactory<>(external))
+                            .setWriteThrough(true);
+            
+            Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
+            String key = "key";
+            cache.put(key, "some_datum");
+            
+            {
+                String result = external.database.get(key);
+                assertEquals("some_datum", result);
+            }
+            
+            assertEquals("some_datum",cache.get(key));
+            cache.remove(key);
+            {
+                String result = external.database.get(key);
+                assertNull(result);
+            }
+            
+            cache.putIfAbsent(key, "datum2");
+            {
+                String result = external.database.get(key);
+                assertEquals("datum2", result);
+            }
+            
+            cache.replace(key, "datum3");
+            {
+                String result = external.database.get(key);
+                assertEquals("datum3", result);
+            }
+            
+            cache.replace(key, "datum_no", "datum4");
+            {
+                String result = external.database.get(key);
+                assertEquals("datum3", result);
+            }
+            
+            cache.replace(key, "datum3", "datum4");
+            {
+                String result = external.database.get(key);
+                assertEquals("datum4", result);
+            }
+            
+            Map<String, String> newValues = new HashMap<>();
+            newValues.put("a", "a_value");
+            newValues.put("b", "b_value");
+            newValues.put("c", "c_value");
+            cache.putAll(newValues);
+            
+            for (Map.Entry<String, String> entry : newValues.entrySet()) {
+                assertEquals(entry.getValue(), external.database.get(entry.getKey()));
+            }
+            
+            cache.removeAll(newValues.keySet());
+            
+            for (Map.Entry<String, String> entry : newValues.entrySet()) {
+                assertNull(external.database.get(entry.getKey()));
+            }
+            
+            cache.putAll(newValues);
+            for (Map.Entry<String, String> entry : newValues.entrySet()) {
+                assertEquals(entry.getValue(), external.database.get(entry.getKey()));
+            }
+            cache.removeAll();
+            for (Map.Entry<String, String> entry : newValues.entrySet()) {
+                assertNull(external.database.get(entry.getKey()));
+            }
+            cache.putAll(newValues);
+            for (Map.Entry<String, String> entry : newValues.entrySet()) {
+                assertEquals(entry.getValue(), external.database.get(entry.getKey()));
+            }
+            // clear does not call the configured CacheWriter
+            cache.clear();
+            for (Map.Entry<String, String> entry : newValues.entrySet()) {
+                assertEquals(entry.getValue(), external.database.get(entry.getKey()));
+            }
         }
     }
 
@@ -180,21 +181,21 @@ public class CacheWriterTest {
     public void testNoWriteThrough() {
         CachingProvider cachingProvider = Caching.getCachingProvider();
         Properties p = new Properties();
-        CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p);
-
-        MockCacheWriter external = new MockCacheWriter();
-        MutableConfiguration<String, String> config
-                = new MutableConfiguration<String, String>()
-                .setTypes(String.class, String.class)
-                .setCacheWriterFactory(new FactoryBuilder.SingletonFactory<>(external))
-                .setWriteThrough(false);
-
-        Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
-        String key = "key";
-        cache.put(key, "some_datum");
-
-        String result = external.database.get(key);
-        assertNull(result);
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MockCacheWriter external = new MockCacheWriter();
+            MutableConfiguration<String, String> config
+                    = new MutableConfiguration<String, String>()
+                            .setTypes(String.class, String.class)
+                            .setCacheWriterFactory(new FactoryBuilder.SingletonFactory<>(external))
+                            .setWriteThrough(false);
+            
+            Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
+            String key = "key";
+            cache.put(key, "some_datum");
+            
+            String result = external.database.get(key);
+            assertNull(result);
+        }
     }
 
 }

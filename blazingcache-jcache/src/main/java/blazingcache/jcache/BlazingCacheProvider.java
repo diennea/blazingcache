@@ -80,7 +80,7 @@ public class BlazingCacheProvider implements CachingProvider {
      */
     @Override
     public CacheManager getCacheManager() {
-        return getCacheManager(getDefaultURI(), getDefaultClassLoader(), null);
+        return getCacheManager(getDefaultURI(), getDefaultClassLoader(), getDefaultProperties());
     }
 
     /**
@@ -111,8 +111,6 @@ public class BlazingCacheProvider implements CachingProvider {
     @Override
     public Properties getDefaultProperties() {
         Properties res = new Properties();
-        res.put("blazingcache.usefetch", "true");
-        res.put("blazingcache.mode", "local");
         return res;
     }
 
