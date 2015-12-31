@@ -97,11 +97,11 @@ public class BlazingCacheManager implements CacheManager {
             }
             client.start();
             boolean ok = client.waitForConnection(10000);
-            if (!ok) {
-                System.out.println("Connection could not established");
-            } else {
-                System.out.println("Connection OK");
-            }
+//            if (!ok) {
+//                System.out.println("Connection could not established");
+//            } else {
+//                System.out.println("Connection OK");
+//            }
         } catch (Exception err) {
             throw new CacheException(err);
         }
