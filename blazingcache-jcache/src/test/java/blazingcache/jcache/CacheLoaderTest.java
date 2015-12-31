@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.SimpleFormatter;
@@ -37,7 +38,9 @@ import org.junit.Before;
 import org.junit.Test;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNull;
+import static org.hamcrest.CoreMatchers.is;
 import org.junit.After;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
 /**
@@ -74,13 +77,27 @@ public class CacheLoaderTest {
 
     public static class MockCacheLoader implements CacheLoader<String, Object> {
 
+        AtomicInteger loadCount = new AtomicInteger();
+        Set<String> loaded = new HashSet<>();
+        
+        public int getLoadCount() {
+            return loadCount.get();
+        }
+        
+        public boolean hasLoaded(String key) {
+            return loaded.contains(key);
+        }
+        
         @Override
         public Object load(String key) throws CacheLoaderException {
+            loadCount.incrementAndGet();
+            loaded.add(key);
             return "LOADED_" + key;
         }
 
         @Override
         public Map<String, Object> loadAll(Iterable<? extends String> keys) throws CacheLoaderException {
+            System.out.println("loadAll: "+keys);
             Map<String, Object> res = new HashMap<>();
             for (String key : keys) {
                 res.put(key, load(key));
@@ -236,6 +253,52 @@ public class CacheLoaderTest {
                     assertEquals("LOADED_" + key, result);
                 }
             }
+        }
+    }
+
+    @Test
+    public void shouldLoadUsingGetAll() {
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        Properties p = new Properties();
+        MockCacheLoader cacheLoader = new MockCacheLoader();
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<String, Object> config
+                    = new MutableConfiguration<String, Object>()
+                    .setTypes(String.class, Object.class)
+                    .setCacheLoaderFactory(new FactoryBuilder.SingletonFactory<>(cacheLoader))
+                    .setReadThrough(true);
+
+            Cache<String, Object> cache = cacheManager.createCache("simpleCache", config);
+
+            //construct a set of keys
+            HashSet<String> keys = new HashSet<String>();
+            keys.add("gudday");
+            keys.add("hello");
+            keys.add("howdy");
+            keys.add("bonjour");
+
+            //get the keys
+            Map<String, Object> map = cache.getAll(keys);
+
+            //assert that the map content is as expected
+            assertThat(map.size(), is(keys.size()));
+
+            for (String key : keys) {
+                assertThat(map.containsKey(key), is(true));
+                assertThat(map.get(key), is("LOADED_"+key));
+                assertThat(cache.get(key), is("LOADED_"+key));
+            }
+
+            //assert that the loader state is as expected
+            assertThat(cacheLoader.getLoadCount(), is(keys.size()));
+
+            for (String key : keys) {
+                assertThat(cacheLoader.hasLoaded(key), is(true));
+            }
+
+            //attempting to load the same keys should not result in another load
+            cache.getAll(keys);
+            assertThat(cacheLoader.getLoadCount(), is(keys.size()));
         }
     }
 }

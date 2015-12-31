@@ -191,7 +191,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 result = client.fetch(serializedKey);
             } else {
                 result = client.get(serializedKey);
-            }
+            }            
             if (result != null) {
                 return (V) valuesSerializer.deserialize(result.getSerializedData());
             } else {
@@ -202,8 +202,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     } catch (Exception err) {
                         throw new CacheLoaderException(err);
                     }
-                    if (loaded != null) {
-                        client.put(keysSerializer.serialize(key), valuesSerializer.serialize(loaded), defaultTtl);
+                    if (loaded != null) {                        
+                        client.put(serializedKey, valuesSerializer.serialize(loaded), defaultTtl);
                         fireEntryCreated(key, loaded);
                         return loaded;
                     }
@@ -254,15 +254,17 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             if (!keysToLoad.isEmpty()) {
                 Map<K, V> loaded_all;
                 try {
-                    loaded_all = cacheLoader.loadAll(keys);
+                    loaded_all = cacheLoader.loadAll(keysToLoad);
                 } catch (Exception err) {
                     throw new CacheLoaderException(err);
-                }
+                }                
                 for (Map.Entry<K, V> entry : loaded_all.entrySet()) {
                     K key = entry.getKey();
                     V loaded = entry.getValue();
                     if (loaded != null) {
-                        client.put(keysSerializer.serialize(key), valuesSerializer.serialize(loaded), defaultTtl);
+                        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+                        client.put(serializedKey, valuesSerializer.serialize(loaded), defaultTtl);
+                        
                         fireEntryCreated(key, loaded);
                         map_result.put(entry.getKey(), entry.getValue());
                     }
@@ -718,13 +720,98 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     @Override
     public <T> T invoke(K key, EntryProcessor<K, V, T> entryProcessor, Object... arguments) throws EntryProcessorException {
         checkClosed();
-        throw new UnsupportedOperationException("Not supported yet. (invoke)"); //To change body of generated methods, choose Tools | Templates.
+        if (key == null || entryProcessor == null) {
+            throw new NullPointerException();
+        }
+        try {
+            V actualValue = get(key);
+            BlazingCacheCacheMutableEntry<K, V> entry = new BlazingCacheCacheMutableEntry<>(key, actualValue);
+            T returnValue = entryProcessor.process(entry, arguments);
+            if (entry.isRemoved()) {
+                remove(key);
+            } else if (entry.isUpdated()) {
+                put(key, entry.getValue());
+            }
+            return returnValue;
+        } catch (javax.cache.CacheException err) {
+            throw err;
+        } catch (Exception err) {
+            throw new EntryProcessorException(err);
+        }
+    }
+
+    private static class EntryProcessorResultImpl<T> implements EntryProcessorResult<T> {
+
+        private final T value;
+        private final EntryProcessorException exception;
+
+        public EntryProcessorResultImpl(T value, EntryProcessorException exception) {
+            this.value = value;
+            this.exception = exception;
+        }
+
+        @Override
+        public T get() throws EntryProcessorException {
+            if (exception != null) {
+                throw exception;
+            }
+            return value;
+        }
+
     }
 
     @Override
     public <T> Map<K, EntryProcessorResult<T>> invokeAll(Set<? extends K> keys, EntryProcessor<K, V, T> entryProcessor, Object... arguments) {
         checkClosed();
-        throw new UnsupportedOperationException("Not supported yet. (invokeAll)"); //To change body of generated methods, choose Tools | Templates.
+        if (keys == null || entryProcessor == null) {
+            throw new NullPointerException();
+        }
+        for (K key : keys) {
+            if (key == null) {
+                throw new NullPointerException();
+            }
+        }
+        try {
+            Map<K, EntryProcessorResult<T>> result = new HashMap<>();
+            Map<K, V> actualValues = getAll(keys);
+            Set<K> keysToRemove = new HashSet<>();
+            Map<K, V> valuesToPut = new HashMap<>();
+            for (K key : keys) {
+                V actualValue = actualValues.get(key);
+                BlazingCacheCacheMutableEntry<K, V> entry = new BlazingCacheCacheMutableEntry<>(key, actualValue);
+                T returnValue = null;
+                EntryProcessorException exception = null;
+                try {
+                    returnValue = entryProcessor.process(entry, arguments);
+                } catch (Exception err) {
+                    exception = new EntryProcessorException(err);
+                }
+                if (exception == null) {
+                    if (entry.isRemoved()) {
+                        keysToRemove.add(key);
+                    } else if (entry.isUpdated()) {
+                        valuesToPut.put(key, entry.getValue());
+                    }
+                    if (returnValue != null) {
+                        result.put(key, new EntryProcessorResultImpl(returnValue, null));
+                    }
+                } else {
+                    result.put(key, new EntryProcessorResultImpl<>(null, exception));
+                }
+
+            }
+            
+            // cache mutations
+            if (!keysToRemove.isEmpty()) {
+                removeAll(keysToRemove);
+            }
+            if (!valuesToPut.isEmpty()) {
+                putAll(valuesToPut);
+            }
+            return result;
+        } catch (javax.cache.CacheException err) {
+            throw err;
+        }
     }
 
     @Override
@@ -842,8 +929,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 .stream()
                 .map(s -> {
                     String noPrefix = s.substring(prefixLen);
-                    K key = keysSerializer.deserialize(noPrefix);
-                    System.out.println("deser key: " + s + " - " + noPrefix + " ->" + key);
+                    K key = keysSerializer.deserialize(noPrefix);                    
                     return (K) key;
                 }).collect(Collectors.toSet());
         Iterator<K> keysIterator = localKeys.iterator();

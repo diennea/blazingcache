@@ -354,7 +354,7 @@ public class TCKCacheManagerTest {
 
         try {
             CacheManager cacheManager = getCacheManager();
-            Cache<String,String > cache = cacheManager.createCache("test", new MutableConfiguration<String, String>());
+            Cache<String, String> cache = cacheManager.createCache("test", new MutableConfiguration<String, String>());
             CompletionListenerFuture future = new CompletionListenerFuture();
             cache.loadAll(keys, false, future);
 
@@ -365,5 +365,11 @@ public class TCKCacheManagerTest {
 //            assertThat(cacheLoader.getLoadCount(), is(0));
         }
     }
+
+    /**
+     * Ensure that a {@link Cache#getAll(java.util.Set)} will load the expected
+     * entries.
+     */
+   
 
 }

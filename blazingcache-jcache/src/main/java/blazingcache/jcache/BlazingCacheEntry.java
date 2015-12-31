@@ -26,8 +26,8 @@ import javax.cache.Cache;
  */
 public class BlazingCacheEntry<K, V> implements Cache.Entry<K, V> {
 
-    private final K key;
-    private final V value;
+    protected K key;
+    protected V value;
 
     BlazingCacheEntry(K key, V value) {
         this.key = key;
