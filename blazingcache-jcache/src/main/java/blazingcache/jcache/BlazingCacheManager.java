@@ -16,14 +16,14 @@
 package blazingcache.jcache;
 
 import blazingcache.client.CacheClient;
-import blazingcache.network.ServerHostData;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.netty.NettyCacheServerLocator;
-import blazingcache.server.CacheServer;
 import blazingcache.zookeeper.ZKCacheServerLocator;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -31,7 +31,6 @@ import javax.cache.Cache;
 import javax.cache.CacheException;
 import javax.cache.CacheManager;
 import javax.cache.configuration.Configuration;
-import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.spi.CachingProvider;
 
 /**
@@ -46,9 +45,8 @@ public class BlazingCacheManager implements CacheManager {
     private final ClassLoader classLoader;
     private final Properties properties;
     private volatile boolean closed;
-    private final CacheClient client;    
+    private final CacheClient client;
     private final boolean usefetch;
-    private final CacheServer cacheServer;
     private final Serializer<Object, String> keysSerializer;
     private final Serializer<Object, byte[]> valuesSerializer;
     private final Map<String, BlazingCacheCache> caches = new HashMap<>();
@@ -74,7 +72,7 @@ public class BlazingCacheManager implements CacheManager {
                 }
             }
             ServerLocator locator;
-            String mode = properties.getProperty("blazingcache.mode", "static");
+            String mode = properties.getProperty("blazingcache.mode", "local");
             switch (mode) {
                 case "zk":
                     String connect = properties.getProperty("blazingcache.zookeeper.connectstring", "localhost");
@@ -82,7 +80,6 @@ public class BlazingCacheManager implements CacheManager {
                     String path = properties.getProperty("blazingcache.zookeeper.path", "/cache");
                     locator = new ZKCacheServerLocator(connect, timeout, path);
                     this.client = new CacheClient(clientId, secret, locator);
-                    this.cacheServer = null;
                     break;
                 case "static":
                     String host = properties.getProperty("blazingcache.server.host", "localhost");
@@ -90,18 +87,13 @@ public class BlazingCacheManager implements CacheManager {
                     boolean ssl = Boolean.parseBoolean(properties.getProperty("blazingcache.server.ssl", "false"));
                     locator = new NettyCacheServerLocator(host, port, ssl);
                     this.client = new CacheClient(clientId, secret, locator);
-                    this.cacheServer = null;
                     break;
                 case "local":
-                    this.cacheServer = new CacheServer(secret, new ServerHostData("localhost", 1025, "", false, new HashMap<>()));
-                    locator = new NettyCacheServerLocator("localhost", 1025, false);
+                    locator = new blazingcache.network.mock.MockServerLocator();
                     this.client = new CacheClient(clientId, secret, locator);
                     break;
                 default:
                     throw new RuntimeException("unsupported blazingcache.mode=" + mode);
-            }
-            if (cacheServer != null) {
-                cacheServer.start();
             }
             client.start();
             boolean ok = client.waitForConnection(10000);
@@ -137,58 +129,115 @@ public class BlazingCacheManager implements CacheManager {
 
     @Override
     public <K, V, C extends Configuration<K, V>> Cache<K, V> createCache(String cacheName, C configuration) throws IllegalArgumentException {
+        checkClosed();
+        if (cacheName == null || configuration == null) {
+            throw new NullPointerException();
+        }
         BlazingCacheCache c = new BlazingCacheCache(cacheName, client, this, keysSerializer, valuesSerializer, usefetch, configuration);
+        if (caches.putIfAbsent(cacheName, c) != null) {
+            throw new CacheException("A cache with name " + cacheName + " already exists");
+        }
         return c;
+    }
+
+    private void checkClosed() {
+        if (closed) {
+            throw new IllegalStateException("this CacheManager is closed");
+        }
     }
 
     @Override
     public <K, V> Cache<K, V> getCache(String cacheName, Class<K> keyType, Class<V> valueType) {
-        return caches.get(cacheName);
+        checkClosed();
+        if (keyType == null || valueType == null) {
+            throw new NullPointerException();
+        }
+        if (cacheName == null) {
+            throw new NullPointerException();
+        }
+        Cache<K, V> res = caches.get(cacheName);
+        if (res == null) {
+            return null;
+        }
+        Configuration configuration = res.getConfiguration(Configuration.class);
+        if ((!keyType.equals(configuration.getKeyType()))
+                || !valueType.equals(configuration.getValueType())) {
+            throw new ClassCastException();
+        }
+        return res;
     }
 
     @Override
     public <K, V> Cache<K, V> getCache(String cacheName) {
-        return caches.get(cacheName);
+        checkClosed();
+        if (cacheName == null) {
+            throw new NullPointerException();
+        }
+        Cache<K, V> res = caches.get(cacheName);
+        if (res == null) {
+            return null;
+        }
+        Configuration configuration = res.getConfiguration(Configuration.class);
+        if ((configuration.getKeyType() != null && !configuration.getKeyType().equals(Object.class))
+                || (configuration.getValueType() != null && !configuration.getValueType().equals(Object.class))) {
+            throw new IllegalArgumentException();
+        }
+        return res;
     }
 
     @Override
     public Iterable<String> getCacheNames() {
-        return caches.keySet();
+        //checkClosed(); TCK does not pass if we throw IllegalStateException
+        return Collections.unmodifiableCollection(new ArrayList<>(caches.keySet()));
     }
 
     @Override
     public void destroyCache(String cacheName) {
+        checkClosed();
+        if (cacheName == null) {
+            throw new NullPointerException();
+        }
         BlazingCacheCache removed = caches.remove(cacheName);
         if (removed != null) {
-            removed.clear();
+            removed.close();
         }
     }
 
     @Override
     public void enableManagement(String cacheName, boolean enabled) {
+        checkClosed();
+        if (cacheName == null) {
+            throw new NullPointerException();
+        }
         // noop
     }
 
     @Override
     public void enableStatistics(String cacheName, boolean enabled) {
+        checkClosed();
+        if (cacheName == null) {
+            throw new NullPointerException();
+        }
         // noop
     }
 
     @Override
     public void close() {
+        if (closed) {
+            return;
+        }
+        for (BlazingCacheCache cache : caches.values()) {
+            cache.close();
+        }
+        caches.clear();
         if (client != null) {
             try {
                 client.close();
             } catch (Exception err) {
             }
         }
-        if (cacheServer != null) {
-            try {
-                cacheServer.close();
-            } catch (Exception err) {
-            }
-        }
         closed = true;
+        provider.releaseCacheManager(uri, classLoader);
     }
 
     @Override
@@ -200,8 +249,9 @@ public class BlazingCacheManager implements CacheManager {
     public <T> T unwrap(Class<T> clazz) {
         if (clazz.isInstance(this)) {
             return (T) this;
+        } else {
+            throw new IllegalArgumentException();
         }
-        return null;
     }
 
 }

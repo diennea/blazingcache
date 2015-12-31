@@ -187,7 +187,7 @@ public class CacheServer implements AutoCloseable {
         clientsForKey.forEach((clientId) -> {
             CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
             if (connection == null) {
-                LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidate");
+                LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidated");
                 propagation.clientDone(clientId);
             } else {
                 connection.sendPutEntry(sourceClientId, key, data, expiretime, propagation);
@@ -204,7 +204,7 @@ public class CacheServer implements AutoCloseable {
             onFinish.onResult(key, null);
             return;
         }
-        LOGGER.log(Level.SEVERE, "invalidateKey {0} from {1} interested clients {2}", new Object[]{key, sourceClientId, clientsForKey});
+        LOGGER.log(Level.FINE, "invalidateKey {0} from {1} interested clients {2}", new Object[]{key, sourceClientId, clientsForKey});
         BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateKey " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, onFinish, (clientId, error) -> {
             cacheStatus.removeKeyForClient(key, clientId);
         });
@@ -213,7 +213,7 @@ public class CacheServer implements AutoCloseable {
         clientsForKey.forEach((clientId) -> {
             CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
             if (connection == null) {
-                LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidate");
+                LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidated");
                 invalidation.clientDone(clientId);
             } else {
                 connection.sendKeyInvalidationMessage(sourceClientId, key, invalidation);
@@ -283,7 +283,7 @@ public class CacheServer implements AutoCloseable {
         clients.forEach((clientId) -> {
             CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
             if (connection == null) {
-                LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering prefix " + prefix + " invalidate");
+                LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering prefix " + prefix + " invalidated");
                 invalidation.clientDone(clientId);
             } else {
                 connection.sendPrefixInvalidationMessage(sourceClientId, prefix, invalidation);

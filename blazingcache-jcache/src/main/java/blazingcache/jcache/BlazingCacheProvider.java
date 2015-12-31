@@ -18,10 +18,8 @@ package blazingcache.jcache;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 import java.util.WeakHashMap;
-import java.util.concurrent.ConcurrentHashMap;
 import javax.cache.CacheException;
 import javax.cache.CacheManager;
 import javax.cache.configuration.OptionalFeature;
@@ -82,7 +80,7 @@ public class BlazingCacheProvider implements CachingProvider {
      */
     @Override
     public CacheManager getCacheManager() {
-        return getCacheManager(getDefaultURI(), getDefaultClassLoader(), null);
+        return getCacheManager(getDefaultURI(), getDefaultClassLoader(), getDefaultProperties());
     }
 
     /**
@@ -113,8 +111,6 @@ public class BlazingCacheProvider implements CachingProvider {
     @Override
     public Properties getDefaultProperties() {
         Properties res = new Properties();
-        res.put("blazingcache.usefetch", "true");
-        res.put("blazingcache.mode", "static");
         return res;
     }
 

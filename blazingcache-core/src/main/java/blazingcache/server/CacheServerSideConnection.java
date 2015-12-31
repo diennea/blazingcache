@@ -94,7 +94,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         Channel _channel = channel;
         lastReceivedMessageTs = System.currentTimeMillis();
         if (_channel == null) {
-            LOGGER.log(Level.SEVERE, "receivedMessageFromWorker {0}, but channel is closed", message);
+            LOGGER.log(Level.SEVERE, "receivedMessage {0}, but channel is closed", message);
             return;
         }
         LOGGER.log(Level.FINE, "receivedMessageFromWorker {0}", message);

@@ -28,6 +28,7 @@ import static javax.cache.expiry.Duration.ONE_HOUR;
 import javax.cache.spi.CachingProvider;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNull;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -37,7 +38,13 @@ import org.junit.Test;
  * @author enrico.olivelli
  */
 public class JSRExamplesTest {
- @Before
+
+    @After
+    public void clear() {
+        Caching.getCachingProvider().close();
+    }
+
+    @Before
     public void setupLogger() throws Exception {
         Level level = Level.SEVERE;
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
@@ -56,28 +63,28 @@ public class JSRExamplesTest {
         java.util.logging.Logger.getLogger("").setLevel(level);
         java.util.logging.Logger.getLogger("").addHandler(ch);
     }
+
     @Test
     public void testJSRExample1() {
-        //resolve a cache manager
+
         CachingProvider cachingProvider = Caching.getCachingProvider();
         Properties p = new Properties();
-        p.put("blazingcache.mode", "local");
-        CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(),p);
-//configure the cache
-        MutableConfiguration<String, Integer> config
-                = new MutableConfiguration<String, Integer>()
-                .setTypes(String.class, Integer.class)
-                .setExpiryPolicyFactory(AccessedExpiryPolicy.factoryOf(ONE_HOUR))
-                .setStatisticsEnabled(true);
-//create the cache
-        Cache<String, Integer> cache = cacheManager.createCache("simpleCache", config);
-//cache operations
-        String key = "key";
-        Integer value1 = 1;
-        cache.put("key", value1);
-        Integer value2 = cache.get(key);
-        assertEquals(value1, value2);
-        cache.remove(key);
-        assertNull(cache.get(key));
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<String, Integer> config
+                    = new MutableConfiguration<String, Integer>()
+                    .setTypes(String.class, Integer.class)
+                    .setExpiryPolicyFactory(AccessedExpiryPolicy.factoryOf(ONE_HOUR))
+                    .setStatisticsEnabled(true);
+
+            Cache<String, Integer> cache = cacheManager.createCache("simpleCache", config);
+
+            String key = "key";
+            Integer value1 = 1;
+            cache.put("key", value1);
+            Integer value2 = cache.get(key);
+            assertEquals(value1, value2);
+            cache.remove(key);
+            assertNull(cache.get(key));
+        }
     }
 }
