@@ -36,6 +36,7 @@ import javax.cache.spi.CachingProvider;
 import org.junit.Before;
 import org.junit.Test;
 import static junit.framework.Assert.assertEquals;
+import org.junit.After;
 
 /**
  * Test for listeners
@@ -43,6 +44,11 @@ import static junit.framework.Assert.assertEquals;
  * @author enrico.olivelli
  */
 public class CacheListenersTest {
+
+    @After
+    public void clear() {
+        Caching.getCachingProvider().close();
+    }
 
     @Before
     public void setupLogger() throws Exception {
@@ -119,7 +125,7 @@ public class CacheListenersTest {
             CacheEntryCreatedListener<String, String> listener2 = new CacheEntryCreatedListener<String, String>() {
                 @Override
                 public void onCreated(Iterable<CacheEntryEvent<? extends String, ? extends String>> events) throws CacheEntryListenerException {
-                    for (CacheEntryEvent<? extends String, ? extends String> e : events) {                        
+                    for (CacheEntryEvent<? extends String, ? extends String> e : events) {
                         created.put(e.getKey(), e.getValue());
                     }
                 }

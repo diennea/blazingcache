@@ -15,31 +15,20 @@
  */
 package blazingcache.jcache;
 
-import java.io.Serializable;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicInteger;
 import javax.cache.Cache;
 import javax.cache.CacheException;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
-import javax.cache.configuration.CacheEntryListenerConfiguration;
-import javax.cache.configuration.CompleteConfiguration;
-import javax.cache.configuration.FactoryBuilder;
-import javax.cache.configuration.MutableCacheEntryListenerConfiguration;
 import javax.cache.configuration.MutableConfiguration;
-import javax.cache.event.CacheEntryCreatedListener;
-import javax.cache.event.CacheEntryEvent;
-import javax.cache.event.CacheEntryExpiredListener;
-import javax.cache.event.CacheEntryListenerException;
-import javax.cache.event.CacheEntryRemovedListener;
-import javax.cache.event.CacheEntryUpdatedListener;
-import static javax.cache.event.EventType.CREATED;
-import static javax.cache.event.EventType.REMOVED;
-import static javax.cache.event.EventType.UPDATED;
+import javax.cache.integration.CompletionListenerFuture;
 import javax.cache.spi.CachingProvider;
 import static junit.framework.TestCase.assertNotNull;
+import static org.hamcrest.CoreMatchers.is;
 
 import org.junit.After;
 import static org.junit.Assert.*;
@@ -289,6 +278,92 @@ public class TCKCacheManagerTest {
 
         ensureClosed(cache1);
         ensureClosed(cache2);
+    }
+
+    @Test
+    public void getCaches_MutateCacheManager() {
+        CacheManager cacheManager = getCacheManager();
+
+        String removeName = "c2";
+        ArrayList<String> cacheNames1 = new ArrayList<String>();
+        cacheManager.createCache("c1", new MutableConfiguration());
+        Cache c1 = cacheManager.getCache("c1");
+        cacheNames1.add(c1.getName());
+        cacheManager.createCache(removeName, new MutableConfiguration());
+        cacheManager.createCache("c3", new MutableConfiguration());
+        Cache c3 = cacheManager.getCache("c3");
+        cacheNames1.add(c3.getName());
+
+        Iterable<String> cacheNames;
+        int size;
+
+        cacheNames = cacheManager.getCacheNames();
+        size = 0;
+        for (String cacheName : cacheNames) {
+            size++;
+        }
+        assertEquals(3, size);
+        cacheManager.destroyCache(removeName);
+        size = 0;
+        for (String cacheName : cacheNames) {
+            size++;
+        }
+        assertEquals(3, size);
+
+        cacheNames = cacheManager.getCacheNames();
+        size = 0;
+        for (String cacheName : cacheNames) {
+            size++;
+        }
+        assertEquals(2, size);
+        checkCollections(cacheNames1, cacheNames);
+    }
+
+    private <T> void checkCollections(Collection<T> collection1, Iterable<?> iterable2) {
+        ArrayList<Object> collection2 = new ArrayList<Object>();
+        for (Object element : iterable2) {
+            assertTrue(collection1.contains(element));
+            collection2.add(element);
+        }
+        assertEquals(collection1.size(), collection2.size());
+        for (T element : collection1) {
+            assertTrue(collection2.contains(element));
+        }
+    }
+
+    @Test
+    public void createCache_Same() {
+        String name = "c1";
+        CacheManager cacheManager = getCacheManager();
+        try {
+            cacheManager.createCache(name, new MutableConfiguration());
+            Cache cache1 = cacheManager.getCache(name);
+            cacheManager.createCache(name, new MutableConfiguration());
+            Cache cache2 = cacheManager.getCache(name);
+            fail();
+        } catch (CacheException exception) {
+            //expected
+        }
+    }
+
+    @Test
+    public void shouldNotLoadWithNullKeyUsingLoadAll() throws Exception {
+
+        HashSet<String> keys = new HashSet<>();
+        keys.add(null);
+
+        try {
+            CacheManager cacheManager = getCacheManager();
+            Cache<String,String > cache = cacheManager.createCache("test", new MutableConfiguration<String, String>());
+            CompletionListenerFuture future = new CompletionListenerFuture();
+            cache.loadAll(keys, false, future);
+
+            fail("Expected a NullPointerException");
+        } catch (NullPointerException e) {
+            //SKIP: expected
+        } finally {
+//            assertThat(cacheLoader.getLoadCount(), is(0));
+        }
     }
 
 }

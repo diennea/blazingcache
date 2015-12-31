@@ -17,6 +17,7 @@ package blazingcache.jcache;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Properties;
@@ -34,6 +35,9 @@ import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.fail;
+import org.junit.After;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Examples taken from JSR107 documentation
@@ -41,6 +45,11 @@ import static junit.framework.Assert.fail;
  * @author enrico.olivelli
  */
 public class IteratorTest {
+
+    @After
+    public void clear() {
+        Caching.getCachingProvider().close();
+    }
 
     @Before
     public void setupLogger() throws Exception {
@@ -69,7 +78,7 @@ public class IteratorTest {
         try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
             MutableConfiguration<String, String> config
                     = new MutableConfiguration<String, String>()
-                            .setTypes(String.class, String.class);
+                    .setTypes(String.class, String.class);
             Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
             Map<String, String> expected = new HashMap<>();
             for (int i = 0; i < 10; i++) {
@@ -107,6 +116,29 @@ public class IteratorTest {
                 fail();
             } catch (IllegalStateException expectedError) {
             }
-        }    }
+        }
+    }
+
+    @Test
+    public void iterator() {
+        LinkedHashMap<Long, String> data = new LinkedHashMap<Long, String>();
+        data.put(1L, "one");
+        data.put(2L, "two");
+
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        Properties p = new Properties();
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            Cache<Long, String> cache = cacheManager.createCache("test", new MutableConfiguration().setTypes(Long.class, String.class));
+            cache.putAll(data);
+            Iterator<Cache.Entry<Long, String>> iterator = cache.iterator();
+            while (iterator.hasNext()) {
+                Cache.Entry<Long, String> next = iterator.next();
+                assertEquals(next.getValue(), data.get(next.getKey()));
+                iterator.remove();
+                data.remove(next.getKey());
+            }
+            assertTrue(data.isEmpty());
+        }
+    }
 
 }

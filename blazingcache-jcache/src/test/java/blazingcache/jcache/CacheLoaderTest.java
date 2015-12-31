@@ -15,6 +15,7 @@
  */
 package blazingcache.jcache;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -36,6 +37,8 @@ import org.junit.Before;
 import org.junit.Test;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNull;
+import org.junit.After;
+import static org.junit.Assert.fail;
 
 /**
  * Examples taken from JSR107 documentation
@@ -43,6 +46,11 @@ import static junit.framework.Assert.assertNull;
  * @author enrico.olivelli
  */
 public class CacheLoaderTest {
+
+    @After
+    public void clear() {
+        Caching.getCachingProvider().close();
+    }
 
     @Before
     public void setupLogger() throws Exception {
@@ -83,6 +91,32 @@ public class CacheLoaderTest {
     }
 
     @Test
+    public void shouldNotLoadWithNullKeyUsingLoadAll() throws Exception {
+
+        HashSet<String> keys = new HashSet<>();
+        keys.add(null);
+
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        Properties p = new Properties();
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<String, String> config
+                    = new MutableConfiguration<String, String>()
+                    .setTypes(String.class, String.class)
+                    .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
+                    .setReadThrough(true);
+            Cache<String, String> cache = cacheManager.createCache("test", config);
+            CompletionListenerFuture future = new CompletionListenerFuture();
+            cache.loadAll(keys, false, future);
+
+            fail("Expected a NullPointerException");
+        } catch (NullPointerException e) {
+            //SKIP: expected
+        } finally {
+//            assertThat(cacheLoader.getLoadCount(), is(0));
+        }
+    }
+
+    @Test
     public void testReadThrough() {
 
         CachingProvider cachingProvider = Caching.getCachingProvider();
@@ -90,15 +124,36 @@ public class CacheLoaderTest {
         try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
             MutableConfiguration<String, String> config
                     = new MutableConfiguration<String, String>()
-                            .setTypes(String.class, String.class)
-                            .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
-                            .setReadThrough(true);
-            
+                    .setTypes(String.class, String.class)
+                    .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
+                    .setReadThrough(true);
+
             Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
-            
+
             String key = "key";
             String result = cache.get(key);
             assertEquals("LOADED_" + key, result);
+        }
+    }
+
+    @Test
+    public void testReadThroughGetAll() {
+
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        Properties p = new Properties();
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<String, String> config
+                    = new MutableConfiguration<String, String>()
+                    .setTypes(String.class, String.class)
+                    .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
+                    .setReadThrough(true);
+
+            Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
+
+            String key = "key";
+            Map<String, String> result = cache.getAll(new HashSet<>(Arrays.asList(key)));
+            assertEquals("LOADED_" + key, result.get(key));
+            assertEquals("LOADED_" + key, cache.get(key));
         }
     }
 
@@ -110,12 +165,12 @@ public class CacheLoaderTest {
         try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
             MutableConfiguration<String, String> config
                     = new MutableConfiguration<String, String>()
-                            .setTypes(String.class, String.class)
-                            .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
-                            .setReadThrough(false);
-            
+                    .setTypes(String.class, String.class)
+                    .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
+                    .setReadThrough(false);
+
             Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
-            
+
             String key = "key";
             String result = cache.get(key);
             assertNull(result);
@@ -130,10 +185,10 @@ public class CacheLoaderTest {
         try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
             MutableConfiguration<String, String> config
                     = new MutableConfiguration<String, String>()
-                            .setTypes(String.class, String.class)
-                            .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
-                            .setReadThrough(false);
-            
+                    .setTypes(String.class, String.class)
+                    .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
+                    .setReadThrough(false);
+
             Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
             cache.put("one", "to_be_replaced");
             Set<String> keys = new HashSet<>();
@@ -143,7 +198,7 @@ public class CacheLoaderTest {
             CompletionListenerFuture future = new CompletionListenerFuture();
             cache.loadAll(keys, true, future);
             future.get();
-            
+
             for (String key : keys) {
                 String result = cache.get(key);
                 assertEquals("LOADED_" + key, result);
@@ -159,10 +214,10 @@ public class CacheLoaderTest {
         try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
             MutableConfiguration<String, String> config
                     = new MutableConfiguration<String, String>()
-                            .setTypes(String.class, String.class)
-                            .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
-                            .setReadThrough(false);
-            
+                    .setTypes(String.class, String.class)
+                    .setCacheLoaderFactory(new FactoryBuilder.ClassFactory(MockCacheLoader.class))
+                    .setReadThrough(false);
+
             Cache<String, String> cache = cacheManager.createCache("simpleCache", config);
             cache.put("one", "not_to_be_replaced");
             Set<String> keys = new HashSet<>();
@@ -172,7 +227,7 @@ public class CacheLoaderTest {
             CompletionListenerFuture future = new CompletionListenerFuture();
             cache.loadAll(keys, false, future);
             future.get();
-            
+
             for (String key : keys) {
                 String result = cache.get(key);
                 if (key.equals("one")) {

@@ -28,6 +28,7 @@ import static javax.cache.expiry.Duration.ONE_HOUR;
 import javax.cache.spi.CachingProvider;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNull;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -37,6 +38,11 @@ import org.junit.Test;
  * @author enrico.olivelli
  */
 public class JSRExamplesTest {
+
+    @After
+    public void clear() {
+        Caching.getCachingProvider().close();
+    }
 
     @Before
     public void setupLogger() throws Exception {
@@ -66,12 +72,12 @@ public class JSRExamplesTest {
         try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
             MutableConfiguration<String, Integer> config
                     = new MutableConfiguration<String, Integer>()
-                            .setTypes(String.class, Integer.class)
-                            .setExpiryPolicyFactory(AccessedExpiryPolicy.factoryOf(ONE_HOUR))
-                            .setStatisticsEnabled(true);
-            
+                    .setTypes(String.class, Integer.class)
+                    .setExpiryPolicyFactory(AccessedExpiryPolicy.factoryOf(ONE_HOUR))
+                    .setStatisticsEnabled(true);
+
             Cache<String, Integer> cache = cacheManager.createCache("simpleCache", config);
-            
+
             String key = "key";
             Integer value1 = 1;
             cache.put("key", value1);

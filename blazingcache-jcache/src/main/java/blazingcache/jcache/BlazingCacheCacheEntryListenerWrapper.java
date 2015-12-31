@@ -94,8 +94,9 @@ final class BlazingCacheCacheEntryListenerWrapper<K, V> {
         public <T> T unwrap(Class<T> clazz) {
             if (clazz.isInstance(this)) {
                 return (T) this;
+            } else {
+                throw new IllegalArgumentException();
             }
-            return null;
         }
 
     }

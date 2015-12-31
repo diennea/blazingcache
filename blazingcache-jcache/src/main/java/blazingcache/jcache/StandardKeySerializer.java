@@ -44,7 +44,7 @@ public class StandardKeySerializer implements Serializer<Object, String> {
             ObjectOutputStream o = new ObjectOutputStream(oo);
             o.writeUnshared(value);
             o.flush();
-            return Base64.getEncoder().encodeToString(oo.toByteArray());
+            return "$"+Base64.getEncoder().encodeToString(oo.toByteArray());
         } catch (IOException err) {
             throw new CacheException(err);
         }

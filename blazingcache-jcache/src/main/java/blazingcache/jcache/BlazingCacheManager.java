@@ -22,6 +22,8 @@ import blazingcache.zookeeper.ZKCacheServerLocator;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -132,7 +134,9 @@ public class BlazingCacheManager implements CacheManager {
             throw new NullPointerException();
         }
         BlazingCacheCache c = new BlazingCacheCache(cacheName, client, this, keysSerializer, valuesSerializer, usefetch, configuration);
-        caches.put(cacheName, c);
+        if (caches.putIfAbsent(cacheName, c) != null) {
+            throw new CacheException("A cache with name " + cacheName + " already exists");
+        }
         return c;
     }
 
@@ -152,6 +156,9 @@ public class BlazingCacheManager implements CacheManager {
             throw new NullPointerException();
         }
         Cache<K, V> res = caches.get(cacheName);
+        if (res == null) {
+            return null;
+        }
         Configuration configuration = res.getConfiguration(Configuration.class);
         if ((!keyType.equals(configuration.getKeyType()))
                 || !valueType.equals(configuration.getValueType())) {
@@ -167,6 +174,9 @@ public class BlazingCacheManager implements CacheManager {
             throw new NullPointerException();
         }
         Cache<K, V> res = caches.get(cacheName);
+        if (res == null) {
+            return null;
+        }
         Configuration configuration = res.getConfiguration(Configuration.class);
         if ((configuration.getKeyType() != null && !configuration.getKeyType().equals(Object.class))
                 || (configuration.getValueType() != null && !configuration.getValueType().equals(Object.class))) {
@@ -174,12 +184,11 @@ public class BlazingCacheManager implements CacheManager {
         }
         return res;
     }
-    
-        
+
     @Override
     public Iterable<String> getCacheNames() {
-        checkClosed();
-        return caches.keySet();
+        //checkClosed(); TCK does not pass if we throw IllegalStateException
+        return Collections.unmodifiableCollection(new ArrayList<>(caches.keySet()));
     }
 
     @Override
@@ -240,8 +249,9 @@ public class BlazingCacheManager implements CacheManager {
     public <T> T unwrap(Class<T> clazz) {
         if (clazz.isInstance(this)) {
             return (T) this;
+        } else {
+            throw new IllegalArgumentException();
         }
-        return null;
     }
 
 }
