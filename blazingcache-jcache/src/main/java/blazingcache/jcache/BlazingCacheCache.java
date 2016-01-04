@@ -270,6 +270,10 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
     @Override
     public Map<K, V> getAll(Set<? extends K> keys) {
+        return getAll(keys, true);
+    }
+
+    private Map<K, V> getAll(Set<? extends K> keys, boolean allowCheckAccess) {
         checkClosed();
         try {
             Map<K, V> map_result = new HashMap<>();
@@ -297,7 +301,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 }
 
                 if (r != null) {
-                    boolean validAfterAccess = handleEntryAccessed(serializedKey);
+                    boolean validAfterAccess = !allowCheckAccess || handleEntryAccessed(serializedKey);
                     if (validAfterAccess) {
                         map_result.put(key, r);
                     }
@@ -644,6 +648,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         try {
             String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
             V actual = getNoFetch(key);
+            if (actual == null) {
+                return false;
+            }
             if (Objects.equals(actual, oldValue)) {
                 if (isWriteThrough) {
                     try {
@@ -835,7 +842,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             throw new NullPointerException();
         }
         try {
-            V actualValue = get(key);
+            V actualValue = get(key, true, false);
             BlazingCacheCacheMutableEntry<K, V> entry = new BlazingCacheCacheMutableEntry<>(key, actualValue);
             T returnValue = entryProcessor.process(entry, arguments);
             if (entry.isRemoved()) {
@@ -926,7 +933,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
         try {
             Map<K, EntryProcessorResult<T>> result = new HashMap<>();
-            Map<K, V> actualValues = getAll(keys);
+            Map<K, V> actualValues = getAll(keys, false);
             Set<K> keysToRemove = new HashSet<>();
             Map<K, V> valuesToPut = new HashMap<>();
             for (K key : keys) {
@@ -940,6 +947,10 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     exception = new EntryProcessorException(err);
                 }
                 if (exception == null) {
+                    if (entry.isAccessed()) {
+                        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+                        boolean valid = handleEntryAccessed(serializedKey);
+                    }
                     if (entry.isRemoved()) {
                         keysToRemove.add(key);
                     } else if (entry.isUpdated()) {

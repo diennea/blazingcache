@@ -25,7 +25,7 @@ import javax.cache.expiry.ExpiryPolicy;
  *
  * @author enrico.olivelli
  */
-public class TCKCountingExpiryPolicy implements ExpiryPolicy, Serializable {
+public class CountingExpiryPolicy implements ExpiryPolicy, Serializable {
 
     /**
      * The number of times {@link #getExpiryForCreation()} was called.
@@ -45,7 +45,7 @@ public class TCKCountingExpiryPolicy implements ExpiryPolicy, Serializable {
     /**
      * Constructs a new {@link CountingExpiryPolicy}.
      */
-    public TCKCountingExpiryPolicy() {
+    public CountingExpiryPolicy() {
         this.creationCount = new AtomicInteger(0);
         this.accessedCount = new AtomicInteger(0);
         this.updatedCount = new AtomicInteger(0);

@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 import javax.cache.Cache;
 import javax.cache.CacheException;
 import javax.cache.CacheManager;
@@ -31,11 +32,14 @@ import javax.cache.configuration.MutableConfiguration;
 import javax.cache.expiry.Duration;
 import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.integration.CompletionListenerFuture;
+import javax.cache.processor.EntryProcessor;
 import javax.cache.spi.CachingProvider;
 
 import org.junit.After;
 import static org.junit.Assert.*;
 import org.junit.Test;
+import static junit.framework.TestCase.assertNotNull;
+import static org.hamcrest.CoreMatchers.is;
 import static junit.framework.TestCase.assertNotNull;
 import static org.hamcrest.CoreMatchers.is;
 
@@ -374,7 +378,7 @@ public class TCKCacheManagerTest {
     @Test
     public void containsKeyShouldNotCallExpiryPolicyMethods() {
 
-        TCKCountingExpiryPolicy expiryPolicy = new TCKCountingExpiryPolicy();
+        CountingExpiryPolicy expiryPolicy = new CountingExpiryPolicy();
 
         MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
         config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
@@ -583,7 +587,7 @@ public class TCKCacheManagerTest {
 
     @Test
     public void replaceSpecificShouldCallGetExpiry() {
-        TCKCountingExpiryPolicy expiryPolicy = new TCKCountingExpiryPolicy();        
+        CountingExpiryPolicy expiryPolicy = new CountingExpiryPolicy();
 
         MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
         config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
@@ -603,7 +607,7 @@ public class TCKCacheManagerTest {
         assertThat(expiryPolicy.getUpdatedCount(), is(0));
 
         cache.put(1, 1);
-        assertTrue(expiryPolicy.getCreationCount()>=1);
+        assertTrue(expiryPolicy.getCreationCount() >= 1);
         assertThat(expiryPolicy.getAccessCount(), is(0));
         assertThat(expiryPolicy.getUpdatedCount(), is(0));
         expiryPolicy.resetCount();
@@ -614,7 +618,7 @@ public class TCKCacheManagerTest {
 
         assertFalse(result);
         assertThat(expiryPolicy.getCreationCount(), is(0));
-        assertTrue(expiryPolicy.getAccessCount()>=1);
+        assertTrue(expiryPolicy.getAccessCount() >= 1);
         assertThat(expiryPolicy.getUpdatedCount(), is(0));
         expiryPolicy.resetCount();
 
@@ -624,8 +628,132 @@ public class TCKCacheManagerTest {
         assertTrue(result);
         assertThat(expiryPolicy.getCreationCount(), is(0));
         assertThat(expiryPolicy.getAccessCount(), is(0));
-        assertTrue(expiryPolicy.getUpdatedCount()>=1);
+        assertTrue(expiryPolicy.getUpdatedCount() >= 1);
         expiryPolicy.resetCount();
     }
 
+    @Test
+    public void invokeSetValueShouldCallGetExpiry() {
+
+        CountingExpiryPolicy expiryPolicy = new CountingExpiryPolicy();
+
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
+        config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
+        Cache<Integer, Integer> cache = getCacheManager().createCache("test-4", config);
+
+        final Integer key = 123;
+        final Integer setValue = 456;
+        final Integer modifySetValue = 789;
+
+        // verify create
+        EntryProcessor processors[]
+                = new EntryProcessor[]{
+                    new AssertNotPresentEntryProcessor(null),
+                    new SetEntryProcessor<Integer, Integer>(setValue),
+                    new GetEntryProcessor<Integer, Integer>()
+                };
+        Object[] result = (Object[]) cache.invoke(key, new CombineEntryProcessor(processors));
+
+        assertEquals(result[1], setValue);
+        assertEquals(result[2], setValue);
+
+        // expiry called should be for create, not for the get or modify.
+        // Operations get combined in entry processor and only net result should be expiryPolicy method called.
+        assertTrue(expiryPolicy.getCreationCount() >= 1);
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+        expiryPolicy.resetCount();
+
+        // verify modify
+        Integer resultValue = cache.invoke(key, new SetEntryProcessor<Integer, Integer>(modifySetValue));
+        assertEquals(modifySetValue, resultValue);
+
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertTrue(expiryPolicy.getUpdatedCount() >= 1);
+    }
+
+    @Test
+    public void removeSpecifiedEntryShouldNotCallExpiryPolicyMethods() {
+        CountingExpiryPolicy expiryPolicy = new CountingExpiryPolicy();
+
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
+        config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
+        Cache<Integer, Integer> cache = getCacheManager().createCache("test-2314", config);
+
+        boolean result = cache.remove(1, 1);
+
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+
+        cache.put(1, 1);
+
+        assertTrue(expiryPolicy.getCreationCount() >= 1);
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+        expiryPolicy.resetCount();
+
+        result = cache.remove(1, 2);
+
+        assertFalse(result);
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertThat(expiryPolicy.getAccessCount(), is(1));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+        expiryPolicy.resetCount();
+
+        result = cache.remove(1, 1);
+
+        assertTrue(result);
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+    }
+
+    @Test
+    public void invokeAllSetValueShouldCallGetExpiry() {
+
+        CountingExpiryPolicy expiryPolicy = new CountingExpiryPolicy();
+        
+
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
+        config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
+        Cache<Integer, Integer> cache = getCacheManager().createCache("test-234", config);
+
+        final Integer INITIAL_KEY = 123;
+        final Integer MAX_KEY_VALUE = INITIAL_KEY + 4;
+        final Integer setValue = 456;
+        final Integer modifySetValue = 789;
+
+        // set half of the keys so half of invokeAll will be modify and rest will be create.
+        Set<Integer> keys = new HashSet<>();
+        int createdCount = 0;
+        for (int key = INITIAL_KEY; key <= MAX_KEY_VALUE; key++) {
+            keys.add(key);
+            if (key <= MAX_KEY_VALUE - 2) {
+                cache.put(key, setValue);
+                createdCount++;
+            }
+        }
+
+        assertTrue(expiryPolicy.getCreationCount()>=createdCount);
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+        expiryPolicy.resetCount();
+
+        // verify modify or create
+        cache.invokeAll(keys, new SetEntryProcessor<Integer, Integer>(setValue));
+
+        assertTrue(expiryPolicy.getCreationCount()>=(keys.size() - createdCount));
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertTrue(expiryPolicy.getUpdatedCount()>=(createdCount));
+        expiryPolicy.resetCount();
+
+        // verify accessed
+        cache.invokeAll(keys, new GetEntryProcessor<Integer, Integer>());
+
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertTrue(expiryPolicy.getAccessCount()>=(keys.size()));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+    }
 }

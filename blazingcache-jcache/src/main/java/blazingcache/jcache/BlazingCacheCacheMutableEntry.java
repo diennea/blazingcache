@@ -30,6 +30,7 @@ public class BlazingCacheCacheMutableEntry<K, V> extends BlazingCacheEntry<K, V>
 
     private boolean removed;
     private boolean updated;
+    private boolean accessed;
 
     @Override
     public <T> T unwrap(Class<T> clazz) {
@@ -49,8 +50,16 @@ public class BlazingCacheCacheMutableEntry<K, V> extends BlazingCacheEntry<K, V>
         return updated;
     }
 
-    
-    
+    public boolean isAccessed() {
+        return accessed;
+    }
+
+    @Override
+    public V getValue() {
+        accessed = true;
+        return super.getValue();
+    }
+
     @Override
     public void setValue(V value) {
         if (value == null) {
