@@ -15,24 +15,29 @@
  */
 package blazingcache.jcache;
 
+import java.io.Serializable;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Properties;
 import javax.cache.Cache;
 import javax.cache.CacheException;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
+import javax.cache.configuration.FactoryBuilder;
 import javax.cache.configuration.MutableConfiguration;
+import javax.cache.expiry.Duration;
+import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.integration.CompletionListenerFuture;
 import javax.cache.spi.CachingProvider;
-import static junit.framework.TestCase.assertNotNull;
-import static org.hamcrest.CoreMatchers.is;
 
 import org.junit.After;
 import static org.junit.Assert.*;
 import org.junit.Test;
+import static junit.framework.TestCase.assertNotNull;
+import static org.hamcrest.CoreMatchers.is;
 
 /**
  *
@@ -366,10 +371,261 @@ public class TCKCacheManagerTest {
         }
     }
 
+    @Test
+    public void containsKeyShouldNotCallExpiryPolicyMethods() {
+
+        TCKCountingExpiryPolicy expiryPolicy = new TCKCountingExpiryPolicy();
+
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
+        config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
+        Cache<Integer, Integer> cache = getCacheManager().createCache("test", config);
+
+        cache.containsKey(1);
+
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+
+        cache.put(1, 1);
+
+        assertTrue(expiryPolicy.getCreationCount() >= 1);
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+        expiryPolicy.resetCount();
+
+        cache.containsKey(1);
+
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+    }
+
     /**
-     * Ensure that a {@link Cache#getAll(java.util.Set)} will load the expected
-     * entries.
+     * A {@link javax.cache.expiry.ExpiryPolicy} that updates the expiry time
+     * based on defined parameters.
      */
-   
+    public static class ParameterizedExpiryPolicy implements ExpiryPolicy, Serializable {
+
+        /**
+         * The serialVersionUID required for {@link java.io.Serializable}.
+         */
+        public static final long serialVersionUID = 201306141148L;
+
+        /**
+         * The {@link Duration} after which a Cache Entry will expire when
+         * created.
+         */
+        private Duration createdExpiryDuration;
+
+        /**
+         * The {@link Duration} after which a Cache Entry will expire when
+         * accessed. (when <code>null</code> the current expiry duration will be
+         * used)
+         */
+        private Duration accessedExpiryDuration;
+
+        /**
+         * The {@link Duration} after which a Cache Entry will expire when
+         * modified. (when <code>null</code> the current expiry duration will be
+         * used)
+         */
+        private Duration updatedExpiryDuration;
+
+        /**
+         * Constructs an {@link ParameterizedExpiryPolicy}.
+         *
+         * @param createdExpiryDuration the {@link Duration} to expire when an
+         * entry is created (must not be <code>null</code>)
+         * @param accessedExpiryDuration the {@link Duration} to expire when an
+         * entry is accessed (<code>null</code> means don't change the expiry)
+         * @param updatedExpiryDuration the {@link Duration} to expire when an
+         * entry is updated (<code>null</code> means don't change the expiry)
+         */
+        public ParameterizedExpiryPolicy(Duration createdExpiryDuration,
+                Duration accessedExpiryDuration,
+                Duration updatedExpiryDuration) {
+            if (createdExpiryDuration == null) {
+                throw new NullPointerException("createdExpiryDuration can't be null");
+            }
+
+            this.createdExpiryDuration = createdExpiryDuration;
+            this.accessedExpiryDuration = accessedExpiryDuration;
+            this.updatedExpiryDuration = updatedExpiryDuration;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Duration getExpiryForCreation() {
+            return createdExpiryDuration;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Duration getExpiryForAccess() {
+            return accessedExpiryDuration;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public Duration getExpiryForUpdate() {
+            return updatedExpiryDuration;
+        }
+    }
+
+    /**
+     * Ensure that a cache using a {@link javax.cache.expiry.ExpiryPolicy}
+     * configured to return a {@link Duration#ZERO} after modifying entries will
+     * immediately expire the entries.
+     */
+    @Test
+    public void expire_whenModified() {
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<Integer, Integer>();
+        config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(new ParameterizedExpiryPolicy(Duration.ETERNAL, null, Duration.ZERO)));
+
+        Cache<Integer, Integer> cache = getCacheManager().createCache("testexpiry", config);
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertTrue(cache.containsKey(1));
+        assertEquals((Integer) 1, cache.get(1));
+        assertEquals((Integer) 1, cache.get(1));
+
+        cache.put(1, 2);
+
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertEquals((Integer) 1, cache.get(1));
+
+        cache.put(1, 2);
+
+        assertFalse(cache.remove(1));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertEquals((Integer) 1, cache.get(1));
+
+        cache.put(1, 2);
+
+        assertFalse(cache.remove(1, 2));
+
+        cache.getAndPut(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertEquals((Integer) 1, cache.get(1));
+
+        cache.put(1, 2);
+
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.getAndPut(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertEquals((Integer) 1, cache.getAndPut(1, 2));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertEquals((Integer) 1, cache.get(1));
+
+        HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();
+        map.put(1, 2);
+        cache.putAll(map);
+
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertEquals((Integer) 1, cache.get(1));
+
+        cache.replace(1, 2);
+
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertEquals((Integer) 1, cache.get(1));
+
+        cache.replace(1, 1, 2);
+
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.iterator().hasNext());
+        assertEquals((Integer) 1, cache.iterator().next().getValue());
+        assertTrue(cache.containsKey(1));
+        assertEquals((Integer) 1, cache.iterator().next().getValue());
+
+        cache.put(1, 2);
+
+        assertFalse(cache.iterator().hasNext());
+    }
+
+    @Test
+    public void replaceSpecificShouldCallGetExpiry() {
+        TCKCountingExpiryPolicy expiryPolicy = new TCKCountingExpiryPolicy();        
+
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
+        config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
+        Cache<Integer, Integer> cache = getCacheManager().createCache("test-replace", config);
+
+        cache.containsKey(1);
+
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+
+        boolean result = cache.replace(1, 1, 2);
+
+        assertFalse(result);
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+
+        cache.put(1, 1);
+        assertTrue(expiryPolicy.getCreationCount()>=1);
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+        expiryPolicy.resetCount();
+
+        // verify case when entry exist for key, but oldValue is incorrect. So replacement does not happen.
+        // this counts as an access of entry referred to by key.
+        result = cache.replace(1, 2, 5);
+
+        assertFalse(result);
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertTrue(expiryPolicy.getAccessCount()>=1);
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+        expiryPolicy.resetCount();
+
+        // verify the modify case when replace does succeed.
+        result = cache.replace(1, 1, 2);
+
+        assertTrue(result);
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertTrue(expiryPolicy.getUpdatedCount()>=1);
+        expiryPolicy.resetCount();
+    }
 
 }
