@@ -148,7 +148,7 @@ public class CacheStatus {
                 if (keys.isEmpty()) {
                     keysForClient.remove(client);
                 }
-            }            
+            }
         } finally {
             lock.writeLock().unlock();
         }
@@ -230,6 +230,22 @@ public class CacheStatus {
                     }).map(entry -> entry.getKey()).limit(max).collect(Collectors.toList());
         } finally {
             lock.readLock().unlock();
+        }
+    }
+
+    void touchKeyFromClient(String key, String clientId, long expiretime) {
+        LOGGER.log(Level.FINEST, "touchKeyFromClient key={0} client={1} expiretime={2}", new Object[]{key, clientId, expiretime});
+        lock.writeLock().lock();
+        try {
+            if (clientsForKey.containsKey(key)) {
+                if (expiretime > 0) {
+                    entryExpireTime.put(key, expiretime);
+                } else {
+                    entryExpireTime.remove(key);
+                }
+            }
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 }

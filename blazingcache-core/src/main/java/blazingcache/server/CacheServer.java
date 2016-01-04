@@ -74,6 +74,10 @@ public class CacheServer implements AutoCloseable {
         return cacheStatus;
     }
 
+    void touchEntry(String key, String clientId, long expiretime) {
+        cacheStatus.touchKeyFromClient(key, clientId, expiretime);
+    }
+
     private class LeaderShipChangeListenerImpl extends LeaderShipChangeListener {
 
         @Override
@@ -100,7 +104,9 @@ public class CacheServer implements AutoCloseable {
         this.expireManager = new Thread(new Expirer(), "cache-server-expire-thread");
         this.expireManager.setDaemon(true);
         this.expireManager.start();
-        this.server.start();
+        if (this.server.getPort() > 0) {
+            this.server.start();
+        }
     }
 
     private class Expirer implements Runnable {

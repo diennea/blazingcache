@@ -40,6 +40,13 @@ public final class Message {
         data.put("key", key);
         return new Message(clientId, TYPE_FETCH_ENTRY, data);
     }
+    
+    public static Message TOUCH_ENTRY(String clientId, String key, long expiretime) {
+        HashMap<String, Object> data = new HashMap<>();
+        data.put("key", key);
+        data.put("expiretime", expiretime);
+        return new Message(clientId, TYPE_TOUCH_ENTRY, data);
+    }
 
     public static Message PUT_ENTRY(String clientId, String key, byte[] serializedData, long expiretime) {
         HashMap<String, Object> data = new HashMap<>();
@@ -107,6 +114,7 @@ public final class Message {
     public static final int TYPE_INVALIDATE_BY_PREFIX = 7;
     public static final int TYPE_UNREGISTER_ENTRY = 8;
     public static final int TYPE_FETCH_ENTRY = 9;
+    public static final int TYPE_TOUCH_ENTRY = 10;
 
     public static String typeToString(int type) {
         switch (type) {
@@ -128,6 +136,8 @@ public final class Message {
                 return "TYPE_UNREGISTER_ENTRY";
             case TYPE_FETCH_ENTRY:
                 return "TYPE_FETCH_ENTRY";
+            case TYPE_TOUCH_ENTRY:
+                return "TYPE_TOUCH_ENTRY";
             default:
                 return "?" + type;
         }
