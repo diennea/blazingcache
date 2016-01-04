@@ -7,30 +7,29 @@ package blazingcache;
 
 import java.nio.charset.StandardCharsets;
 import blazingcache.client.CacheClient;
-import blazingcache.client.CacheEntry;
 import blazingcache.network.ServerHostData;
-import blazingcache.network.mock.MockServerLocator;
-import blazingcache.network.netty.NettyCacheServerLocator;
+import blazingcache.network.jvm.JVMBrokerLocator;
 import blazingcache.server.CacheServer;
 import org.junit.Assert;
+import static org.junit.Assert.assertNotNull;
+import org.junit.Test;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import org.junit.Test;
 
 /**
  *
  * @author enrico.olivelli
  */
-public class MockClientTest {
+public class JVMClientTest {
 
     @Test
     public void basicTest() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
 
-        ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
+        ServerHostData serverHostData = new ServerHostData("localhost", -1, "test", false, null);
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
             cacheServer.start();
-            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new MockServerLocator());) {
+            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new JVMBrokerLocator("test", cacheServer));) {
                 client1.start();
                 assertTrue(client1.waitForConnection(10000));
 
@@ -40,6 +39,17 @@ public class MockClientTest {
 
                 client1.invalidate("pippo");
                 assertNull(client1.get("pippo"));
+
+                client1.put("key2", data, System.currentTimeMillis());
+                Thread.sleep(2000);
+                assertNull(client1.get("key2"));
+
+                client1.put("key3", data, -1);
+                assertNotNull(client1.get("key3"));
+                client1.touchEntry("key3", System.currentTimeMillis());
+                Thread.sleep(2000);
+                assertNull(client1.get("key3"));
+                
 
             }
 

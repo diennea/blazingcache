@@ -58,7 +58,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final String sharedSecret;
     private volatile boolean stopped = false;
     private Channel channel;
-    private long connectionTimestamp;    
+    private long connectionTimestamp;
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
@@ -73,7 +73,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public void setMaxMemory(long maxMemory) {
         this.maxMemory = maxMemory;
     }
-    
 
     private final AtomicLong actualMemory = new AtomicLong();
 
@@ -157,7 +156,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         disconnect();
         channel = brokerLocator.connect(this, this);
         connectionTimestamp = System.currentTimeMillis();
-        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connected, channel:" + channel);        
+        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connected, channel:" + channel);
     }
 
     public void disconnect() {
@@ -169,7 +168,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (c != null) {
                 channel = null;
                 c.close();
-            }            
+            }
         } finally {
             channel = null;
         }
@@ -189,7 +188,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                             connect();
                         }
 
-                    } catch (InterruptedException exit) {                        
+                    } catch (InterruptedException exit) {
                         continue;
                     } catch (ServerNotAvailableException | ServerRejectedConnectionException retry) {
                         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "no broker available:" + retry);
@@ -199,14 +198,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                         try {
                             CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "not connected, waiting 5000 ms");
                             Thread.sleep(5000);
-                        } catch (InterruptedException exit) {                            
+                        } catch (InterruptedException exit) {
                         }
                         continue;
                     }
                     if (maxMemory > 0) {
                         try {
                             ensureMaxMemoryLimit();
-                        } catch (InterruptedException exit) {                            
+                        } catch (InterruptedException exit) {
                             continue;
                         }
                     }
@@ -214,7 +213,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                         // TODO: wait for IO error or stop condition before reconnect 
                         CONNECTION_MANAGER_LOGGER.log(Level.FINEST, "connected");
                         Thread.sleep(5000);
-                    } catch (InterruptedException exit) {                        
+                    } catch (InterruptedException exit) {
                         continue;
                     }
 
@@ -323,7 +322,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 LOGGER.log(Level.FINEST, clientId + " invalidate " + key + " from " + message.clientId);
                 CacheEntry removed = cache.remove(key);
                 if (removed != null) {
-                    actualMemory.addAndGet(-removed.getSerializedData().length);                    
+                    actualMemory.addAndGet(-removed.getSerializedData().length);
                 }
                 Channel _channel = channel;
                 if (_channel != null) {
@@ -338,7 +337,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 keys.forEach((key) -> {
                     CacheEntry removed = cache.remove(key);
                     if (removed != null) {
-                        actualMemory.addAndGet(-removed.getSerializedData().length);                        
+                        actualMemory.addAndGet(-removed.getSerializedData().length);
                     }
                 });
                 Channel _channel = channel;
@@ -407,7 +406,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         stop();
     }
 
-    public void stop() {        
+    public void stop() {
         LOGGER.log(Level.SEVERE, "stopping");
         stopped = true;
         try {
@@ -441,7 +440,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
         } catch (TimeoutException err) {
             LOGGER.log(Level.SEVERE, "fetch failed " + key + ": " + err);
-        }        
+        }
         return null;
 
     }
@@ -454,6 +453,20 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         actualMemory.addAndGet(entry.getSerializedData().length);
     }
 
+    public void touchEntry(String key, long expiretime) {
+        Channel _channel = channel;
+        if (_channel != null) {
+            _channel.sendOneWayMessage(Message.TOUCH_ENTRY(clientId, key, expiretime), new SendResultCallback() {
+                @Override
+                public void messageSent(Message originalMessage, Throwable error) {
+                    if (error != null) {
+                        LOGGER.log(Level.SEVERE, "touch " + key + " failed ", error);
+                    }
+                }
+            });
+        }
+    }
+
     public CacheEntry get(String key) {
         if (channel == null) {
             LOGGER.log(Level.SEVERE, "get failed " + key + ", not connected");
@@ -463,7 +476,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         if (entry != null) {
             entry.lastGetTime = System.nanoTime();
             return entry;
-        }        
+        }
         return null;
     }
 
@@ -473,7 +486,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         // subito rimuoviamo dal locale
         CacheEntry removed = cache.remove(key);
         if (removed != null) {
-            actualMemory.addAndGet(-removed.getSerializedData().length);            
+            actualMemory.addAndGet(-removed.getSerializedData().length);
         }
 
         while (!stopped) {
@@ -501,7 +514,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         keys.forEach((key) -> {
             CacheEntry removed = cache.remove(key);
             if (removed != null) {
-                actualMemory.addAndGet(-removed.getSerializedData().length);                
+                actualMemory.addAndGet(-removed.getSerializedData().length);
             }
         });
 
@@ -531,7 +544,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return false;
         }
         try {
-            CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime);            
+            CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime);
             CacheEntry prev = cache.put(key, entry);
             if (prev != null) {
                 actualMemory.addAndGet(-prev.getSerializedData().length);
@@ -556,8 +569,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
 
     }
-    
-    public Set<String> getLocalKeySetByPrefix(String prefix){
+
+    public Set<String> getLocalKeySetByPrefix(String prefix) {
         return cache.keySet().stream().filter(k -> k.startsWith(prefix)).collect(Collectors.toSet());
     }
 

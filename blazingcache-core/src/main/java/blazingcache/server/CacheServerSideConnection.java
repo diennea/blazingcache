@@ -167,6 +167,14 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 break;
 
             }
+            
+            case Message.TYPE_TOUCH_ENTRY: {
+                String key = (String) message.parameters.get("key");
+                long expiretime = (long) message.parameters.get("expiretime");
+                server.touchEntry(key, clientId, expiretime);
+                break;
+
+            }
             case Message.TYPE_INVALIDATE_BY_PREFIX: {
                 String prefix = (String) message.parameters.get("prefix");
                 server.invalidateByPrefix(prefix, clientId, new SimpleCallback<String>() {

@@ -103,19 +103,31 @@ final class BlazingCacheCacheEntryListenerWrapper<K, V> {
 
     void onEntryCreated(K key, V value) {
         if (onCreate) {
-            ((CacheEntryCreatedListener) listener).onCreated(Arrays.asList(new BlazingCacheCacheEntryEvent(key, null, value, parent, EventType.CREATED)));
+            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, null, value, parent, EventType.CREATED);
+            if (filter != null && !filter.evaluate(event)) {
+                return;
+            }
+            ((CacheEntryCreatedListener) listener).onCreated(Arrays.asList(event));
         }
     }
 
     void onEntryUpdated(K key, V oldValue, V value) {
         if (onUpdate) {
-            ((CacheEntryUpdatedListener) listener).onUpdated(Arrays.asList(new BlazingCacheCacheEntryEvent(key, oldValue, value, parent, EventType.UPDATED)));
+            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, oldValue, value, parent, EventType.UPDATED);
+            if (filter != null && !filter.evaluate(event)) {
+                return;
+            }
+            ((CacheEntryUpdatedListener) listener).onUpdated(Arrays.asList(event));
         }
     }
 
     void onEntryRemoved(K key, V oldValue) {
         if (onRemove) {
-            ((CacheEntryRemovedListener) listener).onRemoved(Arrays.asList(new BlazingCacheCacheEntryEvent(key, oldValue, null, parent, EventType.REMOVED)));
+            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, oldValue, null, parent, EventType.REMOVED);
+            if (filter != null && !filter.evaluate(event)) {
+                return;
+            }
+            ((CacheEntryRemovedListener) listener).onRemoved(Arrays.asList(event));
         }
     }
 

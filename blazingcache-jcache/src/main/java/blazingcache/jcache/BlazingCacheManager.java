@@ -16,8 +16,10 @@
 package blazingcache.jcache;
 
 import blazingcache.client.CacheClient;
+import blazingcache.network.ServerHostData;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.netty.NettyCacheServerLocator;
+import blazingcache.server.CacheServer;
 import blazingcache.zookeeper.ZKCacheServerLocator;
 import java.net.InetAddress;
 import java.net.URI;
@@ -46,6 +48,7 @@ public class BlazingCacheManager implements CacheManager {
     private final Properties properties;
     private volatile boolean closed;
     private final CacheClient client;
+    private final CacheServer embeddedServer;
     private final boolean usefetch;
     private final Serializer<Object, String> keysSerializer;
     private final Serializer<Object, byte[]> valuesSerializer;
@@ -80,6 +83,7 @@ public class BlazingCacheManager implements CacheManager {
                     String path = properties.getProperty("blazingcache.zookeeper.path", "/cache");
                     locator = new ZKCacheServerLocator(connect, timeout, path);
                     this.client = new CacheClient(clientId, secret, locator);
+                    this.embeddedServer = null;
                     break;
                 case "static":
                     String host = properties.getProperty("blazingcache.server.host", "localhost");
@@ -87,13 +91,18 @@ public class BlazingCacheManager implements CacheManager {
                     boolean ssl = Boolean.parseBoolean(properties.getProperty("blazingcache.server.ssl", "false"));
                     locator = new NettyCacheServerLocator(host, port, ssl);
                     this.client = new CacheClient(clientId, secret, locator);
+                    this.embeddedServer = null;
                     break;
                 case "local":
-                    locator = new blazingcache.network.mock.MockServerLocator();
+                    this.embeddedServer = new CacheServer(secret, new ServerHostData("localhost", -1, "", false, new HashMap<>()));
+                    locator = new blazingcache.network.jvm.JVMBrokerLocator("localhost", embeddedServer);
                     this.client = new CacheClient(clientId, secret, locator);
                     break;
                 default:
                     throw new RuntimeException("unsupported blazingcache.mode=" + mode);
+            }
+            if (embeddedServer != null) {
+                embeddedServer.start();
             }
             client.start();
             boolean ok = client.waitForConnection(10000);
@@ -235,6 +244,9 @@ public class BlazingCacheManager implements CacheManager {
                 client.close();
             } catch (Exception err) {
             }
+        }
+        if (embeddedServer != null) {
+            embeddedServer.close();
         }
         closed = true;
         provider.releaseCacheManager(uri, classLoader);
