@@ -123,7 +123,7 @@ final class BlazingCacheCacheEntryListenerWrapper<K, V> {
 
     void onEntryRemoved(K key, V oldValue) {
         if (onRemove) {
-            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, oldValue, null, parent, EventType.REMOVED);
+            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, oldValue, oldValue, parent, EventType.REMOVED);
             if (filter != null && !filter.evaluate(event)) {
                 return;
             }

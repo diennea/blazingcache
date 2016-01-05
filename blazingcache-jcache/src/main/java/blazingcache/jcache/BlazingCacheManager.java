@@ -218,7 +218,11 @@ public class BlazingCacheManager implements CacheManager {
         if (cacheName == null) {
             throw new NullPointerException();
         }
-        // noop
+        BlazingCacheCache cache = caches.get(cacheName);
+        if (cache == null) {
+            return;
+        }
+        cache.setManagementEnabled(enabled);
     }
 
     @Override
@@ -227,7 +231,11 @@ public class BlazingCacheManager implements CacheManager {
         if (cacheName == null) {
             throw new NullPointerException();
         }
-        // noop
+        BlazingCacheCache cache = caches.get(cacheName);
+        if (cache == null) {
+            return;
+        }
+        cache.setStatisticsEnabled(enabled);
     }
 
     @Override
@@ -264,6 +272,15 @@ public class BlazingCacheManager implements CacheManager {
         } else {
             throw new IllegalArgumentException();
         }
+    }
+
+    /**
+     * Get the low-level client
+     *
+     * @return
+     */
+    public CacheClient getClient() {
+        return client;
     }
 
 }

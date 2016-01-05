@@ -56,7 +56,10 @@ public class BlazingCacheCacheMutableEntry<K, V> extends BlazingCacheEntry<K, V>
 
     @Override
     public V getValue() {
-        accessed = true;
+        if (!updated) {
+            // current value has been set by the EntryProcessor, so this is not an 'access'
+            accessed = true;
+        }
         return super.getValue();
     }
 
