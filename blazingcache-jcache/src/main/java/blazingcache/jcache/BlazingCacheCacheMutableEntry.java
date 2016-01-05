@@ -24,10 +24,12 @@ import javax.cache.processor.MutableEntry;
  */
 public class BlazingCacheCacheMutableEntry<K, V> extends BlazingCacheEntry<K, V> implements MutableEntry<K, V> {
 
-    public BlazingCacheCacheMutableEntry(K key, V value) {
+    public BlazingCacheCacheMutableEntry(boolean present, K key, V value) {
         super(key, value);
+        this.present = present;
     }
 
+    private final boolean present;
     private boolean removed;
     private boolean updated;
     private boolean accessed;
@@ -56,11 +58,12 @@ public class BlazingCacheCacheMutableEntry<K, V> extends BlazingCacheEntry<K, V>
 
     @Override
     public V getValue() {
-        if (!updated) {
-            // current value has been set by the EntryProcessor, so this is not an 'access'
+        V actualValue = super.getValue();
+        if (!updated && present) {
+            // current value has been set by the EntryProcessor, so this is not an 'access'            
             accessed = true;
         }
-        return super.getValue();
+        return actualValue;
     }
 
     @Override
@@ -81,7 +84,9 @@ public class BlazingCacheCacheMutableEntry<K, V> extends BlazingCacheEntry<K, V>
     @Override
     public void remove() {
         value = null;
-        removed = true;
+        if (!updated) {
+            removed = true;
+        }
         updated = false;
     }
 

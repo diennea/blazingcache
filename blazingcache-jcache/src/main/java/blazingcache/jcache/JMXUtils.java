@@ -67,8 +67,7 @@ public class JMXUtils {
         String cacheName = safeName(cache.getName());
 
         try {
-            ObjectName name = new ObjectName("javax.cache:type=CacheStatistics,CacheManager=" + cacheManagerName + ",Cache=" + cacheName);
-            System.out.println("registrering statistics at " + name + " on " + platformMBeanServer);
+            ObjectName name = new ObjectName("javax.cache:type=CacheStatistics,CacheManager=" + cacheManagerName + ",Cache=" + cacheName);            
 
             if (platformMBeanServer.isRegistered(name)) {
                 try {

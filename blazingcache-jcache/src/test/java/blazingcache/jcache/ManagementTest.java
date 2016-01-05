@@ -15,18 +15,32 @@
  */
 package blazingcache.jcache;
 
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.SimpleFormatter;
+import javax.cache.Cache;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
+import javax.cache.configuration.FactoryBuilder;
 import javax.cache.configuration.MutableConfiguration;
+import javax.cache.expiry.CreatedExpiryPolicy;
+import javax.cache.expiry.Duration;
+import javax.cache.expiry.ExpiryPolicy;
+import javax.cache.integration.CacheLoader;
+import javax.cache.integration.CompletionListenerFuture;
 import javax.cache.spi.CachingProvider;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.is;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -181,7 +195,7 @@ public class ManagementTest {
 
             boolean result = cache.putIfAbsent(1L, "succeeded");
             putCount++;
-            missCount++;
+//            missCount++;
             assertTrue(result);
             assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
             assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
@@ -190,7 +204,7 @@ public class ManagementTest {
 
             result = cache.putIfAbsent(1L, "succeeded");
             assertFalse(result);
-            hitCount++;
+//            hitCount++;
             assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
             assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
             assertEquals((int) putCount, (int) cache.getStatisticsMXBean().getCachePuts());
@@ -389,5 +403,79 @@ public class ManagementTest {
             assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
 
         }
+    }
+
+    @Test
+    public void loadAllWithReadThroughEnabledShouldCallGetExpiryForCreatedEntry() throws IOException, ExecutionException, InterruptedException {
+        //establish and open a CacheLoaderServer to handle cache
+        //cache loading requests from a CacheLoaderClient
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        Properties p = new Properties();
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            // this cacheLoader just returns the key as the value.
+            RecordingCacheLoader<Integer> recordingCacheLoader = new RecordingCacheLoader<>();
+
+            CountingExpiryPolicy expiryPolicy = new CountingExpiryPolicy();
+
+            MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
+            config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
+            config.setCacheLoaderFactory(new FactoryBuilder.SingletonFactory<>(recordingCacheLoader));
+            config.setReadThrough(true);
+
+            Cache<Integer, Integer> cache = cacheManager.createCache("test-aaa", config);
+
+            final Integer INITIAL_KEY = 123;
+            final Integer MAX_KEY_VALUE = INITIAL_KEY + 4;
+
+            // set half of the keys so half of loadAdd will be loaded
+            Set<Integer> keys = new HashSet<>();
+            for (int key = INITIAL_KEY; key <= MAX_KEY_VALUE; key++) {
+                keys.add(key);
+            }
+
+            // verify read-through of getValue of non-existent entries
+            CompletionListenerFuture future = new CompletionListenerFuture();
+            cache.loadAll(keys, false, future);
+
+            //wait for the load to complete
+            future.get();
+
+            assertThat(future.isDone(), is(true));
+            assertThat(recordingCacheLoader.getLoadCount(), is(keys.size()));
+
+            assertTrue(expiryPolicy.getCreationCount() >= keys.size());
+            assertThat(expiryPolicy.getAccessCount(), is(0));
+            assertThat(expiryPolicy.getUpdatedCount(), is(0));
+            expiryPolicy.resetCount();
+
+            for (Integer key : keys) {
+                assertThat(recordingCacheLoader.hasLoaded(key), is(true));
+                assertThat(cache.get(key), is(equalTo(key)));
+            }
+            assertTrue(expiryPolicy.getAccessCount() >= keys.size());
+            expiryPolicy.resetCount();
+
+            // verify read-through of getValue for existing entries AND replaceExistingValues is true.
+            final boolean REPLACE_EXISTING_VALUES = true;
+            future = new CompletionListenerFuture();
+            cache.loadAll(keys, REPLACE_EXISTING_VALUES, future);
+
+            //wait for the load to complete
+            future.get();
+
+            assertThat(future.isDone(), is(true));
+            assertThat(recordingCacheLoader.getLoadCount(), is(keys.size() * 2));
+
+            assertThat(expiryPolicy.getCreationCount(), is(0));
+            assertThat(expiryPolicy.getAccessCount(), is(0));
+            assertTrue(expiryPolicy.getUpdatedCount() >= keys.size());
+            expiryPolicy.resetCount();
+
+            for (Integer key : keys) {
+                assertThat(recordingCacheLoader.hasLoaded(key), is(true));
+                assertThat(cache.get(key), is(equalTo(key)));
+            }
+        }
+
     }
 }

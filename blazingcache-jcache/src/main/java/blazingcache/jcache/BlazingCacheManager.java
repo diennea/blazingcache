@@ -95,6 +95,7 @@ public class BlazingCacheManager implements CacheManager {
                     break;
                 case "local":
                     this.embeddedServer = new CacheServer(secret, new ServerHostData("localhost", -1, "", false, new HashMap<>()));
+                    this.embeddedServer.setExpirerPeriod(1);
                     locator = new blazingcache.network.jvm.JVMBrokerLocator("localhost", embeddedServer);
                     this.client = new CacheClient(clientId, secret, locator);
                     break;
@@ -105,12 +106,8 @@ public class BlazingCacheManager implements CacheManager {
                 embeddedServer.start();
             }
             client.start();
-            boolean ok = client.waitForConnection(10000);
-//            if (!ok) {
-//                System.out.println("Connection could not established");
-//            } else {
-//                System.out.println("Connection OK");
-//            }
+            client.waitForConnection(10000);
+
         } catch (Exception err) {
             throw new CacheException(err);
         }

@@ -542,4 +542,27 @@ public class CacheWriterTest {
             assertFalse(cache.containsKey(1));
         }
     }
+
+    @Test
+    public void shouldWriteThroughUsingInvoke_remove_nonExistingEntry() {
+        RecordingCacheWriter<Integer, String> cacheWriter = new RecordingCacheWriter<>();
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        Properties p = new Properties();
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<Integer, String> config
+                    = new MutableConfiguration<Integer, String>()
+                    .setTypes(Integer.class, String.class)
+                    .setCacheWriterFactory(new FactoryBuilder.SingletonFactory<>(cacheWriter))
+                    .setWriteThrough(true);
+
+            Cache<Integer, String> cache = cacheManager.createCache("simpleCache", config);
+            assertEquals(0, cacheWriter.getWriteCount());
+            assertEquals(0, cacheWriter.getDeleteCount());
+
+            cache.invoke(1, new RemoveEntryProcessor<Integer, String, Object>());
+            assertEquals(0, cacheWriter.getWriteCount());
+            assertEquals(1, cacheWriter.getDeleteCount());
+            assertFalse(cacheWriter.hasWritten(1));
+        }
+    }
 }
