@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 enrico.olivelli.
+ * Copyright 2015 Diennea S.R.L..
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javax.cache.Cache;
 import javax.cache.CacheManager;
@@ -900,6 +901,10 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         return TimeUnit.MILLISECONDS.convert(res.getDurationAmount(), res.getTimeUnit());
     }
 
+    public void clearStatistics() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
     private static class EntryProcessorResultImpl<T> implements EntryProcessorResult<T> {
 
         private final T value;
@@ -1100,6 +1105,56 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         Iterator<K> keysIterator = localKeys.iterator();
         return new EntryIterator(keysIterator, this);
 
+    }
+
+    private final AtomicLong cacheHits = new AtomicLong();
+    private final AtomicLong cacheMisses = new AtomicLong();
+    private final AtomicLong cacheGets = new AtomicLong();
+    private final AtomicLong cachePuts = new AtomicLong();
+    private final AtomicLong cacheRemovals = new AtomicLong();
+
+    public long getCacheHits() {
+        return cacheHits.get();
+    }
+
+    public float getCacheHitPercentage() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    public long getCacheMisses() {
+        return cacheMisses.get();
+    }
+
+    public float getCacheMissPercentage() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    public long getCacheGets() {
+        return cacheGets.get();
+    }
+
+    public long getCachePuts() {
+        return cachePuts.get();
+    }
+
+    public long getCacheRemovals() {
+        return cacheRemovals.get();
+    }
+
+    public long getCacheEvictions() {
+        return 0;
+    }
+
+    public float getAverageGetTime() {
+        return Float.NaN;
+    }
+
+    public float getAveragePutTime() {
+        return Float.NaN;
+    }
+
+    public float getAverageRemoveTime() {
+        return Float.NaN;
     }
 
 }
