@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.SimpleFormatter;
@@ -30,6 +31,9 @@ import javax.cache.CacheManager;
 import javax.cache.Caching;
 import javax.cache.configuration.FactoryBuilder;
 import javax.cache.configuration.MutableConfiguration;
+import javax.cache.expiry.CreatedExpiryPolicy;
+import javax.cache.expiry.Duration;
+import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.integration.CacheLoader;
 import javax.cache.integration.CompletionListenerFuture;
 import javax.cache.spi.CachingProvider;
@@ -191,7 +195,7 @@ public class ManagementTest {
 
             boolean result = cache.putIfAbsent(1L, "succeeded");
             putCount++;
-            missCount++;
+//            missCount++;
             assertTrue(result);
             assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
             assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
@@ -200,7 +204,7 @@ public class ManagementTest {
 
             result = cache.putIfAbsent(1L, "succeeded");
             assertFalse(result);
-            hitCount++;
+//            hitCount++;
             assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
             assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
             assertEquals((int) putCount, (int) cache.getStatisticsMXBean().getCachePuts());

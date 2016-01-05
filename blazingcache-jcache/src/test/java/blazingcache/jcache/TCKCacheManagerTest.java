@@ -25,12 +25,14 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.cache.Cache;
 import javax.cache.CacheException;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
 import javax.cache.configuration.FactoryBuilder;
 import javax.cache.configuration.MutableConfiguration;
+import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
 import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.integration.CompletionListenerFuture;
@@ -130,6 +132,30 @@ public class TCKCacheManagerTest {
 
         assertEquals(cache1, cacheManager.getCache(name1));
         assertEquals(cache2, cacheManager.getCache(name2));
+    }
+
+    @Test
+    public void testCacheStatisticsRemoveAll() throws Exception {
+
+        //cannot be zero or will not be added to the cache
+        ExpiryPolicy policy = new CreatedExpiryPolicy(new Duration(TimeUnit.MILLISECONDS, 20));
+
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
+        config.setExpiryPolicyFactory(new FactoryBuilder.SingletonFactory<>(policy)).setStatisticsEnabled(true);
+        Cache<Integer, Integer> cache = getCacheManager().createCache("test-c", config);
+
+        for (int i = 0; i < 100; i++) {
+            cache.put(i, i + 100);
+        }
+        //should work with all implementations
+        Thread.sleep(50);
+        cache.removeAll();
+
+        BlazingCacheCache<Integer,Integer> blazingCache = cache.unwrap(BlazingCacheCache.class);
+        assertEquals(100L, blazingCache.getStatisticsMXBean().getCachePuts());
+        //Removals does not count expired entries
+        assertEquals(0L, blazingCache.getStatisticsMXBean().getCacheRemovals());
+
     }
 
     @Test

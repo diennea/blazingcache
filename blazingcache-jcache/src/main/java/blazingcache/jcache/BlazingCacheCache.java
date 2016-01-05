@@ -636,11 +636,11 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
         runtimeCheckType(key, value);
         if (!containsKey(key)) {
-            cacheMisses.incrementAndGet();
+//            cacheMisses.incrementAndGet();
             put(key, value);
             return true;
         } else {
-            cacheHits.incrementAndGet();
+//            cacheHits.incrementAndGet();
             return false;
         }
     }
@@ -937,12 +937,12 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
         try {
             boolean present = containsKey(key);
-            System.out.println("key "+key+" present:"+present);
+            System.out.println("key " + key + " present:" + present);
             V valueBeforeProcessor = get(key, true, false);
             BlazingCacheCacheMutableEntry<K, V> entry = new BlazingCacheCacheMutableEntry<>(present, key, valueBeforeProcessor);
             T returnValue = entryProcessor.process(entry, arguments);
             String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
-            System.out.println("key "+key+" accesses "+entry.isAccessed()+" removed "+entry.isRemoved()+" updated "+entry.isUpdated());
+            System.out.println("key " + key + " accesses " + entry.isAccessed() + " removed " + entry.isRemoved() + " updated " + entry.isUpdated());
             boolean validAfterAccess = true;
             if (entry.isAccessed()) {
                 validAfterAccess = handleEntryAccessed(serializedKey);

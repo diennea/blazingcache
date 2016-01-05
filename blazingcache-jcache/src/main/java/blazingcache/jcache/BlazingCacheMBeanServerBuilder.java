@@ -132,7 +132,7 @@ public class BlazingCacheMBeanServerBuilder extends MBeanServerBuilder {
 
         @Override
         public synchronized String getMBeanServerId() {
-            return System.getProperty("org.jsr107.tck.management.agentId");
+            return System.getProperty("org.jsr107.tck.management.agentId", "blazingcache-nbeanserver");
         }
     }
 

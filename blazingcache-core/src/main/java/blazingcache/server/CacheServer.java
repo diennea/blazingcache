@@ -109,6 +109,16 @@ public class CacheServer implements AutoCloseable {
         }
     }
 
+    private int expirerPeriod = 1000;
+
+    public int getExpirerPeriod() {
+        return expirerPeriod;
+    }
+
+    public void setExpirerPeriod(int expirerPeriod) {
+        this.expirerPeriod = expirerPeriod;
+    }
+
     private class Expirer implements Runnable {
 
         @Override
@@ -139,7 +149,7 @@ public class CacheServer implements AutoCloseable {
                     }
                 }
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(expirerPeriod);
                 } catch (InterruptedException exit) {
                     break;
                 }
