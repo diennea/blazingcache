@@ -55,6 +55,10 @@ public class JMXUtils {
         return s.replaceAll(",|:|=|\n\r#", ".");
     }
 
+    public static MBeanServer getMBeanServer() {
+        return platformMBeanServer;
+    }
+
     public static <K, V> void registerStatisticsMXBean(BlazingCacheCache<K, V> cache, BlazingCacheStatisticsMXBean<K, V> bean) {
         if (platformMBeanServer == null) {
             throw new CacheException("PlatformMBeanServer not available", mBeanServerLookupError);
@@ -64,7 +68,7 @@ public class JMXUtils {
 
         try {
             ObjectName name = new ObjectName("javax.cache:type=CacheStatistics,CacheManager=" + cacheManagerName + ",Cache=" + cacheName);
-            System.out.println("registrering statistics at " + name);
+            System.out.println("registrering statistics at " + name + " on " + platformMBeanServer);
 
             if (platformMBeanServer.isRegistered(name)) {
                 try {

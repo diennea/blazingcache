@@ -245,8 +245,9 @@ public class CacheListenersTest {
         }
 
         @Override
-        public void onRemoved(Iterable<CacheEntryEvent<? extends K, ? extends V>> events) throws CacheEntryListenerException {
+        public void onRemoved(Iterable<CacheEntryEvent<? extends K, ? extends V>> events) throws CacheEntryListenerException {            
             for (CacheEntryEvent<? extends K, ? extends V> event : events) {
+                new Exception("onRemoved "+event).printStackTrace(System.out);
                 assertEquals(REMOVED.toString(), event.getEventType().toString());
                 removed.incrementAndGet();
                 event.getKey();

@@ -82,6 +82,7 @@ public class BlazingCacheCacheMutableEntry<K, V> extends BlazingCacheEntry<K, V>
     public void remove() {
         value = null;
         removed = true;
+        updated = false;
     }
 
 }

@@ -15,6 +15,8 @@
  */
 package blazingcache.jcache;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
@@ -23,10 +25,14 @@ import javax.cache.CacheManager;
 import javax.cache.Caching;
 import javax.cache.configuration.MutableConfiguration;
 import javax.cache.spi.CachingProvider;
-import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.After;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 
 /**
  * Examples taken from JSR107 documentation
@@ -87,4 +93,301 @@ public class ManagementTest {
         }
     }
 
+    @Test
+    public void testCacheStatisticsInvokeEntryProcessorRemove() throws Exception {
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        Properties p = new Properties();
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<Long, String> config
+                    = new MutableConfiguration<Long, String>()
+                    .setTypes(Long.class, String.class)
+                    .setStatisticsEnabled(true)
+                    .setManagementEnabled(true);
+            BlazingCacheCache<Long, String> cache = cacheManager.createCache("simpleCache", config).unwrap(BlazingCacheCache.class);
+
+            cache.put(1l, "Sooty");
+            String result = cache.invoke(1l, new RemoveEntryProcessor<Long, String, String>(true));
+            assertEquals(result, "Sooty");
+            assertEquals((int) 1, (int) cache.getStatisticsMXBean().getCacheHits());
+            assertEquals((int) 1, (int) cache.getStatisticsMXBean().getCachePuts());
+            assertEquals((int) 1, (int) cache.getStatisticsMXBean().getCacheRemovals());
+        }
+    }
+
+    @Test
+    public void testGetAndReplace() throws Exception {
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        Properties p = new Properties();
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<Long, String> config
+                    = new MutableConfiguration<Long, String>()
+                    .setTypes(Long.class, String.class)
+                    .setStatisticsEnabled(true)
+                    .setManagementEnabled(true);
+            BlazingCacheCache<Long, String> cache = cacheManager.createCache("simpleCache", config).unwrap(BlazingCacheCache.class);
+            long hitCount = 0;
+            long missCount = 0;
+            long putCount = 0;
+
+            String result = cache.getAndReplace(1L, "MissingNoReplace");
+            missCount++;
+
+            assertFalse(cache.containsKey(1L));
+            assertEquals(null, result);
+            assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
+            assertEquals((int) putCount, (int) cache.getStatisticsMXBean().getCachePuts());
+            assertFalse(cache.containsKey(1L));
+
+            cache.put(1l, "Sooty");
+            putCount++;
+            assertTrue(cache.containsKey(1L));
+            assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
+            assertEquals((int) putCount, (int) cache.getStatisticsMXBean().getCachePuts());
+
+            result = cache.getAndReplace(2L, "InvalidReplace");
+            missCount++;
+            assertEquals(null, result);
+            assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
+            assertEquals((int) putCount, (int) cache.getStatisticsMXBean().getCachePuts());
+            assertFalse(cache.containsKey(2L));
+
+            result = cache.getAndReplace(1L, "Replaced");
+            hitCount++;
+            putCount++;
+            assertEquals("Sooty", result);
+            assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
+            assertEquals((int) putCount, (int) cache.getStatisticsMXBean().getCachePuts());
+        }
+    }
+
+    @Test
+    public void testPutIfAbsent() throws Exception {
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        Properties p = new Properties();
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<Long, String> config
+                    = new MutableConfiguration<Long, String>()
+                    .setTypes(Long.class, String.class)
+                    .setStatisticsEnabled(true)
+                    .setManagementEnabled(true);
+            BlazingCacheCache<Long, String> cache = cacheManager.createCache("simpleCache", config).unwrap(BlazingCacheCache.class);
+            long hitCount = 0;
+            long missCount = 0;
+            long putCount = 0;
+
+            boolean result = cache.putIfAbsent(1L, "succeeded");
+            putCount++;
+            missCount++;
+            assertTrue(result);
+            assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
+            assertEquals((int) putCount, (int) cache.getStatisticsMXBean().getCachePuts());
+            assertTrue(cache.containsKey(1L));
+
+            result = cache.putIfAbsent(1L, "succeeded");
+            assertFalse(result);
+            hitCount++;
+            assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
+            assertEquals((int) putCount, (int) cache.getStatisticsMXBean().getCachePuts());
+        }
+    }
+
+    @Test
+    public void testCacheStatistics() throws Exception {
+        final float DELTA = 1.0f;
+        final float DELTA_0 = 0.0f;
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        Properties p = new Properties();
+        try (CacheManager cacheManager = cachingProvider.getCacheManager(cachingProvider.getDefaultURI(), cachingProvider.getDefaultClassLoader(), p)) {
+            MutableConfiguration<Long, String> config
+                    = new MutableConfiguration<Long, String>()
+                    .setTypes(Long.class, String.class)
+                    .setStatisticsEnabled(true)
+                    .setManagementEnabled(true);
+            BlazingCacheCache<Long, String> cache = cacheManager.createCache("simpleCache", config).unwrap(BlazingCacheCache.class);
+            cache.put(1l, "Sooty");
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(1L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            Map<Long, String> entries = new HashMap<Long, String>();
+            entries.put(2l, "Lucky");
+            entries.put(3l, "Prince");
+            cache.putAll(entries);
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(3L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            //Update. But we count these simply as puts for stats
+            cache.put(1l, "Sooty");
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(4L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            cache.putAll(entries);
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(6L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            cache.getAndPut(4l, "Cody");
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(1L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(100.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(7L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            cache.getAndPut(4l, "Cody");
+            assertEquals(1L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(1L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(8L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            String value = cache.get(1l);
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(66.0f, (float) cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA);
+            assertEquals(1L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(33.0f, (float) cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA);
+            assertEquals(8L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            //now do a second miss
+            value = cache.get(1234324324l);
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(8L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            //containsKey() should not affect statistics
+            assertTrue(cache.containsKey(1l));
+            assertFalse(cache.containsKey(1234324324l));
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(8L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            assertTrue(cache.remove(1L));
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(8L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(1L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            //no update to cache removals as does not exist
+            assertFalse(cache.remove(1L));
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(8L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(1L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            //should update removals as succeeded
+            cache.put(1l, "Sooty");
+            assertTrue(cache.remove(1L, "Sooty"));
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(60.0f, (float) cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA);
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(40.0f, (float) cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA);
+            assertEquals(9L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            //should not update removals as remove failed
+            assertFalse(cache.remove(1L, "Sooty"));
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(9L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            cache.clear();
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(9L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            cache.removeAll();
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(9L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(2L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            entries.put(21L, "Trinity");
+            cache.putAll(entries);
+            cache.removeAll();
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(12L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(5L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            cache.putAll(entries);
+            entries.remove(21L);
+            System.out.println("removing " + entries.keySet().size() + " entries");
+            cache.removeAll(entries.keySet());
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(15L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(7L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+            cache.removeAll(entries.keySet());
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheHits());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheHitPercentage(), DELTA_0);
+            assertEquals(3L, cache.getStatisticsMXBean().getCacheMisses());
+            assertEquals(50.0f, cache.getStatisticsMXBean().getCacheMissPercentage(), DELTA_0);
+            assertEquals(15L, cache.getStatisticsMXBean().getCachePuts());
+            assertEquals(7L, cache.getStatisticsMXBean().getCacheRemovals());
+            assertEquals(0L, cache.getStatisticsMXBean().getCacheEvictions());
+
+        }
+    }
 }

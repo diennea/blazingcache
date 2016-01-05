@@ -16,12 +16,12 @@
 package blazingcache.jcache;
 
 import java.io.Serializable;
-import java.lang.management.ManagementFactory;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.Set;
 import javax.cache.Cache;
@@ -30,16 +30,13 @@ import javax.cache.CacheManager;
 import javax.cache.Caching;
 import javax.cache.configuration.FactoryBuilder;
 import javax.cache.configuration.MutableConfiguration;
-import javax.cache.expiry.AccessedExpiryPolicy;
 import javax.cache.expiry.Duration;
-import static javax.cache.expiry.Duration.ONE_HOUR;
 import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.integration.CompletionListenerFuture;
 import javax.cache.processor.EntryProcessor;
 import javax.cache.spi.CachingProvider;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
-import static jdk.nashorn.internal.runtime.regexp.joni.Syntax.Java;
 
 import org.junit.After;
 import static org.junit.Assert.*;
@@ -408,6 +405,85 @@ public class TCKCacheManagerTest {
         assertThat(expiryPolicy.getUpdatedCount(), is(0));
     }
 
+    @Test
+    public void expire_whenAccessed() {
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<Integer, Integer>();
+        config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(new ParameterizedExpiryPolicy(Duration.ETERNAL, Duration.ZERO, null)));
+
+        Cache<Integer, Integer> cache = getCacheManager().createCache("test-aaa", config);
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.getAndReplace(1, 2));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.getAndRemove(1));
+
+        cache.put(1, 1);
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.remove(1));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.remove(1, 1));
+
+        cache.getAndPut(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.getAndPut(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.getAndPut(1, 1));
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.putIfAbsent(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();
+        map.put(1, 1);
+        cache.putAll(map);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.put(1, 1);
+        Iterator<Cache.Entry<Integer, Integer>> iterator = cache.iterator();
+
+        assertTrue(iterator.hasNext());
+        assertEquals((Integer) 1, iterator.next().getValue());
+        assertFalse(cache.iterator().hasNext());
+    }
+
     /**
      * A {@link javax.cache.expiry.ExpiryPolicy} that updates the expiry time
      * based on defined parameters.
@@ -756,7 +832,7 @@ public class TCKCacheManagerTest {
         cache.invokeAll(keys, new GetEntryProcessor<Integer, Integer>());
 
         assertThat(expiryPolicy.getCreationCount(), is(0));
-        System.out.println("expiryPolicy.getAccessCount():"+expiryPolicy.getAccessCount());
+        System.out.println("expiryPolicy.getAccessCount():" + expiryPolicy.getAccessCount());
         assertTrue(expiryPolicy.getAccessCount() >= (keys.size()));
         assertThat(expiryPolicy.getUpdatedCount(), is(0));
     }
@@ -772,11 +848,13 @@ public class TCKCacheManagerTest {
         cacheManager.createCache("simpleCache", config);
         Cache<String, Integer> cache = cacheManager.getCache("simpleCache", String.class, Integer.class);
         cache.get("test");
-        MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
+        MBeanServer mBeanServer = JMXUtils.getMBeanServer();
+        System.out.println("mBeanServer:"+mBeanServer);
         ObjectName objectName = new ObjectName("javax.cache:type=CacheStatistics"
                 + ",CacheManager=" + (cache.getCacheManager().getURI().toString())
                 + ",Cache=" + cache.getName());
-
+        System.out.println("obhectNAme:" + objectName);
+//        Thread.sleep(Integer.MAX_VALUE);
         Long CacheMisses = (Long) mBeanServer.getAttribute(objectName, "CacheMisses");
         System.out.println("CacheMisses:" + CacheMisses);
         assertEquals(1L, CacheMisses.longValue());

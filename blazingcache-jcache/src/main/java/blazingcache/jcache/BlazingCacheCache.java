@@ -249,10 +249,11 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             }
             if (result != null) {
                 boolean validAfterAccess = !checkExpiryAccess || handleEntryAccessed(serializedKey);
-                if (validAfterAccess) {
-                    cacheHits.incrementAndGet();
-                    return (V) valuesSerializer.deserialize(result.getSerializedData());
+                if (!validAfterAccess) {
+                    client.invalidate(serializedKey);
                 }
+                cacheHits.incrementAndGet();
+                return (V) valuesSerializer.deserialize(result.getSerializedData());
             }
             if (allowLoader && cacheLoader != null && isReadThrough) {
                 V loaded;
@@ -316,9 +317,10 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
                 if (r != null) {
                     boolean validAfterAccess = !allowCheckAccess || handleEntryAccessed(serializedKey);
-                    if (validAfterAccess) {
-                        map_result.put(key, r);
+                    if (!validAfterAccess) {
+                        client.invalidate(serializedKey);
                     }
+                    map_result.put(key, r);
                 }
             }
             if (!keysToLoad.isEmpty()) {
@@ -549,6 +551,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     @Override
     public void putAll(Map<? extends K, ? extends V> map) {
         checkClosed();
+        CacheWriterException cacheWriterError = null;
         try {
             for (Map.Entry<? extends K, ? extends V> entry : map.entrySet()) {
                 K key = entry.getKey();
@@ -557,8 +560,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     throw new NullPointerException();
                 }
             }
+            map = new HashMap<>(map);// cloning
             if (isWriteThrough) {
-                Collection<Cache.Entry<? extends K, ? extends V>> entries = new ArrayList<>();
+                ArrayList<Cache.Entry<? extends K, ? extends V>> entries = new ArrayList<>();
                 for (Map.Entry<? extends K, ? extends V> entry : map.entrySet()) {
                     K key = entry.getKey();
                     V value = entry.getValue();
@@ -566,10 +570,18 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 }
 
                 try {
-                    cacheWriter.writeAll(entries);
+                    if (!entries.isEmpty()) {
+                        cacheWriter.writeAll(entries);
+                    }
                 } catch (Exception err) {
-                    throw new CacheWriterException(err);
+                    cacheWriterError = new CacheWriterException(err);
                 }
+                for (Cache.Entry<? extends K, ? extends V> entry : entries) {
+                    // in case of partial success the entries collection will contain the un-written entries                                        
+                    System.out.println("entry " + entry.getKey() + " was not written to writer");
+                    map.remove(entry.getKey());
+                }
+
             }
             for (Map.Entry<? extends K, ? extends V> entry : map.entrySet()) {
                 K key = entry.getKey();
@@ -606,6 +618,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 }
 
             }
+            if (cacheWriterError != null) {
+                throw cacheWriterError;
+            }
         } catch (InterruptedException err) {
             Thread.currentThread().interrupt();
             throw new javax.cache.CacheException(err);
@@ -622,9 +637,11 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
         runtimeCheckType(key, value);
         if (!containsKey(key)) {
+            cacheMisses.incrementAndGet();
             put(key, value);
             return true;
         } else {
+            cacheHits.incrementAndGet();
             return false;
         }
     }
@@ -641,19 +658,18 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
         try {
             V actual = getNoFetch(key);
-
-            if (actual == null) {
-                cacheMisses.incrementAndGet();
-                return false;
-            }
-            cacheHits.incrementAndGet();
             if (allowWriteThrough && isWriteThrough) {
                 try {
+                    // write even if value is not cached locally
                     cacheWriter.delete(key);
                 } catch (Exception err) {
                     throw new CacheWriterException(err);
                 }
             }
+            if (actual == null) {
+                return false;
+            }
+
             String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
             client.invalidate(serializedKey);
             fireEntryRemoved(key, actual);
@@ -693,7 +709,10 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 cacheRemovals.incrementAndGet();
                 return true;
             }
-            handleEntryAccessed(serializedKey);
+            boolean validAfterAccess = handleEntryAccessed(serializedKey);
+            if (!validAfterAccess) {
+                client.invalidate(serializedKey);
+            }
             return false;
         } catch (InterruptedException err) {
             Thread.currentThread().interrupt();
@@ -740,7 +759,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
 
         if (containsKey(key)) {
-            V actual = get(key, false, false);            
+            V actual = get(key, false, false);
             if (Objects.equals(actual, oldValue)) {
                 put(key, newValue);
                 return true;
@@ -786,7 +805,6 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             throw new NullPointerException();
         }
         if (containsKey(key)) {
-            cacheHits.incrementAndGet();
             V oldValue = get(key, false, false);
             put(key, value);
             return oldValue;
@@ -799,15 +817,32 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     @Override
     public void removeAll(Set<? extends K> keys) {
         checkClosed();
-        if (isWriteThrough) {
+        Collection<K> notWrittenByWriter = null;
+        CacheWriterException error = null;
+        if (isWriteThrough && !keys.isEmpty()) {
             try {
-                cacheWriter.deleteAll(keys);
+                notWrittenByWriter = new ArrayList<>(keys);
+                // the writer will leave entries which coult not be deleted from storage in the passed argument
+                if (!notWrittenByWriter.isEmpty()) {
+                    cacheWriter.deleteAll(notWrittenByWriter);
+                }
             } catch (Exception err) {
-                throw new CacheWriterException(err);
+                error = new CacheWriterException(err);
             }
         }
-        for (K key : keys) {
-            remove(key, false);
+        if (notWrittenByWriter != null) {
+            Collection<K> toRemove = new ArrayList<>(keys);
+            toRemove.removeAll(notWrittenByWriter);
+            for (K key : toRemove) {
+                remove(key, false);
+            }
+        } else {
+            for (K key : keys) {
+                remove(key, false);
+            }
+        }
+        if (error != null) {
+            throw error;
         }
 
     }
@@ -836,22 +871,40 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             } else {
                 localKeys = null;
             }
+            CacheWriterException cacheWriterError = null;
+            Collection<K> unprocessedByWriter = null;
             if (localKeys != null && isWriteThrough) {
+                unprocessedByWriter = new ArrayList<>(localKeys);
                 try {
-                    cacheWriter.deleteAll(localKeys);
+                    // the writer will leave entries which coult not be deleted from storage in the passed argument
+                    if (!unprocessedByWriter.isEmpty()) {
+                        cacheWriter.deleteAll(unprocessedByWriter);
+                    }
                 } catch (Exception err) {
-                    throw new CacheWriterException(err);
+                    cacheWriterError = new CacheWriterException(err);
                 }
             }
-            client.invalidateByPrefix(cacheName + "#");
-
-            if (previousValuesForListener != null) {
-                for (Map.Entry<K, V> entry : previousValuesForListener.entrySet()) {
-                    fireEntryRemoved(entry.getKey(), entry.getValue());
+            if (cacheWriterError == null) {
+                client.invalidateByPrefix(cacheName + "#");
+                if (previousValuesForListener != null) {
+                    for (Map.Entry<K, V> entry : previousValuesForListener.entrySet()) {
+                        fireEntryRemoved(entry.getKey(), entry.getValue());
+                    }
                 }
-            }
-            if (localKeys != null) {
-                cacheRemovals.addAndGet(localKeys.size());
+                if (localKeys != null) {
+                    Collection<K> toRemove = new ArrayList<>(localKeys);
+                    if (unprocessedByWriter != null) {
+                        toRemove.removeAll(unprocessedByWriter);
+                    }
+                    cacheRemovals.addAndGet(toRemove.size());
+                }
+            } else {
+                Collection<K> toRemove = new ArrayList<>(localKeys);
+                toRemove.removeAll(unprocessedByWriter);
+                for (K k : toRemove) {
+                    remove(k, false);
+                }
+                throw cacheWriterError;
             }
 
         } catch (InterruptedException err) {
@@ -869,11 +922,11 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             Thread.currentThread().interrupt();
             throw new javax.cache.CacheException(err);
         }
-        clearStatistics();
     }
 
     @Override
-    public <C extends Configuration<K, V>> C getConfiguration(Class<C> clazz) {
+    public <C extends Configuration<K, V>>
+            C getConfiguration(Class<C> clazz) {
         return (C) configuration;
     }
 
@@ -884,10 +937,10 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             throw new NullPointerException();
         }
         try {
-            V actualValue = get(key, true, false);
-            BlazingCacheCacheMutableEntry<K, V> entry = new BlazingCacheCacheMutableEntry<>(key, actualValue);
+            V valueBeforeProcessor = get(key, true, false);
+            BlazingCacheCacheMutableEntry<K, V> entry = new BlazingCacheCacheMutableEntry<>(key, valueBeforeProcessor);
             T returnValue = entryProcessor.process(entry, arguments);
-            if (entry.isRemoved()) {
+            if (entry.isRemoved() && valueBeforeProcessor != null) {
                 remove(key);
             } else if (entry.isUpdated()) {
                 put(key, entry.getValue());
@@ -945,7 +998,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     /**
      * Sets statistics
      */
-    void setStatisticsEnabled(boolean enabled) {
+    final void setStatisticsEnabled(boolean enabled) {
         if (enabled) {
             JMXUtils.registerStatisticsMXBean(this, statisticsMXBean);
         } else {
@@ -959,7 +1012,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
      *
      * @param enabled true if management should be enabled
      */
-    void setManagementEnabled(boolean enabled) {
+    final void setManagementEnabled(boolean enabled) {
         if (enabled) {
             JMXUtils.registerConfigurationMXBean(this, configurationMXBean);
         } else {
@@ -1015,14 +1068,17 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     exception = new EntryProcessorException(err);
                 }
                 if (exception == null) {
+                    boolean validAfterAccess = true;
+                    String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
                     if (entry.isAccessed()) {
-                        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
-                        handleEntryAccessed(serializedKey);
+                        validAfterAccess = handleEntryAccessed(serializedKey);
                     }
                     if (entry.isRemoved()) {
                         keysToRemove.add(key);
                     } else if (entry.isUpdated()) {
                         valuesToPut.put(key, entry.getValue());
+                    } else if (!validAfterAccess) {
+                        client.invalidate(serializedKey);
                     }
                     if (returnValue != null) {
                         result.put(key, new EntryProcessorResultImpl(returnValue, null));
@@ -1041,6 +1097,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 putAll(valuesToPut);
             }
             return result;
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            throw new javax.cache.CacheException(err);
         } catch (javax.cache.CacheException err) {
             throw err;
         }
@@ -1143,7 +1202,19 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         @Override
         public Entry<K, V> next() {
             currentKey = keysIterator.next();
-            return new BlazingCacheEntry<>(currentKey, parent.getNoFetch(currentKey));
+            parent.cacheHits.incrementAndGet();
+            BlazingCacheEntry<K, V> res = new BlazingCacheEntry<>(currentKey, parent.getNoFetch(currentKey));
+            String serializedKey = parent.cacheName + "#" + parent.keysSerializer.serialize(currentKey);
+            boolean validAfterAccess = parent.handleEntryAccessed(serializedKey);
+            if (!validAfterAccess) {
+                try {
+                    parent.client.invalidate(serializedKey);
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                    throw new javax.cache.CacheException(err);
+                }
+            }
+            return res;
         }
 
         @Override
@@ -1152,6 +1223,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 throw new IllegalStateException();
             }
             parent.remove(currentKey);
+            currentKey = null;
         }
     }
 
