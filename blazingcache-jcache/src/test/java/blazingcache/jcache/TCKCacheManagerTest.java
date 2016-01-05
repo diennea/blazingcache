@@ -15,6 +15,7 @@
  */
 package blazingcache.jcache;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
 import java.util.ArrayList;
@@ -754,6 +755,78 @@ public class TCKCacheManagerTest {
     }
 
     @Test
+    public void invokeGetValueShouldCallGetExpiry() {
+        CountingExpiryPolicy expiryPolicy = new CountingExpiryPolicy();
+
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
+        config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
+        Cache<Integer, Integer> cache = getCacheManager().createCache("test-dfd", config);
+
+        final Integer key = 123;
+        final Integer setValue = 456;
+
+        // verify non-access to non-existent entry does not call getExpiryForAccessedEntry. no read-through scenario.
+        Integer resultValue = cache.invoke(key, new GetEntryProcessor<Integer, Integer>());
+
+        assertEquals(null, resultValue);
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+
+        // verify access to existing entry.
+        resultValue = cache.invoke(key, new SetEntryProcessor<Integer, Integer>(setValue));
+
+        assertEquals(resultValue, setValue);
+        assertTrue(expiryPolicy.getCreationCount() >= 1);
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+        expiryPolicy.resetCount();
+
+        resultValue = cache.invoke(key, new GetEntryProcessor<Integer, Integer>());
+
+        assertEquals(setValue, resultValue);
+        assertThat(expiryPolicy.getCreationCount(), is(0));
+        assertTrue(expiryPolicy.getAccessCount() >= 1);
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+    }
+
+    @Test
+    public void invokeAllReadThroughEnabledGetOnNonExistentEntry() throws IOException {
+        //establish and open a CacheLoaderServer to handle cache
+        //cache loading requests from a CacheLoaderClient
+
+        // this cacheLoader just returns the key as the value.
+        RecordingCacheLoader<Integer> recordingCacheLoader = new RecordingCacheLoader<>();
+
+        CountingExpiryPolicy expiryPolicy = new CountingExpiryPolicy();
+
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
+        config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
+        config.setCacheLoaderFactory(new FactoryBuilder.SingletonFactory<>(recordingCacheLoader));
+        config.setReadThrough(true);
+
+        Cache<Integer, Integer> cache = getCacheManager().createCache("test-1", config);
+
+        final Integer INITIAL_KEY = 123;
+        final Integer MAX_KEY_VALUE = INITIAL_KEY + 4;
+
+        // set keys to read through
+        Set<Integer> keys = new HashSet<>();
+        for (int key = INITIAL_KEY; key <= MAX_KEY_VALUE; key++) {
+            keys.add(key);
+        }
+
+        // verify read-through of getValue of non-existent entries
+        cache.invokeAll(keys, new GetEntryProcessor<Integer, Integer>());
+
+        assertTrue(expiryPolicy.getCreationCount() >= keys.size());
+        assertThat(expiryPolicy.getAccessCount(), is(0));
+        assertThat(expiryPolicy.getUpdatedCount(), is(0));
+        expiryPolicy.resetCount();
+
+    }
+
+    @Test
     public void removeSpecifiedEntryShouldNotCallExpiryPolicyMethods() {
         CountingExpiryPolicy expiryPolicy = new CountingExpiryPolicy();
 
@@ -849,7 +922,7 @@ public class TCKCacheManagerTest {
         Cache<String, Integer> cache = cacheManager.getCache("simpleCache", String.class, Integer.class);
         cache.get("test");
         MBeanServer mBeanServer = JMXUtils.getMBeanServer();
-        System.out.println("mBeanServer:"+mBeanServer);
+        System.out.println("mBeanServer:" + mBeanServer);
         ObjectName objectName = new ObjectName("javax.cache:type=CacheStatistics"
                 + ",CacheManager=" + (cache.getCacheManager().getURI().toString())
                 + ",Cache=" + cache.getName());

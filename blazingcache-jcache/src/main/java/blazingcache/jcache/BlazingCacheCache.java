@@ -415,7 +415,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                             String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
                             if (needPreviuosValueForListeners) {
                                 V actual = getNoFetch(key);
-                                if (actual != null) {
+                                if (actual == null) {
                                     long createdExpireTime = getCreatedExpireTime();
                                     if (createdExpireTime != 0) {
                                         client.put(serializedKey, valuesSerializer.serialize(value), nowPlusDuration(createdExpireTime));
@@ -577,8 +577,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     cacheWriterError = new CacheWriterException(err);
                 }
                 for (Cache.Entry<? extends K, ? extends V> entry : entries) {
-                    // in case of partial success the entries collection will contain the un-written entries                                        
-                    System.out.println("entry " + entry.getKey() + " was not written to writer");
+                    // in case of partial success the entries collection will contain the un-written entries                                                            
                     map.remove(entry.getKey());
                 }
 
@@ -937,13 +936,31 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             throw new NullPointerException();
         }
         try {
+            boolean present = containsKey(key);
+            System.out.println("key "+key+" present:"+present);
             V valueBeforeProcessor = get(key, true, false);
-            BlazingCacheCacheMutableEntry<K, V> entry = new BlazingCacheCacheMutableEntry<>(key, valueBeforeProcessor);
+            BlazingCacheCacheMutableEntry<K, V> entry = new BlazingCacheCacheMutableEntry<>(present, key, valueBeforeProcessor);
             T returnValue = entryProcessor.process(entry, arguments);
-            if (entry.isRemoved() && valueBeforeProcessor != null) {
-                remove(key);
+            String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+            System.out.println("key "+key+" accesses "+entry.isAccessed()+" removed "+entry.isRemoved()+" updated "+entry.isUpdated());
+            boolean validAfterAccess = true;
+            if (entry.isAccessed()) {
+                validAfterAccess = handleEntryAccessed(serializedKey);
+            }
+            if (entry.isRemoved()) {
+                if (present) {
+                    remove(key);
+                } else if (isWriteThrough) {
+                    try {
+                        cacheWriter.delete(key);
+                    } catch (Exception err) {
+                        throw new CacheWriterException(err);
+                    }
+                }
             } else if (entry.isUpdated()) {
                 put(key, entry.getValue());
+            } else if (!validAfterAccess) {
+                client.invalidate(serializedKey);
             }
             return returnValue;
         } catch (javax.cache.CacheException err) {
@@ -1054,12 +1071,14 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
         try {
             Map<K, EntryProcessorResult<T>> result = new HashMap<>();
+            Set<K> presentKeys = keys.stream().filter(this::containsKey).collect(Collectors.toSet());
             Map<K, V> actualValues = getAll(keys, false);
             Set<K> keysToRemove = new HashSet<>();
             Map<K, V> valuesToPut = new HashMap<>();
             for (K key : keys) {
                 V actualValue = actualValues.get(key);
-                BlazingCacheCacheMutableEntry<K, V> entry = new BlazingCacheCacheMutableEntry<>(key, actualValue);
+                boolean present = presentKeys.contains(key);
+                BlazingCacheCacheMutableEntry<K, V> entry = new BlazingCacheCacheMutableEntry<>(present, key, actualValue);
                 T returnValue = null;
                 EntryProcessorException exception = null;
                 try {
@@ -1166,7 +1185,6 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
         listeners = newList;
         needPreviuosValueForListeners = _needPreviuosValueForListeners || policy != null;
-        System.out.println("deregisterCacheEntryListener needPreviuosValueForListeners " + needPreviuosValueForListeners);
         this.configuration.removeCacheEntryListenerConfiguration(cacheEntryListenerConfiguration);
     }
 
