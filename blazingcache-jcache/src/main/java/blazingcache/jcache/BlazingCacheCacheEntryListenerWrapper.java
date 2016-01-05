@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 enrico.olivelli.
+ * Copyright 2015 Diennea S.R.L..
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -123,7 +123,7 @@ final class BlazingCacheCacheEntryListenerWrapper<K, V> {
 
     void onEntryRemoved(K key, V oldValue) {
         if (onRemove) {
-            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, oldValue, null, parent, EventType.REMOVED);
+            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, oldValue, oldValue, parent, EventType.REMOVED);
             if (filter != null && !filter.evaluate(event)) {
                 return;
             }

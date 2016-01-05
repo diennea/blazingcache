@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 enrico.olivelli.
+ * Copyright 2015 Diennea S.R.L..
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.Set;
 import javax.cache.Cache;
@@ -34,12 +35,12 @@ import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.integration.CompletionListenerFuture;
 import javax.cache.processor.EntryProcessor;
 import javax.cache.spi.CachingProvider;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 
 import org.junit.After;
 import static org.junit.Assert.*;
 import org.junit.Test;
-import static junit.framework.TestCase.assertNotNull;
-import static org.hamcrest.CoreMatchers.is;
 import static junit.framework.TestCase.assertNotNull;
 import static org.hamcrest.CoreMatchers.is;
 
@@ -404,6 +405,85 @@ public class TCKCacheManagerTest {
         assertThat(expiryPolicy.getUpdatedCount(), is(0));
     }
 
+    @Test
+    public void expire_whenAccessed() {
+        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<Integer, Integer>();
+        config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(new ParameterizedExpiryPolicy(Duration.ETERNAL, Duration.ZERO, null)));
+
+        Cache<Integer, Integer> cache = getCacheManager().createCache("test-aaa", config);
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.getAndReplace(1, 2));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.getAndRemove(1));
+
+        cache.put(1, 1);
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.remove(1));
+
+        cache.put(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.remove(1, 1));
+
+        cache.getAndPut(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.getAndPut(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.getAndPut(1, 1));
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.putIfAbsent(1, 1);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();
+        map.put(1, 1);
+        cache.putAll(map);
+
+        assertTrue(cache.containsKey(1));
+        assertNotNull(cache.get(1));
+        assertFalse(cache.containsKey(1));
+        assertNull(cache.get(1));
+
+        cache.put(1, 1);
+        Iterator<Cache.Entry<Integer, Integer>> iterator = cache.iterator();
+
+        assertTrue(iterator.hasNext());
+        assertEquals((Integer) 1, iterator.next().getValue());
+        assertFalse(cache.iterator().hasNext());
+    }
+
     /**
      * A {@link javax.cache.expiry.ExpiryPolicy} that updates the expiry time
      * based on defined parameters.
@@ -714,7 +794,6 @@ public class TCKCacheManagerTest {
     public void invokeAllSetValueShouldCallGetExpiry() {
 
         CountingExpiryPolicy expiryPolicy = new CountingExpiryPolicy();
-        
 
         MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
         config.setExpiryPolicyFactory(FactoryBuilder.factoryOf(expiryPolicy));
@@ -736,7 +815,7 @@ public class TCKCacheManagerTest {
             }
         }
 
-        assertTrue(expiryPolicy.getCreationCount()>=createdCount);
+        assertTrue(expiryPolicy.getCreationCount() >= createdCount);
         assertThat(expiryPolicy.getAccessCount(), is(0));
         assertThat(expiryPolicy.getUpdatedCount(), is(0));
         expiryPolicy.resetCount();
@@ -744,16 +823,40 @@ public class TCKCacheManagerTest {
         // verify modify or create
         cache.invokeAll(keys, new SetEntryProcessor<Integer, Integer>(setValue));
 
-        assertTrue(expiryPolicy.getCreationCount()>=(keys.size() - createdCount));
+        assertTrue(expiryPolicy.getCreationCount() >= (keys.size() - createdCount));
         assertThat(expiryPolicy.getAccessCount(), is(0));
-        assertTrue(expiryPolicy.getUpdatedCount()>=(createdCount));
+        assertTrue(expiryPolicy.getUpdatedCount() >= (createdCount));
         expiryPolicy.resetCount();
 
         // verify accessed
         cache.invokeAll(keys, new GetEntryProcessor<Integer, Integer>());
 
         assertThat(expiryPolicy.getCreationCount(), is(0));
-        assertTrue(expiryPolicy.getAccessCount()>=(keys.size()));
+        System.out.println("expiryPolicy.getAccessCount():" + expiryPolicy.getAccessCount());
+        assertTrue(expiryPolicy.getAccessCount() >= (keys.size()));
         assertThat(expiryPolicy.getUpdatedCount(), is(0));
+    }
+
+    @Test
+    public void jmxExampleTest() throws Exception {
+        CachingProvider cachingProvider = Caching.getCachingProvider();
+        CacheManager cacheManager = cachingProvider.getCacheManager();
+        MutableConfiguration<String, Integer> config
+                = new MutableConfiguration<String, Integer>();
+        config.setTypes(String.class, Integer.class)
+                .setStatisticsEnabled(true);
+        cacheManager.createCache("simpleCache", config);
+        Cache<String, Integer> cache = cacheManager.getCache("simpleCache", String.class, Integer.class);
+        cache.get("test");
+        MBeanServer mBeanServer = JMXUtils.getMBeanServer();
+        System.out.println("mBeanServer:"+mBeanServer);
+        ObjectName objectName = new ObjectName("javax.cache:type=CacheStatistics"
+                + ",CacheManager=" + (cache.getCacheManager().getURI().toString())
+                + ",Cache=" + cache.getName());
+        System.out.println("obhectNAme:" + objectName);
+//        Thread.sleep(Integer.MAX_VALUE);
+        Long CacheMisses = (Long) mBeanServer.getAttribute(objectName, "CacheMisses");
+        System.out.println("CacheMisses:" + CacheMisses);
+        assertEquals(1L, CacheMisses.longValue());
     }
 }

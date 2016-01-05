@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 enrico.olivelli.
+ * Copyright 2015 Diennea S.R.L..
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,7 +56,10 @@ public class BlazingCacheCacheMutableEntry<K, V> extends BlazingCacheEntry<K, V>
 
     @Override
     public V getValue() {
-        accessed = true;
+        if (!updated) {
+            // current value has been set by the EntryProcessor, so this is not an 'access'
+            accessed = true;
+        }
         return super.getValue();
     }
 
@@ -79,6 +82,7 @@ public class BlazingCacheCacheMutableEntry<K, V> extends BlazingCacheEntry<K, V>
     public void remove() {
         value = null;
         removed = true;
+        updated = false;
     }
 
 }
