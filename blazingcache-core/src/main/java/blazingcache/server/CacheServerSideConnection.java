@@ -100,7 +100,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         LOGGER.log(Level.FINE, "receivedMessageFromWorker {0}", message);
         switch (message.type) {
             case Message.TYPE_CLIENT_CONNECTION_REQUEST: {
-                LOGGER.log(Level.INFO, "connection request {0}", message);
+                LOGGER.log(Level.INFO, "connection request from {0}", message.clientId);
                 String sharedSecret = (String) message.parameters.get("secret");
                 if (sharedSecret == null || !sharedSecret.equals(server.getSharedSecret())) {
                     answerConnectionNotAcceptedAndClose(message, new Exception("invalid network secret"));
