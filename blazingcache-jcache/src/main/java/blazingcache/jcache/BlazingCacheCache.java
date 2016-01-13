@@ -55,6 +55,8 @@ import javax.cache.processor.EntryProcessorResult;
  */
 public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
+    final static boolean JSR107_TCK_101_COMPAT_MODE = Boolean.getBoolean("org.blazingcache.jsr107tck101compatmode");
+
     private final String cacheName;
     private final CacheClient client;
     private final Serializer<K, String> keysSerializer;
@@ -636,11 +638,15 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
         runtimeCheckType(key, value);
         if (!containsKey(key)) {
-//            cacheMisses.incrementAndGet();
+            if (!JSR107_TCK_101_COMPAT_MODE) {
+                cacheMisses.incrementAndGet();
+            }
             put(key, value);
             return true;
         } else {
-//            cacheHits.incrementAndGet();
+            if (!JSR107_TCK_101_COMPAT_MODE) {
+                cacheHits.incrementAndGet();
+            }
             return false;
         }
     }

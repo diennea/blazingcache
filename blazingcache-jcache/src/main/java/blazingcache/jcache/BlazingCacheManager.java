@@ -16,6 +16,7 @@
 package blazingcache.jcache;
 
 import blazingcache.client.CacheClient;
+import static blazingcache.jcache.BlazingCacheCache.JSR107_TCK_101_COMPAT_MODE;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.netty.NettyCacheServerLocator;
@@ -95,7 +96,9 @@ public class BlazingCacheManager implements CacheManager {
                     break;
                 case "local":
                     this.embeddedServer = new CacheServer(secret, new ServerHostData("localhost", -1, "", false, new HashMap<>()));
-                    this.embeddedServer.setExpirerPeriod(1);
+                    if (JSR107_TCK_101_COMPAT_MODE) {
+                        this.embeddedServer.setExpirerPeriod(1);
+                    }
                     locator = new blazingcache.network.jvm.JVMBrokerLocator("localhost", embeddedServer);
                     this.client = new CacheClient(clientId, secret, locator);
                     break;
