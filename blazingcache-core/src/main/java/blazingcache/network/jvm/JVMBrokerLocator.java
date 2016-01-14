@@ -39,6 +39,7 @@ public class JVMBrokerLocator implements ServerLocator {
 
     private final CacheServer broker;
     private final String brokerId;
+    private JVMChannel workerSide;
 
     public JVMBrokerLocator(String brokerId, CacheServer broker) {
         this.brokerId = brokerId;
@@ -50,7 +51,7 @@ public class JVMBrokerLocator implements ServerLocator {
         if (broker == null || !broker.isLeader()) {
             throw new ServerNotAvailableException(new Exception("embedded server " + brokerId + " is not running"));
         }
-        JVMChannel workerSide = new JVMChannel();
+        workerSide = new JVMChannel();
         workerSide.setMessagesReceiver(worker);
         JVMChannel brokerSide = new JVMChannel();
         broker.getAcceptor().createConnection(brokerSide);
@@ -72,6 +73,13 @@ public class JVMBrokerLocator implements ServerLocator {
 
     @Override
     public void brokerDisconnected() {
+    }
+
+    @Override
+    public void close() {
+        if (workerSide != null) {
+            workerSide.close();
+        }
     }
 
 }

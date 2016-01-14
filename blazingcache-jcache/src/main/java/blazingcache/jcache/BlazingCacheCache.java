@@ -1144,7 +1144,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     public void close() {
         if (closed) {
             return;
-        }
+        }        
         clear();
         setStatisticsEnabled(false);
         setManagementEnabled(false);
