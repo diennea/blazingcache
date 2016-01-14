@@ -56,7 +56,7 @@ public class CountingExpiryPolicy implements ExpiryPolicy, Serializable {
      */
     @Override
     public Duration getExpiryForCreation() {
-        new Exception().printStackTrace();
+        
         creationCount.incrementAndGet();
         return Duration.ETERNAL;
     }
@@ -76,7 +76,7 @@ public class CountingExpiryPolicy implements ExpiryPolicy, Serializable {
      */
     @Override
     public Duration getExpiryForAccess() {
-        new Exception().printStackTrace();
+        
         accessedCount.incrementAndGet();
         return null;
     }
@@ -96,7 +96,7 @@ public class CountingExpiryPolicy implements ExpiryPolicy, Serializable {
      */
     @Override
     public Duration getExpiryForUpdate() {
-        new Exception().printStackTrace();
+        
         updatedCount.incrementAndGet();
         return null;
     }
