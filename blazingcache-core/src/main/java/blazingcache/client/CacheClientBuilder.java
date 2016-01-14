@@ -20,9 +20,10 @@
 package blazingcache.client;
 
 import blazingcache.network.ServerLocator;
-import blazingcache.network.jvm.JVMBrokerLocator;
+import blazingcache.network.jvm.JVMServerLocator;
 import blazingcache.network.netty.GenericNettyBrokerLocator;
 import blazingcache.network.netty.NettyCacheServerLocator;
+import blazingcache.server.CacheServer;
 import blazingcache.zookeeper.ZKCacheServerLocator;
 
 /**
@@ -43,12 +44,14 @@ public class CacheClientBuilder {
     private int zkSessionTimeout = 40000;
     private String zkPath = "/blazingcache";
     private String host = "localhost";
+    private Object cacheServer;
     private int port = 1025;
     private boolean ssl = false;
 
     public static enum Mode {
         SINGLESERVER,
-        CLUSTERED
+        CLUSTERED,
+        LOCAL
     }
 
     private CacheClientBuilder() {
@@ -71,6 +74,11 @@ public class CacheClientBuilder {
 
     public CacheClientBuilder zkConnectString(String zkConnectString) {
         this.zkConnectString = zkConnectString;
+        return this;
+    }
+
+    public CacheClientBuilder localCacheServer(Object cacheServer) {
+        this.cacheServer = cacheServer;
         return this;
     }
 
@@ -127,9 +135,13 @@ public class CacheClientBuilder {
                 ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
                 break;
             case CLUSTERED:
-                locator = new ZKCacheServerLocator(zkPath, zkSessionTimeout, zkPath);
+                locator = new ZKCacheServerLocator(zkConnectString, zkSessionTimeout, zkPath);
                 ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
                 ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
+                break;
+            case LOCAL:
+                CacheServer cs = (CacheServer) cacheServer;
+                locator = new JVMServerLocator(cs);                
                 break;
             default:
                 throw new IllegalArgumentException("invalid mode " + mode);
