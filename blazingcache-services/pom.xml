@@ -51,6 +51,7 @@
                         <descriptor>src/main/assemble/zip-assembly.xml</descriptor>                        
                     </descriptors>                    
                     <attach>true</attach>
+                    <finalName>blazingcache-${project.version}</finalName>
                 </configuration>
                 <executions>
                     <execution>

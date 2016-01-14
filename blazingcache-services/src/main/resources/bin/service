@@ -35,25 +35,9 @@
 ### BEGIN OF CONFIGURATION PARAMETERS ###
 
 
-SERVICE=$1
-shift
-
 BASE_DIR=
 RUN_AS_USER=
-PIDFILENAME=$SERVICE.java.pid
-MAINCLASS=
-
-case "$SERVICE" in
-  server)
-    MAINCLASS=blazingcache.services.ServerMain
-    ;;
- 
-      
-  *)
-    echo $"Usage: $0 [server] {start|stop|restart|console|kill|stacktrace|status}"
-    RETVAL=1
-    exit $RETVAL
-esac
+PIDFILENAME=blazingcache.java.pid
 
 
 KILL_GRACE_TIME=10
@@ -111,9 +95,16 @@ start() {
     fi
   fi
 
-  $PRERUN "$BASE_DIR/bin/java-utils.sh -daemon $SERVICE -Dpidfile=$PIDFILENAME $MAINCLASS"
+  $PRERUN "$BASE_DIR/bin/java-utils.sh -daemon server -Dpidfile=$PIDFILENAME blazingcache.services.ServerMain"
   RETVAL=$?
   return
+}
+
+startzookeeper() {
+   echo "Starting zookeeper"
+   $PRERUN  "$BASE_DIR/bin/java-utils.sh -daemon zookeeper org.apache.zookeeper.server.quorum.QuorumPeerMain 1281 $BASE_DIR/zk-data"
+   RETVAR=$?
+   return
 }
 
 console() {
@@ -130,7 +121,7 @@ console() {
     fi
   fi
 
-  $PRERUN "$BASE_DIR/bin/java-utils.sh $SERVICE -Dpidfile=$PIDFILENAME $MAINCLASS"
+  $PRERUN "$BASE_DIR/bin/java-utils.sh server -Dpidfile=$PIDFILENAME blazingcache.services.ServerMain"
   RETVAL=$?
   return
 }
@@ -285,6 +276,11 @@ case "$1" in
     start
     ;;
 
+  startzookeeper)
+   checkuser
+   startzookeeper
+   ;;
+
   stop)
     stop
     ;;
@@ -313,7 +309,7 @@ case "$1" in
     ;;
 
   *)
-    echo $"Usage: $0 {start|stop|restart|console|kill|stacktrace|status}"
+    echo $"Usage: $0 {start|stop|restart|console|kill|stacktrace|status|startzookeeper}"
     RETVAL=1
 esac
 
