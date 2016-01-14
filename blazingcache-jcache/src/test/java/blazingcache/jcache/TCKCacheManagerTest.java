@@ -135,30 +135,6 @@ public class TCKCacheManagerTest {
     }
 
     @Test
-    public void testCacheStatisticsRemoveAll() throws Exception {
-
-        //cannot be zero or will not be added to the cache
-        ExpiryPolicy policy = new CreatedExpiryPolicy(new Duration(TimeUnit.MILLISECONDS, 20));
-
-        MutableConfiguration<Integer, Integer> config = new MutableConfiguration<>();
-        config.setExpiryPolicyFactory(new FactoryBuilder.SingletonFactory<>(policy)).setStatisticsEnabled(true);
-        Cache<Integer, Integer> cache = getCacheManager().createCache("test-c", config);
-
-        for (int i = 0; i < 100; i++) {
-            cache.put(i, i + 100);
-        }
-        //should work with all implementations
-        Thread.sleep(50);
-        cache.removeAll();
-
-        BlazingCacheCache<Integer,Integer> blazingCache = cache.unwrap(BlazingCacheCache.class);
-        assertEquals(100L, blazingCache.getStatisticsMXBean().getCachePuts());
-        //Removals does not count expired entries
-        assertEquals(0L, blazingCache.getStatisticsMXBean().getCacheRemovals());
-
-    }
-
-    @Test
     public void createCache_Different() {
         String name1 = "c1";
         CacheManager cacheManager = getCacheManager();
