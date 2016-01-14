@@ -68,7 +68,7 @@ public class ZKCacheServerLocator extends GenericNettyBrokerLocator {
         this.zkSessiontimeout = 0;
     }
 
-    public ZKCacheServerLocator(String zkAddress, int zkSessiontimeout, String basePath) throws Exception {
+    public ZKCacheServerLocator(String zkAddress, int zkSessiontimeout, String basePath) {
         this.ownedZk = true;
         this.zkSupplier = null;
         this.basePath = basePath;
