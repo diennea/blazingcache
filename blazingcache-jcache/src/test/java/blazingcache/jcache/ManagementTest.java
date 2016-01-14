@@ -195,7 +195,7 @@ public class ManagementTest {
 
             boolean result = cache.putIfAbsent(1L, "succeeded");
             putCount++;
-//            missCount++;
+            missCount++;
             assertTrue(result);
             assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
             assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
@@ -204,7 +204,7 @@ public class ManagementTest {
 
             result = cache.putIfAbsent(1L, "succeeded");
             assertFalse(result);
-//            hitCount++;
+            hitCount++;
             assertEquals((int) missCount, (int) cache.getStatisticsMXBean().getCacheMisses());
             assertEquals((int) hitCount, (int) cache.getStatisticsMXBean().getCacheHits());
             assertEquals((int) putCount, (int) cache.getStatisticsMXBean().getCachePuts());

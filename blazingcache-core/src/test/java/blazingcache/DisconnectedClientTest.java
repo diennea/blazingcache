@@ -9,12 +9,11 @@ import java.nio.charset.StandardCharsets;
 import blazingcache.client.CacheClient;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
-import blazingcache.network.netty.NettyChannelAcceptor;
 import blazingcache.server.CacheServer;
 import org.junit.Assert;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import org.junit.Test;
 
 /**
@@ -35,11 +34,19 @@ public class DisconnectedClientTest {
                 assertTrue(client1.waitForConnection(10000));
 
                 client1.put("pippo", data, 0);
+                assertEquals(1,cacheServer.getCacheStatus().getClientsForKey("pippo").size());
                 Assert.assertArrayEquals(data, client1.get("pippo").getSerializedData());
                 client1.disconnect();
                 assertTrue(client1.waitForDisconnection(60000));
-
+                
                 assertNull(client1.get("pippo"));
+                for (int i = 0; i < 100; i++) {
+                    if (cacheServer.getCacheStatus().getClientsForKey("pippo").isEmpty()) {
+                        break;
+                    }
+                    Thread.sleep(100);
+                }
+                assertEquals(0,cacheServer.getCacheStatus().getClientsForKey("pippo").size());
 
             }
         }

@@ -78,12 +78,16 @@ public class BlazingCacheManager implements CacheManager {
             }
             ServerLocator locator;
             String mode = properties.getProperty("blazingcache.mode", "local");
+            int sockettimeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.sockettimeout", "0"));
+            int connecttimeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.connecttimeout", "10000"));
             switch (mode) {
                 case "zk":
                     String connect = properties.getProperty("blazingcache.zookeeper.connectstring", "localhost");
                     int timeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.sessiontimeout", "40000"));
                     String path = properties.getProperty("blazingcache.zookeeper.path", "/cache");
                     locator = new ZKCacheServerLocator(connect, timeout, path);
+                    ((ZKCacheServerLocator) locator).setSocketTimeout(sockettimeout);
+                    ((ZKCacheServerLocator) locator).setConnectTimeout(connecttimeout);
                     this.client = new CacheClient(clientId, secret, locator);
                     this.embeddedServer = null;
                     break;
@@ -92,6 +96,8 @@ public class BlazingCacheManager implements CacheManager {
                     int port = Integer.parseInt(properties.getProperty("blazingcache.server.port", "1025"));
                     boolean ssl = Boolean.parseBoolean(properties.getProperty("blazingcache.server.ssl", "false"));
                     locator = new NettyCacheServerLocator(host, port, ssl);
+                    ((NettyCacheServerLocator) locator).setSocketTimeout(sockettimeout);
+                    ((NettyCacheServerLocator) locator).setConnectTimeout(connecttimeout);
                     this.client = new CacheClient(clientId, secret, locator);
                     this.embeddedServer = null;
                     break;

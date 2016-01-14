@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -49,15 +48,17 @@ public class NettyChannel extends Channel {
     private final Map<String, ReplyCallback> pendingReplyMessages = new ConcurrentHashMap<>();
     private final Map<String, Message> pendingReplyMessagesSource = new ConcurrentHashMap<>();
     private final ExecutorService callbackexecutor;
+    private final NettyConnector connector;
 
     @Override
     public String toString() {
         return "NettyChannel{" + "socket=" + socket + '}';
     }
 
-    public NettyChannel(SocketChannel socket, ExecutorService callbackexecutor) {
+    public NettyChannel(SocketChannel socket, ExecutorService callbackexecutor, NettyConnector connector) {
         this.socket = socket;
         this.callbackexecutor = callbackexecutor;
+        this.connector = connector;
     }
 
     public void messageReceived(Message message) {
@@ -187,9 +188,14 @@ public class NettyChannel extends Channel {
             });
         });
         pendingReplyMessages.clear();
+
+        if (connector != null) {
+            connector.close();
+        }
     }
 
-    void exceptionCaught(Throwable cause) {
+    void exceptionCaught(Throwable cause
+    ) {
         LOGGER.log(Level.SEVERE, this + " io-error", cause);
     }
 

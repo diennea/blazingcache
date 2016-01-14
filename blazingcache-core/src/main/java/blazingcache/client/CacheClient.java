@@ -415,6 +415,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         } catch (InterruptedException ex) {
             LOGGER.log(Level.SEVERE, "stop interrupted", ex);
         }
+        brokerLocator.close();
     }
 
     public CacheEntry fetch(String key) throws InterruptedException {

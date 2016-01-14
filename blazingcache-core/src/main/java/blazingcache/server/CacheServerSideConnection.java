@@ -24,6 +24,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import blazingcache.network.Channel;
 import blazingcache.network.ChannelEventListener;
+import blazingcache.network.HashUtils;
 import blazingcache.network.Message;
 import blazingcache.network.ReplyCallback;
 import blazingcache.network.ServerSideConnection;
@@ -42,6 +43,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
     private Channel channel;
     private CacheServer server;
     private long lastReceivedMessageTs;
+    private final long MAX_TS_DELTA = Long.getLong("blazingcache.server.maxclienttsdelta", 1000L * 60 * 60);
 
     private static final AtomicLong sessionId = new AtomicLong();
 
@@ -101,10 +103,33 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         switch (message.type) {
             case Message.TYPE_CLIENT_CONNECTION_REQUEST: {
                 LOGGER.log(Level.INFO, "connection request from {0}", message.clientId);
-                String sharedSecret = (String) message.parameters.get("secret");
-                if (sharedSecret == null || !sharedSecret.equals(server.getSharedSecret())) {
-                    answerConnectionNotAcceptedAndClose(message, new Exception("invalid network secret"));
-                    return;
+                String challenge = (String) message.parameters.get("challenge");
+                String ts = (String) message.parameters.get("ts");
+                if (challenge != null && ts != null) {
+                    String expectedChallenge = HashUtils.sha1(ts + "#" + server.getSharedSecret());
+                    if (!challenge.equals(expectedChallenge)) {
+                        answerConnectionNotAcceptedAndClose(message, new Exception("invalid network challenge"));
+                        return;
+                    }
+                    long _ts = 0;
+                    try {
+                        _ts = Long.parseLong(ts);
+                    } catch (NumberFormatException ee) {
+                    }
+                    long now = System.currentTimeMillis();
+                    long delta = Math.abs(now - _ts);
+                    if (delta > MAX_TS_DELTA) {
+                        LOGGER.log(Level.INFO, "connection request from {0} -> invalid network challenge. client/server clocks are not in sync now=" + new java.sql.Timestamp(now) + " client time:" + new java.sql.Timestamp(_ts), message.clientId);
+                        answerConnectionNotAcceptedAndClose(message, new Exception("invalid network challenge. client/server clocks are not in sync now=" + new java.sql.Timestamp(now) + " client time:" + new java.sql.Timestamp(_ts)));
+                        return;
+                    }
+                } else {
+                    // legacy 1.1.x clients
+                    String sharedSecret = (String) message.parameters.get("secret");
+                    if (sharedSecret == null || !sharedSecret.equals(server.getSharedSecret())) {
+                        answerConnectionNotAcceptedAndClose(message, new Exception("invalid network secret"));
+                        return;
+                    }
                 }
                 String _clientId = message.clientId;
                 if (_clientId == null) {
@@ -167,7 +192,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 break;
 
             }
-            
+
             case Message.TYPE_TOUCH_ENTRY: {
                 String key = (String) message.parameters.get("key");
                 long expiretime = (long) message.parameters.get("expiretime");

@@ -133,7 +133,7 @@ public class ZKCacheServerLocator extends GenericNettyBrokerLocator {
 
     @Override
     public void close() {
-        if (this.ownedZk) {
+        if (this.ownedZk && zkSupplier != null) {
             try {
                 zkSupplier.get().close();
             } catch (InterruptedException ex) {
