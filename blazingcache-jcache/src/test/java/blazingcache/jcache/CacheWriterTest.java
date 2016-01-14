@@ -300,7 +300,7 @@ public class CacheWriterTest {
                 cache.removeAll(keysToRemove);
                 assertTrue("expected CacheWriterException to be thrown for BatchPartialSuccessRecordingClassWriter", false);
             } catch (CacheWriterException ce) {
-                ce.printStackTrace();
+                
                 // ignore expected exception
             }
 
