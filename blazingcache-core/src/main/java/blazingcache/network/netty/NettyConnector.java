@@ -113,7 +113,7 @@ public class NettyConnector implements AutoCloseable {
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
-                        channel = new NettyChannel(ch, callbackExecutor);
+                        channel = new NettyChannel(ch, callbackExecutor, NettyConnector.this);
                         channel.setMessagesReceiver(receiver);
                         if (ssl) {
                             ch.pipeline().addLast(sslCtx.newHandler(ch.alloc(), host, port));
@@ -137,10 +137,8 @@ public class NettyConnector implements AutoCloseable {
         return channel;
     }
 
+    @Override
     public void close() {
-        if (channel != null) {
-            channel.close();
-        }
         if (socketchannel != null) {
             try {
                 socketchannel.close();

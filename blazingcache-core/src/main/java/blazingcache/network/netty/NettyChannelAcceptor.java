@@ -166,7 +166,7 @@ public class NettyChannelAcceptor implements AutoCloseable {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
-                        NettyChannel session = new NettyChannel(ch, callbackExecutor);
+                        NettyChannel session = new NettyChannel(ch, callbackExecutor,null);
                         if (acceptor != null) {
                             acceptor.createConnection(session);
                         }
