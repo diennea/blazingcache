@@ -40,7 +40,7 @@ public final class Message {
         data.put("key", key);
         return new Message(clientId, TYPE_FETCH_ENTRY, data);
     }
-    
+
     public static Message TOUCH_ENTRY(String clientId, String key, long expiretime) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
@@ -73,7 +73,9 @@ public final class Message {
 
     public static Message CLIENT_CONNECTION_REQUEST(String clientId, String secret) {
         HashMap<String, Object> data = new HashMap<>();
-        data.put("secret", secret);
+        String ts = System.currentTimeMillis() + "";
+        data.put("ts", ts);
+        data.put("challenge", HashUtils.sha1(ts + "#" + secret));
         return new Message(clientId, TYPE_CLIENT_CONNECTION_REQUEST, data);
     }
 
