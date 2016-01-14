@@ -7,6 +7,7 @@ package blazingcache;
 
 import java.nio.charset.StandardCharsets;
 import blazingcache.client.CacheClient;
+import blazingcache.client.CacheClientBuilder;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.jvm.JVMServerLocator;
 import blazingcache.server.CacheServer;
@@ -20,16 +21,22 @@ import static org.junit.Assert.assertTrue;
  *
  * @author enrico.olivelli
  */
-public class JVMClientTest {
+public class ClientBuilderTest {
 
     @Test
-    public void basicTest() throws Exception {
+    public void basicJvmTest() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
 
         ServerHostData serverHostData = new ServerHostData("localhost", -1, "test", false, null);
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
             cacheServer.start();
-            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new JVMServerLocator(cacheServer));) {
+            try (CacheClient client1 = CacheClientBuilder
+                    .newBuilder()
+                    .clientId("theClient1")
+                    .clientSecret("ciao")
+                    .mode(CacheClientBuilder.Mode.LOCAL)
+                    .localCacheServer(cacheServer)
+                    .build()) {
                 client1.start();
                 assertTrue(client1.waitForConnection(10000));
 
@@ -49,7 +56,6 @@ public class JVMClientTest {
                 client1.touchEntry("key3", System.currentTimeMillis());
                 Thread.sleep(2000);
                 assertNull(client1.get("key3"));
-                
 
             }
 

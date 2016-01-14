@@ -82,9 +82,9 @@ public class BlazingCacheManager implements CacheManager {
             int connecttimeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.connecttimeout", "10000"));
             switch (mode) {
                 case "zk":
-                    String connect = properties.getProperty("blazingcache.zookeeper.connectstring", "localhost");
+                    String connect = properties.getProperty("blazingcache.zookeeper.connectstring", "localhost:1281");
                     int timeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.sessiontimeout", "40000"));
-                    String path = properties.getProperty("blazingcache.zookeeper.path", "/cache");
+                    String path = properties.getProperty("blazingcache.zookeeper.path", "/blazingcache");
                     locator = new ZKCacheServerLocator(connect, timeout, path);
                     ((ZKCacheServerLocator) locator).setSocketTimeout(sockettimeout);
                     ((ZKCacheServerLocator) locator).setConnectTimeout(connecttimeout);
@@ -106,7 +106,7 @@ public class BlazingCacheManager implements CacheManager {
                     if (JSR107_TCK_101_COMPAT_MODE) {
                         this.embeddedServer.setExpirerPeriod(1);
                     }
-                    locator = new blazingcache.network.jvm.JVMBrokerLocator("localhost", embeddedServer);
+                    locator = new blazingcache.network.jvm.JVMServerLocator(embeddedServer);
                     this.client = new CacheClient(clientId, secret, locator);
                     break;
                 default:
