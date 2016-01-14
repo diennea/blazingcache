@@ -106,7 +106,7 @@ public class BlazingCacheManager implements CacheManager {
                     if (JSR107_TCK_101_COMPAT_MODE) {
                         this.embeddedServer.setExpirerPeriod(1);
                     }
-                    locator = new blazingcache.network.jvm.JVMBrokerLocator("localhost", embeddedServer);
+                    locator = new blazingcache.network.jvm.JVMServerLocator(embeddedServer);
                     this.client = new CacheClient(clientId, secret, locator);
                     break;
                 default:
