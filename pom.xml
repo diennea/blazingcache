@@ -6,6 +6,8 @@
     <version>1.2.0</version>
     <packaging>pom</packaging>
     <name>BlazingCache</name>
+    <url>http://blazingcache.org</url>
+    <description>A Fast Distributed Cache</description>
     <licenses>
         <license>
             <name>Apache License, Version 2.0</name>
@@ -13,6 +15,24 @@
             <distribution>repo</distribution>            
         </license>
     </licenses>
+    <scm>
+        <url>https://github.com/BlazingCache/blazingcache.git</url>        
+    </scm>
+    <developers>
+        <developer>
+            <id>eolivelli</id>
+            <name>Enrico Olivelli</name>
+            <organization>Diennea</organization>
+        </developer>
+        <developer>
+            <id>alessandro.luccaroni</id>
+            <name>Alessandro Luccaroni</name>
+            <organization>Diennea</organization>
+        </developer>
+    </developers>
+    <issueManagement>
+        <url>https://dev.blazingcache.org/jira</url>		
+    </issueManagement>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -124,7 +144,7 @@
                         <configuration>
                             <serverId>ossrh</serverId>
                             <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                            <autoReleaseAfterClose>false</autoReleaseAfterClose>
                         </configuration>
                     </plugin>                                 
                     <plugin>
