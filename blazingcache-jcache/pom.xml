@@ -4,9 +4,10 @@
     <parent>
         <groupId>org.blazingcache</groupId>
         <artifactId>blazingcache</artifactId>
-        <version>1.2.0</version>
+        <version>1.2.1</version>
     </parent>
     <artifactId>blazingcache-jcache</artifactId>    
+    <groupId>org.blazingcache</groupId>
     <packaging>jar</packaging>
     <name>BlazingCache :: JCache</name>
     <licenses>
