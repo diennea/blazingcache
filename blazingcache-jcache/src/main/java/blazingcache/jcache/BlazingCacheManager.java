@@ -63,10 +63,12 @@ public class BlazingCacheManager implements CacheManager {
             this.classLoader = classLoader;
             this.properties = properties;
             String keySerializerClass = properties.getProperty("blazingcache.jcache.keyserializer", "blazingcache.jcache.StandardKeySerializer");
-            String valuesSerializerClass = properties.getProperty("blazingcache.jcache.keyserializer", "blazingcache.jcache.StandardValuesSerializer");
+            String valuesSerializerClass = properties.getProperty("blazingcache.jcache.valuesserializer", "blazingcache.jcache.StandardValuesSerializer");
             long maxmemory = Long.parseLong(properties.getProperty("blazingcache.jcache.maxmemory", "0"));
             this.keysSerializer = (Serializer<Object, String>) Class.forName(keySerializerClass, true, classLoader).newInstance();
             this.valuesSerializer = (Serializer<Object, byte[]>) Class.forName(valuesSerializerClass, true, classLoader).newInstance();
+            this.keysSerializer.configure(properties);
+            this.valuesSerializer.configure(properties);
             String clientId = properties.getProperty("blazingcache.clientId", "client");
             String secret = properties.getProperty("blazingcache.secret", "blazingcache");
             if (clientId.isEmpty()) {
@@ -81,7 +83,7 @@ public class BlazingCacheManager implements CacheManager {
             int sockettimeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.sockettimeout", "0"));
             int connecttimeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.connecttimeout", "10000"));
             switch (mode) {
-                case "zk":
+                case "clustered":
                     String connect = properties.getProperty("blazingcache.zookeeper.connectstring", "localhost:1281");
                     int timeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.sessiontimeout", "40000"));
                     String path = properties.getProperty("blazingcache.zookeeper.path", "/blazingcache");
@@ -106,7 +108,7 @@ public class BlazingCacheManager implements CacheManager {
                     if (JSR107_TCK_101_COMPAT_MODE) {
                         this.embeddedServer.setExpirerPeriod(1);
                     }
-                    locator = new blazingcache.network.jvm.JVMServerLocator(embeddedServer);
+                    locator = new blazingcache.network.jvm.JVMServerLocator(embeddedServer, false);
                     this.client = new CacheClient(clientId, secret, locator);
                     break;
                 default:
