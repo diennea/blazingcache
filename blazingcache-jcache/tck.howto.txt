@@ -3,17 +3,18 @@ In order to run the JSR107 TCK download it and use the following command:
 Clone the TCK from GitHub (see https://github.com/jsr107/jsr107tck)
 
 git clone https://github.com/jsr107/jsr107tck.git
+cd jsr107tck
 
 if you want to test against the v1.0.1-release of the TCK:
 git reset --hard
 git checkout v1.0.1-release
 sed -i -- 's/\${implementation-version}/1.0.0/g' spring-annotations-test-harness/pom.xml cdi-weld-annotations-test-harness/pom.xml guice-annotations-test-harness/pom.xml
-mvn clean install -Dimplementation-groupId=org.blazingcache -Dimplementation-artifactId=blazingcache-jcache -Dimplementation-version=1.2.0 -DCacheManagerImpl=blazingcache.jcache.BlazingCacheCacheManager -DCacheImpl=blazingcache.jcache.BlazingCacheCache -DCacheEntryImpl=blazingcache.jcache.BlazingCacheEntry -Djavax.management.builder.initial=blazingcache.jcache.BlazingCacheMBeanServerBuilder -Dorg.jsr107.tck.management.agentId=RIMBeanServer -Dorg.blazingcache.jsr107tck101compatmode=true
+mvn clean install -Dimplementation-groupId=org.blazingcache -Dimplementation-artifactId=blazingcache-jcache -Dimplementation-version=1.3.0 -DCacheManagerImpl=blazingcache.jcache.BlazingCacheCacheManager -DCacheImpl=blazingcache.jcache.BlazingCacheCache -DCacheEntryImpl=blazingcache.jcache.BlazingCacheEntry -Djavax.management.builder.initial=blazingcache.jcache.BlazingCacheMBeanServerBuilder -Dorg.jsr107.tck.management.agentId=RIMBeanServer -Dorg.blazingcache.jsr107tck101compatmode=true
 
 if you want to test against the latest (master) version of the TCK
 git reset --hard
 git checkout master
 sed -i -- 's/\${implementation-version}/1.0.0/g' spring-annotations-test-harness/pom.xml cdi-weld-annotations-test-harness/pom.xml guice-annotations-test-harness/pom.xml
 
-mvn clean install -Dimplementation-groupId=org.blazingcache -Dimplementation-artifactId=blazingcache-jcache -Dimplementation-version=1.2.0 -DCacheManagerImpl=blazingcache.jcache.BlazingCacheCacheManager -DCacheImpl=blazingcache.jcache.BlazingCacheCache -DCacheEntryImpl=blazingcache.jcache.BlazingCacheEntry -Djavax.management.builder.initial=blazingcache.jcache.BlazingCacheMBeanServerBuilder -Dorg.jsr107.tck.management.agentId=RIMBeanServer
+mvn clean install -Dimplementation-groupId=org.blazingcache -Dimplementation-artifactId=blazingcache-jcache -Dimplementation-version=1.3.0 -DCacheManagerImpl=blazingcache.jcache.BlazingCacheCacheManager -DCacheImpl=blazingcache.jcache.BlazingCacheCache -DCacheEntryImpl=blazingcache.jcache.BlazingCacheEntry -Djavax.management.builder.initial=blazingcache.jcache.BlazingCacheMBeanServerBuilder -Dorg.jsr107.tck.management.agentId=RIMBeanServer
 

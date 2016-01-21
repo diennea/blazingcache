@@ -66,10 +66,18 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     private long maxMemory = 0;
 
+    /**
+     * Maximum amount of memory used for storing entry values. 0 or negative to
+     * disable
+     */
     public long getMaxMemory() {
         return maxMemory;
     }
 
+    /**
+     * Maximum amount of memory used for storing entry values. 0 or negative to
+     * disable
+     */
     public void setMaxMemory(long maxMemory) {
         this.maxMemory = maxMemory;
     }
@@ -101,10 +109,21 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return brokerLocator;
     }
 
+    /**
+     * Start the client. You MUST start the client before using it, otherwise the client will always operated in disconnected mode
+     * @see #isConnected() 
+     * @see #waitForConnection(int) 
+     */
     public void start() {
         this.coreThread.start();
     }
 
+    /**
+     * Waits for the client to establish the first connection to the server
+     * @param timeout
+     * @return
+     * @throws InterruptedException 
+     */
     public boolean waitForConnection(int timeout) throws InterruptedException {
         long time = System.currentTimeMillis();
         while (System.currentTimeMillis() - time <= timeout) {
@@ -116,6 +135,12 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return false;
     }
 
+    /**
+     * Waits for the client to be disconnected
+     * @param timeout
+     * @return
+     * @throws InterruptedException 
+     */
     public boolean waitForDisconnection(int timeout) throws InterruptedException {
         long time = System.currentTimeMillis();
         while (System.currentTimeMillis() - time <= timeout) {
@@ -131,7 +156,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public String getClientId() {
         return clientId;
     }
-
+    
     public boolean isConnected() {
         return channel != null;
     }
@@ -140,6 +165,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return connectionTimestamp;
     }
 
+    /**
+     * Actual number of entries in the local cache
+     * @return 
+     */
     public int getCacheSize() {
         return this.cache.size();
     }
@@ -159,6 +188,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connected, channel:" + channel);
     }
 
+    /**
+     * Disconnects the client. This operation autmatically evicts all the entries from the local cache
+     */
     public void disconnect() {
         try {
             this.cache.clear();
@@ -401,6 +433,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return sharedSecret;
     }
 
+    /**
+     * Closes the client. It will never try to reconnect again to the server
+     * @throws Exception 
+     */
     @Override
     public void close() throws Exception {
         stop();
@@ -418,6 +454,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         brokerLocator.close();
     }
 
+    /**
+     * Returns an entry from the local cache, if not found asks to the CacheServer to find the entry on other clients
+     * @param key
+     * @return
+     * @throws InterruptedException 
+     * @see #get(java.lang.String) 
+     */
     public CacheEntry fetch(String key) throws InterruptedException {
         Channel _channel = channel;
         if (_channel == null) {
@@ -454,6 +497,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         actualMemory.addAndGet(entry.getSerializedData().length);
     }
 
+    /**
+     * Modifies the expireTime for a given entry. Expiration works at CacheServer side.
+     * @param key
+     * @param expiretime 
+     */
     public void touchEntry(String key, long expiretime) {
         Channel _channel = channel;
         if (_channel != null) {
@@ -468,6 +516,12 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
+    /**
+     * Returns an entry from the local cache. No network operations will be executed
+     * @param key
+     * @return 
+     * @see #fetch(java.lang.String) 
+     */
     public CacheEntry get(String key) {
         if (channel == null) {
             LOGGER.log(Level.SEVERE, "get failed " + key + ", not connected");
@@ -483,6 +537,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     private static final int invalidateTimeout = 240000;
 
+    /**
+     * Invalidates an entry from the local cache and blocks until any other client which holds the same entry has invalidated the entry locally
+     * @param key
+     * @throws InterruptedException 
+     */
     public void invalidate(String key) throws InterruptedException {
         // subito rimuoviamo dal locale
         CacheEntry removed = cache.remove(key);
@@ -509,6 +568,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     }
 
+    /**
+     * Same as {@link #invalidate(java.lang.String) } but it applies to every entry whose key 'startsWith' the given prefix
+     * @param prefix
+     * @throws InterruptedException 
+     */
     public void invalidateByPrefix(String prefix) throws InterruptedException {
         // subito rimuoviamo dal locale
         Collection<String> keys = cache.keySet().stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
@@ -538,6 +602,16 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     }
 
+    /**
+     * Put an entry on the local cache. This method will also notify of the change to all other clients which hold the same entry locally.
+     * @param key
+     * @param data
+     * @param expireTime This is the UNIX timestamp at which the entry should be invalidated automatically. Use 0 in order to create an immortal entry
+     * @return
+     * @throws InterruptedException     
+     * @throws CacheException 
+     * @see #touchEntry(java.lang.String, long) 
+     */
     public boolean put(String key, byte[] data, long expireTime) throws InterruptedException, CacheException {
         Channel _chanel = channel;
         if (_chanel == null) {
@@ -571,6 +645,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     }
 
+    /**
+     * Return the local key set
+     * @param prefix
+     * @return 
+     */
     public Set<String> getLocalKeySetByPrefix(String prefix) {
         return cache.keySet().stream().filter(k -> k.startsWith(prefix)).collect(Collectors.toSet());
     }

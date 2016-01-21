@@ -32,7 +32,7 @@ import blazingcache.zookeeper.LeaderShipChangeListener;
 import blazingcache.zookeeper.ZKClusterManager;
 
 /**
- *
+ * The CacheServer core
  * @author enrico.olivelli
  */
 public class CacheServer implements AutoCloseable {
@@ -46,6 +46,10 @@ public class CacheServer implements AutoCloseable {
     private Thread expireManager;
     private final NettyChannelAcceptor server;
     private final static Logger LOGGER = Logger.getLogger(CacheServer.class.getName());
+
+    public static String VERSION() {
+        return "1.3.0";
+    }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
         this.sharedSecret = sharedSecret;

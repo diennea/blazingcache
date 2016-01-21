@@ -29,7 +29,7 @@ public class JVMClientTest {
         ServerHostData serverHostData = new ServerHostData("localhost", -1, "test", false, null);
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
             cacheServer.start();
-            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new JVMServerLocator(cacheServer));) {
+            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new JVMServerLocator(cacheServer, false));) {
                 client1.start();
                 assertTrue(client1.waitForConnection(10000));
 
@@ -49,7 +49,6 @@ public class JVMClientTest {
                 client1.touchEntry("key3", System.currentTimeMillis());
                 Thread.sleep(2000);
                 assertNull(client1.get("key3"));
-                
 
             }
 

@@ -37,23 +37,25 @@ import java.util.concurrent.TimeoutException;
  */
 public class JVMServerLocator implements ServerLocator {
 
-    private final CacheServer broker;
+    private final CacheServer cacheServer;
 
     private JVMChannel workerSide;
+    private final boolean stopServerAtClose;
 
-    public JVMServerLocator(CacheServer broker) {
-        this.broker = broker;
+    public JVMServerLocator(CacheServer broker, boolean stopServerAtClose) {
+        this.cacheServer = broker;
+        this.stopServerAtClose = stopServerAtClose;
     }
 
     @Override
     public Channel connect(ChannelEventListener worker, ConnectionRequestInfo workerInfo) throws InterruptedException, ServerRejectedConnectionException, ServerNotAvailableException {
-        if (broker == null || !broker.isLeader()) {
+        if (cacheServer == null || !cacheServer.isLeader()) {
             throw new ServerNotAvailableException(new Exception("embedded server is not running"));
         }
         workerSide = new JVMChannel();
         workerSide.setMessagesReceiver(worker);
         JVMChannel brokerSide = new JVMChannel();
-        broker.getAcceptor().createConnection(brokerSide);
+        cacheServer.getAcceptor().createConnection(brokerSide);
         brokerSide.setOtherSide(workerSide);
         workerSide.setOtherSide(brokerSide);
         Message acceptMessage = Message.CLIENT_CONNECTION_REQUEST(workerInfo.getClientId(), workerInfo.getSharedSecret());
@@ -78,6 +80,9 @@ public class JVMServerLocator implements ServerLocator {
     public void close() {
         if (workerSide != null) {
             workerSide.close();
+        }
+        if (stopServerAtClose) {
+            cacheServer.close();
         }
     }
 

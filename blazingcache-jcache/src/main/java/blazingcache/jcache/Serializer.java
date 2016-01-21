@@ -15,7 +15,7 @@
  */
 package blazingcache.jcache;
 
-import java.io.IOException;
+import java.util.Properties;
 
 /**
  * Serializer for values
@@ -24,8 +24,33 @@ import java.io.IOException;
  */
 public interface Serializer<K, V> {
 
+    /**
+     * Serialize the give value to the value thet is to be written to the
+     * underlying cache. For keys you MUST return a java.lang.String, for values
+     * you MUST return a byte[]
+     *
+     * @param value
+     * @return
+     */
     public V serialize(K value);
 
+    /**
+     * Deserialize the given value from the raw type to the type required by the
+     * javax.cache.Cache. For keys you will receive a java.lang.String, for
+     * values you will receive a byte[]
+     *
+     * @param cachedValue
+     * @return
+     */
     public K deserialize(V cachedValue);
+
+    /**
+     * Read the actual CacheManager configuration. This method is called before any call to other methods
+     *
+     * @param properties
+     */
+    public default void configure(Properties properties) {
+    }
+;
 
 };

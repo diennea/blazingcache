@@ -1,3 +1,4 @@
+
 /*
  Licensed to Diennea S.r.l. under one
  or more contributor license agreements. See the NOTICE file
@@ -19,6 +20,7 @@
  */
 package blazingcache.network;
 
+import blazingcache.server.CacheServer;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -39,6 +41,10 @@ public class ServerHostData {
     private final String version;
     private final boolean ssl;
     private final Map<String, String> additionalData;
+
+    public static final ServerHostData LOCAL() {
+        return new ServerHostData("localhost", 0, CacheServer.VERSION(), false, new HashMap<>());
+    }
 
     public ServerHostData(String host, int port, String version, boolean ssl, Map<String, String> additionalData) {
         this.port = port;
