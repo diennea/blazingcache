@@ -212,6 +212,10 @@ public class CacheServer implements AutoCloseable {
     public void putEntry(String key, byte[] data, long expiretime, String sourceClientId, String clientProvidedLockId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId, clientProvidedLockId);
+            if (lockID == null) {
+                onFinish.onResult(null, new Exception("invalid clientProvidedLockId " + clientProvidedLockId));
+                return;
+            }
             Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
             if (sourceClientId != null) {
                 clientsForKey.remove(sourceClientId);
@@ -248,6 +252,10 @@ public class CacheServer implements AutoCloseable {
     public void invalidateKey(String key, String sourceClientId, String clientProvidedLockId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId, clientProvidedLockId);
+            if (lockID == null) {
+                onFinish.onResult(null, new Exception("invalid clientProvidedLockId " + clientProvidedLockId));
+                return;
+            }
             Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
             if (sourceClientId != null) {
                 clientsForKey.remove(sourceClientId);
@@ -286,7 +294,7 @@ public class CacheServer implements AutoCloseable {
 
     public void lockKey(String key, String sourceClientId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
-            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);            
             cacheStatus.clientLockedKey(sourceClientId, key, lockID);
             onFinish.onResult(lockID.stamp + "", null);
         };
@@ -306,7 +314,7 @@ public class CacheServer implements AutoCloseable {
     public void unregisterEntry(String key, String clientId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
             LOGGER.log(Level.SEVERE, "client " + clientId + " evicted entry " + key);
-            final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId);
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId);            
             try {
                 cacheStatus.removeKeyForClient(key, clientId);
             } finally {
@@ -320,6 +328,10 @@ public class CacheServer implements AutoCloseable {
     public void fetchEntry(String key, String clientId, String clientProvidedLockId, SimpleCallback<Message> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId, clientProvidedLockId);
+            if (lockID == null) {
+                onFinish.onResult(null, new Exception("invalid clientProvidedLockId " + clientProvidedLockId));
+                return;
+            }
             Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
             if (clientId != null) {
                 clientsForKey.remove(clientId);
