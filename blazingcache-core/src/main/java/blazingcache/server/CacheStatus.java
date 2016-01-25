@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -45,6 +46,8 @@ public class CacheStatus {
     private final Map<String, Set<String>> keysForClient = new HashMap<>();
     private final Map<String, Long> entryExpireTime = new HashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
+    private final Map<String, Map<String, List<LockID>>> remoteLocks = new HashMap<>();
+    private final ReentrantLock remoteLocksLock = new ReentrantLock(true);
 
     @Override
     public String toString() {
@@ -186,17 +189,37 @@ public class CacheStatus {
         }
     }
 
-    int removeClientListeners(String client) {
+    public static final class ClientRemovalResult {
+
+        private final int listenersCount;
+        private final Map<String, List<LockID>> locks;
+
+        public ClientRemovalResult(int listenersCount, Map<String, List<LockID>> locks) {
+            this.listenersCount = listenersCount;
+            this.locks = locks;
+        }
+
+        public int getListenersCount() {
+            return listenersCount;
+        }
+
+        public Map<String, List<LockID>> getLocks() {
+            return locks;
+        }
+
+    }
+
+    ClientRemovalResult removeClientListeners(String clientId) {
         AtomicInteger count = new AtomicInteger();
         lock.writeLock().lock();
         try {
-            Set<String> keys = keysForClient.get(client);
+            Set<String> keys = keysForClient.get(clientId);
             if (keys != null) {
                 keys.forEach((key) -> {
                     count.incrementAndGet();
                     Set<String> clients = clientsForKey.get(key);
                     if (clients != null) {
-                        clients.remove(client);
+                        clients.remove(clientId);
                         if (clients.isEmpty()) {
                             clientsForKey.remove(key);
                             entryExpireTime.remove(key);
@@ -204,11 +227,18 @@ public class CacheStatus {
                     }
                 });
             }
-            keysForClient.remove(client);
+            keysForClient.remove(clientId);
         } finally {
             lock.writeLock().unlock();
         }
-        return count.intValue();
+        Map<String, List<LockID>> locksForClient;
+        remoteLocksLock.lock();
+        try {
+            locksForClient = remoteLocks.remove(clientId);
+        } finally {
+            remoteLocksLock.unlock();
+        }
+        return new ClientRemovalResult(count.get(), locksForClient);
     }
 
     Set<String> getAllClientsWithListener() {
@@ -246,6 +276,48 @@ public class CacheStatus {
             }
         } finally {
             lock.writeLock().unlock();
+        }
+    }
+
+    void clientLockedKey(String sourceClientId, String key, LockID lockID) {
+        remoteLocksLock.lock();
+        try {
+            Map<String, List<LockID>> locksForClient = remoteLocks.get(sourceClientId);
+            if (locksForClient == null) {
+                locksForClient = new HashMap<>();
+                remoteLocks.put(sourceClientId, locksForClient);
+            }
+            List<LockID> listForKey = locksForClient.get(key);
+            if (listForKey == null) {
+                listForKey = new ArrayList<>();
+                locksForClient.put(key, listForKey);
+            }
+            listForKey.add(lockID);
+        } finally {
+            remoteLocksLock.unlock();
+        }
+    }
+
+    void clientUnlockedKey(String sourceClientId, String key, LockID lockID) {
+        remoteLocksLock.lock();
+        try {
+            Map<String, List<LockID>> locksForClient = remoteLocks.get(sourceClientId);
+            if (locksForClient == null) {
+                return;
+            }
+            List<LockID> listForKey = locksForClient.get(key);
+            if (listForKey == null) {
+                return;
+            }
+            listForKey.remove(lockID);
+            if (listForKey.isEmpty()) {
+                locksForClient.remove(key);
+                if (locksForClient.isEmpty()) {
+                    remoteLocks.remove(sourceClientId);
+                }
+            }
+        } finally {
+            remoteLocksLock.unlock();
         }
     }
 }
