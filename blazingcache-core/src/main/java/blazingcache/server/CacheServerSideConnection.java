@@ -99,7 +99,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             LOGGER.log(Level.SEVERE, "receivedMessage {0}, but channel is closed", message);
             return;
         }
-        LOGGER.log(Level.FINE, "receivedMessageFromWorker {0}", message);
+        LOGGER.log(Level.FINER, "receivedMessageFromWorker {0}", message);
         switch (message.type) {
             case Message.TYPE_CLIENT_CONNECTION_REQUEST: {
                 LOGGER.log(Level.INFO, "connection request from {0}", message.clientId);
@@ -133,17 +133,17 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 }
                 String _clientId = message.clientId;
                 if (_clientId == null) {
-                    answerConnectionNotAcceptedAndClose(message, new Exception("invalid workerid " + _clientId));
+                    answerConnectionNotAcceptedAndClose(message, new Exception("invalid clientid " + _clientId));
                     return;
                 }
                 if (!server.isLeader()) {
                     answerConnectionNotAcceptedAndClose(message, new Exception("this broker is not yet writable"));
                     return;
                 }
-                LOGGER.log(Level.SEVERE, "registering connection " + connectionId + ", workerId:" + _clientId);
+                LOGGER.log(Level.SEVERE, "registering connection " + connectionId + ", clientId:" + _clientId);
                 CacheServerSideConnection actual = this.server.getAcceptor().getActualConnectionFromClient(_clientId);
                 if (actual != null) {
-                    LOGGER.log(Level.SEVERE, "there is already a connection id: {0}, workerId:{1}, {2}", new Object[]{actual.getConnectionId(), _clientId, actual});
+                    LOGGER.log(Level.SEVERE, "there is already a connection id: {0}, clientId:{1}, {2}", new Object[]{actual.getConnectionId(), _clientId, actual});
                     if (!actual.validate()) {
                         LOGGER.log(Level.SEVERE, "connection id: {0}, is no more valid", actual.getConnectionId());
                         actual.close();
@@ -159,9 +159,32 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 break;
             }
 
+            case Message.TYPE_LOCK_ENTRY: {
+                String key = (String) message.parameters.get("key");
+                server.lockKey(key, clientId, new SimpleCallback<String>() {
+                    @Override
+                    public void onResult(String result, Throwable error) {
+                        _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key).setParameter("lockId", result));
+                    }
+                });
+                break;
+            }
+            case Message.TYPE_UNLOCK_ENTRY: {
+                String key = (String) message.parameters.get("key");
+                String lockId = (String) message.parameters.get("lockId");
+                server.unlockKey(key, clientId, lockId, new SimpleCallback<String>() {
+                    @Override
+                    public void onResult(String result, Throwable error) {
+                        _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key).setParameter("lockId", result));
+                    }
+                });
+                break;
+            }
+
             case Message.TYPE_INVALIDATE: {
                 String key = (String) message.parameters.get("key");
-                server.invalidateKey(key, clientId, new SimpleCallback<String>() {
+                String lockId = (String) message.parameters.get("lockId");
+                server.invalidateKey(key, clientId, lockId, new SimpleCallback<String>() {
                     @Override
                     public void onResult(String result, Throwable error) {
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
@@ -183,7 +206,8 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             }
             case Message.TYPE_FETCH_ENTRY: {
                 String key = (String) message.parameters.get("key");
-                server.fetchEntry(key, clientId, new SimpleCallback<Message>() {
+                String lockId = (String) message.parameters.get("lockId");
+                server.fetchEntry(key, clientId, lockId, new SimpleCallback<Message>() {
                     @Override
                     public void onResult(Message result, Throwable error) {
                         _channel.sendReplyMessage(message, result);
@@ -215,7 +239,8 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 String key = (String) message.parameters.get("key");
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
-                server.putEntry(key, data, expiretime, clientId, new SimpleCallback<String>() {
+                String lockId = (String) message.parameters.get("lockId");
+                server.putEntry(key, data, expiretime, clientId, lockId, new SimpleCallback<String>() {
                     @Override
                     public void onResult(String result, Throwable error) {
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
@@ -224,12 +249,12 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 break;
             }
             case Message.TYPE_CLIENT_SHUTDOWN:
-                LOGGER.log(Level.SEVERE, "worker " + clientId + " sent shutdown message");
+                LOGGER.log(Level.SEVERE, "client " + clientId + " sent shutdown message");
                 /// ignore
                 break;
 
             default:
-                LOGGER.log(Level.SEVERE, "worker " + clientId + " sent unknown message " + message);
+                LOGGER.log(Level.SEVERE, "client " + clientId + " sent unknown message " + message);
                 _channel.sendReplyMessage(message, Message.ERROR(clientId, new Exception("invalid message type:" + message.type)));
 
         }
@@ -238,7 +263,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
     @Override
     public void channelClosed() {
-        LOGGER.log(Level.SEVERE, "worker " + clientId + " connection " + this + " closed");
+        LOGGER.log(Level.SEVERE, "client " + clientId + " connection " + this + " closed");
         channel = null;
         server.getAcceptor().connectionClosed(this);
         server.clientDisconnected(clientId);

@@ -30,9 +30,15 @@ import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyChannelAcceptor;
 import blazingcache.zookeeper.LeaderShipChangeListener;
 import blazingcache.zookeeper.ZKClusterManager;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The CacheServer core
+ *
  * @author enrico.olivelli
  */
 public class CacheServer implements AutoCloseable {
@@ -40,15 +46,17 @@ public class CacheServer implements AutoCloseable {
     private final String sharedSecret;
     private final CacheServerEndpoint acceptor;
     private final CacheStatus cacheStatus = new CacheStatus();
+    private final KeyedLockManager locksManager = new KeyedLockManager();
     private volatile boolean leader;
     private volatile boolean stopped;
     private ZKClusterManager clusterManager;
     private Thread expireManager;
+    private ExecutorService channelsHandlers;
     private final NettyChannelAcceptor server;
     private final static Logger LOGGER = Logger.getLogger(CacheServer.class.getName());
 
     public static String VERSION() {
-        return "1.3.0";
+        return "1.4.0";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
@@ -105,6 +113,15 @@ public class CacheServer implements AutoCloseable {
 
     public void start() throws Exception {
         this.stopped = false;
+        this.channelsHandlers = Executors.newCachedThreadPool(new ThreadFactory() {
+            AtomicLong count = new AtomicLong();
+
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r, "blazingcache-channel-handler-" + count.incrementAndGet());
+                return t;
+            }
+        });
         this.expireManager = new Thread(new Expirer(), "cache-server-expire-thread");
         this.expireManager.setDaemon(true);
         this.expireManager.start();
@@ -136,7 +153,7 @@ public class CacheServer implements AutoCloseable {
                         CountDownLatch latch = new CountDownLatch(entries.size());
                         for (String key : entries) {
                             LOGGER.severe("expiring entry " + key);
-                            invalidateKey(key, "expire-timer", new SimpleCallback<String>() {
+                            invalidateKey(key, "expire-timer", null, new SimpleCallback<String>() {
 
                                 @Override
                                 public void onResult(String result, Throwable error) {
@@ -188,132 +205,209 @@ public class CacheServer implements AutoCloseable {
             expireManager.join(60000);
         } catch (InterruptedException exit) {
         }
+
+        channelsHandlers.shutdown();
     }
 
-    public void putEntry(String key, byte[] data, long expiretime, String sourceClientId, SimpleCallback<String> onFinish) {
-        Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
-        if (sourceClientId != null) {
-            clientsForKey.remove(sourceClientId);
-        }
-        LOGGER.log(Level.FINEST, "putEntry from {0}, key={1}, clientsForKey:{2}", new Object[]{sourceClientId, key, clientsForKey});
-        cacheStatus.registerKeyForClient(key, sourceClientId, expiretime);
-        if (clientsForKey.isEmpty()) {
-            onFinish.onResult(key, null);
-            return;
-        }
-        BroadcastRequestStatus propagation = new BroadcastRequestStatus("putEntry " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, onFinish, null);
-        BroadcastRequestStatusMonitor.register(propagation);
-
-        clientsForKey.forEach((clientId) -> {
-            CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
-            if (connection == null) {
-                LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidated");
-                propagation.clientDone(clientId);
-            } else {
-                connection.sendPutEntry(sourceClientId, key, data, expiretime, propagation);
+    public void putEntry(String key, byte[] data, long expiretime, String sourceClientId, String clientProvidedLockId, SimpleCallback<String> onFinish) {
+        Runnable action = () -> {
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId, clientProvidedLockId);
+            Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
+            if (sourceClientId != null) {
+                clientsForKey.remove(sourceClientId);
             }
-        });
+            LOGGER.log(Level.FINEST, "putEntry from {0}, key={1}, clientsForKey:{2}", new Object[]{sourceClientId, key, clientsForKey});
+            cacheStatus.registerKeyForClient(key, sourceClientId, expiretime);
+            SimpleCallback<String> finishAndReleaseLock = new SimpleCallback<String>() {
+                @Override
+                public void onResult(String result, Throwable error) {
+                    locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+                    onFinish.onResult(result, error);
+                }
+            };
+            if (clientsForKey.isEmpty()) {
+                finishAndReleaseLock.onResult(key, null);
+                return;
+            }
+            BroadcastRequestStatus propagation = new BroadcastRequestStatus("putEntry " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, finishAndReleaseLock, null);
+            BroadcastRequestStatusMonitor.register(propagation);
+
+            clientsForKey.forEach((clientId) -> {
+                CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
+                if (connection == null) {
+                    LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidated");
+                    propagation.clientDone(clientId);
+                } else {
+                    connection.sendPutEntry(sourceClientId, key, data, expiretime, propagation);
+                }
+            });
+        };
+        channelsHandlers.submit(action);
     }
 
-    public void invalidateKey(String key, String sourceClientId, SimpleCallback<String> onFinish) {
-        Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
-        if (sourceClientId != null) {
-            clientsForKey.remove(sourceClientId);
-        }
-        if (clientsForKey.isEmpty()) {
-            onFinish.onResult(key, null);
-            return;
-        }
-        LOGGER.log(Level.FINE, "invalidateKey {0} from {1} interested clients {2}", new Object[]{key, sourceClientId, clientsForKey});
-        BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateKey " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, onFinish, (clientId, error) -> {
-            cacheStatus.removeKeyForClient(key, clientId);
-        });
-        BroadcastRequestStatusMonitor.register(invalidation);
-
-        clientsForKey.forEach((clientId) -> {
-            CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
-            if (connection == null) {
-                LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidated");
-                invalidation.clientDone(clientId);
-            } else {
-                connection.sendKeyInvalidationMessage(sourceClientId, key, invalidation);
+    public void invalidateKey(String key, String sourceClientId, String clientProvidedLockId, SimpleCallback<String> onFinish) {
+        Runnable action = () -> {
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId, clientProvidedLockId);
+            Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
+            if (sourceClientId != null) {
+                clientsForKey.remove(sourceClientId);
             }
-        });
+            SimpleCallback<String> finishAndReleaseLock = new SimpleCallback<String>() {
+                @Override
+                public void onResult(String result, Throwable error) {
+                    locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+                    onFinish.onResult(result, error);
+                }
+            };
+            if (clientsForKey.isEmpty()) {
+                finishAndReleaseLock.onResult(key, null);
+                return;
+            }
+            LOGGER.log(Level.FINE, "invalidateKey {0} from {1} interested clients {2}", new Object[]{key, sourceClientId, clientsForKey});
 
+            BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateKey " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, finishAndReleaseLock, (clientId, error) -> {
+                cacheStatus.removeKeyForClient(key, clientId);
+            });
+            BroadcastRequestStatusMonitor.register(invalidation);
+
+            clientsForKey.forEach((clientId) -> {
+                CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
+                if (connection == null) {
+                    LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidated");
+                    invalidation.clientDone(clientId);
+                } else {
+                    connection.sendKeyInvalidationMessage(sourceClientId, key, invalidation);
+                }
+            });
+
+        };
+        channelsHandlers.submit(action);
+    }
+
+    public void lockKey(String key, String sourceClientId, SimpleCallback<String> onFinish) {
+        Runnable action = () -> {
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
+            cacheStatus.clientLockedKey(sourceClientId, key, lockID);
+            onFinish.onResult(lockID.stamp + "", null);
+        };
+        channelsHandlers.submit(action);
+    }
+
+    public void unlockKey(String key, String sourceClientId, String lockId, SimpleCallback<String> onFinish) {
+        Runnable action = () -> {
+            LockID lockID = new LockID(Long.parseLong(lockId));
+            locksManager.releaseWriteLockForKey(key, lockId, lockID);
+            cacheStatus.clientUnlockedKey(sourceClientId, key, lockID);
+            onFinish.onResult(lockID.stamp + "", null);
+        };
+        channelsHandlers.submit(action);
     }
 
     public void unregisterEntry(String key, String clientId, SimpleCallback<String> onFinish) {
-        LOGGER.log(Level.SEVERE, "client " + clientId + " evicted entry " + key);
-        cacheStatus.removeKeyForClient(key, clientId);
-        onFinish.onResult(null, null);
+        Runnable action = () -> {
+            LOGGER.log(Level.SEVERE, "client " + clientId + " evicted entry " + key);
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId);
+            try {
+                cacheStatus.removeKeyForClient(key, clientId);
+            } finally {
+                locksManager.releaseWriteLockForKey(key, clientId, lockID);
+            }
+            onFinish.onResult(null, null);
+        };
+        channelsHandlers.submit(action);
     }
 
-    public void fetchEntry(String key, String clientId, SimpleCallback<Message> onFinish) {
-        Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
-        if (clientId != null) {
-            clientsForKey.remove(clientId);
-        }
-        LOGGER.log(Level.FINE, "client {0} fetchEntry {1} ask to {2}", new Object[]{clientId, key, clientsForKey});
-        if (clientsForKey.isEmpty()) {
-            onFinish.onResult(Message.ERROR(clientId, new Exception("no client for key " + key)), null);
-            return;
-        }
-        boolean done = false;
-        for (String remoteClientId : clientsForKey) {
-            CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(remoteClientId);
-            if (connection != null) {
-                connection.sendFetchKeyMessage(remoteClientId, key, new SimpleCallback<Message>() {
-
-                    @Override
-                    public void onResult(Message result, Throwable error) {
-                        LOGGER.log(Level.FINE, "client " + remoteClientId + " answer to fetch :" + result, error);
-                        if (result.type == Message.TYPE_ACK) {
-                            // da questo momento consideriamo che il client abbia la entry in memoria
-                            // anche se di fatto potrebbe succedere che il messaggio di risposta non arrivi mai
-                            long expiretime = (long) result.parameters.get("expiretime");
-                            cacheStatus.registerKeyForClient(key, clientId, expiretime);
-                        }
-                        onFinish.onResult(result, error);
-                    }
-                });
-                done = true;
-                break;
+    public void fetchEntry(String key, String clientId, String clientProvidedLockId, SimpleCallback<Message> onFinish) {
+        Runnable action = () -> {
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId, clientProvidedLockId);
+            Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
+            if (clientId != null) {
+                clientsForKey.remove(clientId);
             }
-        }
-        if (!done) {
-            onFinish.onResult(Message.ERROR(clientId, new Exception("no connected client for key " + key)), null);
-            return;
-        }
+            LOGGER.log(Level.FINE, "client {0} fetchEntry {1} ask to {2}", new Object[]{clientId, key, clientsForKey});
+            SimpleCallback<Message> finishAndReleaseLock = new SimpleCallback<Message>() {
+                @Override
+                public void onResult(Message result, Throwable error) {
+                    locksManager.releaseWriteLockForKey(key, clientId, lockID);
+                    onFinish.onResult(result, error);
+                }
+            };
+            if (clientsForKey.isEmpty()) {
+                finishAndReleaseLock.onResult(Message.ERROR(clientId, new Exception("no client for key " + key)), null);
+                return;
+            }
+
+            boolean foundOneGoodClientConnected = false;
+            for (String remoteClientId : clientsForKey) {
+                CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(remoteClientId);
+                if (connection != null) {
+                    connection.sendFetchKeyMessage(remoteClientId, key, new SimpleCallback<Message>() {
+
+                        @Override
+                        public void onResult(Message result, Throwable error) {
+                            LOGGER.log(Level.FINE, "client " + remoteClientId + " answer to fetch :" + result, error);
+                            if (result.type == Message.TYPE_ACK) {
+                                // da questo momento consideriamo che il client abbia la entry in memoria
+                                // anche se di fatto potrebbe succedere che il messaggio di risposta non arrivi mai
+                                long expiretime = (long) result.parameters.get("expiretime");
+                                cacheStatus.registerKeyForClient(key, clientId, expiretime);
+                            }
+                            finishAndReleaseLock.onResult(result, error);
+                        }
+                    });
+                    foundOneGoodClientConnected = true;
+                    break;
+                }
+            }
+            if (!foundOneGoodClientConnected) {
+                finishAndReleaseLock.onResult(Message.ERROR(clientId, new Exception("no connected client for key " + key)), null);
+            }
+        };
+        channelsHandlers.submit(action);
     }
 
     public void invalidateByPrefix(String prefix, String sourceClientId, SimpleCallback<String> onFinish) {
-        Set<String> clients = cacheStatus.getAllClientsWithListener();
-        if (sourceClientId != null) {
-            clients.remove(sourceClientId);
-        }
-        if (clients.isEmpty()) {
-            onFinish.onResult(prefix, null);
-            return;
-        }
-        BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateByPrefix " + prefix + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clients, onFinish, (clientId, error) -> {
-            cacheStatus.removeKeyByPrefixForClient(prefix, clientId);
-        });
-
-        BroadcastRequestStatusMonitor.register(invalidation);
-        clients.forEach((clientId) -> {
-            CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
-            if (connection == null) {
-                LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering prefix " + prefix + " invalidated");
-                invalidation.clientDone(clientId);
-            } else {
-                connection.sendPrefixInvalidationMessage(sourceClientId, prefix, invalidation);
+        Runnable action = () -> {
+            // LOCKS ??
+            Set<String> clients = cacheStatus.getAllClientsWithListener();
+            if (sourceClientId != null) {
+                clients.remove(sourceClientId);
             }
-        });
+            if (clients.isEmpty()) {
+                onFinish.onResult(prefix, null);
+                return;
+            }
+            BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateByPrefix " + prefix + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clients, onFinish, (clientId, error) -> {
+                cacheStatus.removeKeyByPrefixForClient(prefix, clientId);
+            });
+
+            BroadcastRequestStatusMonitor.register(invalidation);
+            clients.forEach((clientId) -> {
+                CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
+                if (connection == null) {
+                    LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering prefix " + prefix + " invalidated");
+                    invalidation.clientDone(clientId);
+                } else {
+                    connection.sendPrefixInvalidationMessage(sourceClientId, prefix, invalidation);
+                }
+            });
+        };
+        channelsHandlers.submit(action);
     }
 
     void clientDisconnected(String clientId) {
-        int count = cacheStatus.removeClientListeners(clientId);
-        LOGGER.log(Level.SEVERE, "client " + clientId + " disconnected, removed " + count + " key listeners");
+        CacheStatus.ClientRemovalResult removalResult = cacheStatus.removeClientListeners(clientId);
+        int count = removalResult.getListenersCount();
+        Map<String, List<LockID>> locks = removalResult.getLocks();
+        LOGGER.log(Level.SEVERE, "client " + clientId + " disconnected, removed " + count + " key listeners, locks:" + locks);
+        if (locks != null) {
+            locks.forEach((key, locksForKey) -> {
+                locksForKey.forEach(lock -> {
+                    locksManager.releaseWriteLockForKey(key, clientId, lock);
+                });
+
+            });
+        }
     }
 
 }

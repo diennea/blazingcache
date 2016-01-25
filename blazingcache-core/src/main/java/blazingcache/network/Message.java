@@ -89,6 +89,19 @@ public final class Message {
         return new Message(clientId, TYPE_INVALIDATE, data);
     }
 
+    public static Message LOCK(String clientId, String key) {
+        HashMap<String, Object> data = new HashMap<>();
+        data.put("key", key);
+        return new Message(clientId, TYPE_LOCK_ENTRY, data);
+    }
+
+    public static Message UNLOCK(String clientId, String key, String lockId) {
+        HashMap<String, Object> data = new HashMap<>();
+        data.put("key", key);
+        data.put("lockId", lockId);
+        return new Message(clientId, TYPE_UNLOCK_ENTRY, data);
+    }
+
     public static Message INVALIDATE_BY_PREFIX(String clientId, String prefix) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("prefix", prefix);
@@ -117,6 +130,8 @@ public final class Message {
     public static final int TYPE_UNREGISTER_ENTRY = 8;
     public static final int TYPE_FETCH_ENTRY = 9;
     public static final int TYPE_TOUCH_ENTRY = 10;
+    public static final int TYPE_LOCK_ENTRY = 11;
+    public static final int TYPE_UNLOCK_ENTRY = 12;
 
     public static String typeToString(int type) {
         switch (type) {
@@ -140,6 +155,10 @@ public final class Message {
                 return "TYPE_FETCH_ENTRY";
             case TYPE_TOUCH_ENTRY:
                 return "TYPE_TOUCH_ENTRY";
+            case TYPE_LOCK_ENTRY:
+                return "TYPE_LOCK_ENTRY";
+            case TYPE_UNLOCK_ENTRY:
+                return "TYPE_UNLOCK_ENTRY";
             default:
                 return "?" + type;
         }

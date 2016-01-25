@@ -110,9 +110,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Start the client. You MUST start the client before using it, otherwise the client will always operated in disconnected mode
-     * @see #isConnected() 
-     * @see #waitForConnection(int) 
+     * Start the client. You MUST start the client before using it, otherwise
+     * the client will always operated in disconnected mode
+     *
+     * @see #isConnected()
+     * @see #waitForConnection(int)
      */
     public void start() {
         this.coreThread.start();
@@ -120,9 +122,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Waits for the client to establish the first connection to the server
+     *
      * @param timeout
      * @return
-     * @throws InterruptedException 
+     * @throws InterruptedException
      */
     public boolean waitForConnection(int timeout) throws InterruptedException {
         long time = System.currentTimeMillis();
@@ -137,9 +140,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Waits for the client to be disconnected
+     *
      * @param timeout
      * @return
-     * @throws InterruptedException 
+     * @throws InterruptedException
      */
     public boolean waitForDisconnection(int timeout) throws InterruptedException {
         long time = System.currentTimeMillis();
@@ -156,7 +160,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public String getClientId() {
         return clientId;
     }
-    
+
     public boolean isConnected() {
         return channel != null;
     }
@@ -167,7 +171,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Actual number of entries in the local cache
-     * @return 
+     *
+     * @return
      */
     public int getCacheSize() {
         return this.cache.size();
@@ -189,7 +194,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Disconnects the client. This operation autmatically evicts all the entries from the local cache
+     * Disconnects the client. This operation autmatically evicts all the
+     * entries from the local cache
      */
     public void disconnect() {
         try {
@@ -435,7 +441,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Closes the client. It will never try to reconnect again to the server
-     * @throws Exception 
+     *
+     * @throws Exception
      */
     @Override
     public void close() throws Exception {
@@ -455,16 +462,33 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns an entry from the local cache, if not found asks to the CacheServer to find the entry on other clients
+     * Returns an entry from the local cache, if not found asks to the
+     * CacheServer to find the entry on other clients
+     *
      * @param key
      * @return
-     * @throws InterruptedException 
-     * @see #get(java.lang.String) 
+     * @throws InterruptedException
+     * @see #get(java.lang.String)
      */
     public CacheEntry fetch(String key) throws InterruptedException {
+        return fetch(key, null);
+    }
+
+    /**
+     * Returns an entry from the local cache, if not found asks to the
+     * CacheServer to find the entry on other clients.
+     *
+     * @param key
+     * @param lock previouly acquired lock
+     * @return
+     * @throws InterruptedException
+     * @see #get(java.lang.String)
+     * @see #lock(java.lang.String)
+     */
+    public CacheEntry fetch(String key, KeyLock lock) throws InterruptedException {
         Channel _channel = channel;
         if (_channel == null) {
-            LOGGER.log(Level.SEVERE, "fetch failed " + key + ", not connected");
+            LOGGER.log(Level.SEVERE, "fetch failed {0}, not connected", key);
             return null;
         }
         CacheEntry entry = cache.get(key);
@@ -473,7 +497,15 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return entry;
         }
         try {
-            Message message = _channel.sendMessageWithReply(Message.FETCH_ENTRY(clientId, key), invalidateTimeout);
+            Message request_message = Message.FETCH_ENTRY(clientId, key);
+            if (lock != null) {
+                if (!lock.getKey().equals(key)) {
+                    LOGGER.log(Level.SEVERE, "lock {0} is not for key {1}", new Object[]{lock, key});
+                    return null;
+                }
+                request_message.setParameter("lockId", lock.getLockId());
+            }
+            Message message = _channel.sendMessageWithReply(request_message, invalidateTimeout);
             LOGGER.log(Level.FINEST, "fetch result " + key + ", answer is " + message);
             if (message.type == Message.TYPE_ACK) {
                 byte[] data = (byte[]) message.parameters.get("data");
@@ -498,14 +530,35 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Modifies the expireTime for a given entry. Expiration works at CacheServer side.
+     * Modifies the expireTime for a given entry. Expiration works at
+     * CacheServer side.
+     *
      * @param key
-     * @param expiretime 
+     * @param expiretime
      */
     public void touchEntry(String key, long expiretime) {
+        touchEntry(key, expiretime, null);
+    }
+
+    /**
+     * Modifies the expireTime for a given entry. Expiration works at
+     * CacheServer side.
+     *
+     * @param key
+     * @param expiretime
+     * @see #lock(java.lang.String)
+     */
+    public void touchEntry(String key, long expiretime, KeyLock lock) {
         Channel _channel = channel;
         if (_channel != null) {
-            _channel.sendOneWayMessage(Message.TOUCH_ENTRY(clientId, key, expiretime), new SendResultCallback() {
+            Message request = Message.TOUCH_ENTRY(clientId, key, expiretime);
+            if (lock != null) {
+                if (!lock.getKey().equals(key)) {
+                    return;
+                }
+                request.setParameter("lockId", lock.getLockId());
+            }
+            _channel.sendOneWayMessage(request, new SendResultCallback() {
                 @Override
                 public void messageSent(Message originalMessage, Throwable error) {
                     if (error != null) {
@@ -517,10 +570,12 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns an entry from the local cache. No network operations will be executed
+     * Returns an entry from the local cache. No network operations will be
+     * executed
+     *
      * @param key
-     * @return 
-     * @see #fetch(java.lang.String) 
+     * @return
+     * @see #fetch(java.lang.String)
      */
     public CacheEntry get(String key) {
         if (channel == null) {
@@ -538,11 +593,22 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private static final int invalidateTimeout = 240000;
 
     /**
-     * Invalidates an entry from the local cache and blocks until any other client which holds the same entry has invalidated the entry locally
+     * Invalidates an entry from the local cache and blocks until any other
+     * client which holds the same entry has invalidated the entry locally
+     *
      * @param key
-     * @throws InterruptedException 
+     * @throws InterruptedException
      */
     public void invalidate(String key) throws InterruptedException {
+        invalidate(key, null);
+    }
+
+    public void invalidate(String key, KeyLock lock) throws InterruptedException {
+        if (lock != null) {
+            if (!lock.getKey().equals(key)) {
+                return;
+            }
+        }
         // subito rimuoviamo dal locale
         CacheEntry removed = cache.remove(key);
         if (removed != null) {
@@ -554,9 +620,15 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (_channel == null) {
                 LOGGER.log(Level.SEVERE, "invalidate " + key + ", not connected");
                 Thread.sleep(1000);
+                // if we are disconnected no lock can be valid
+                lock = null;
             } else {
                 try {
-                    Message response = _channel.sendMessageWithReply(Message.INVALIDATE(clientId, key), invalidateTimeout);
+                    Message request = Message.INVALIDATE(clientId, key);
+                    if (lock != null) {
+                        request.setParameter("lockId", lock.getLockId());
+                    }
+                    Message response = _channel.sendMessageWithReply(request, invalidateTimeout);
                     LOGGER.log(Level.FINEST, "invalidate " + key + ", -> " + response);
                     return;
                 } catch (TimeoutException error) {
@@ -569,9 +641,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Same as {@link #invalidate(java.lang.String) } but it applies to every entry whose key 'startsWith' the given prefix
+     * Same as {@link #invalidate(java.lang.String) } but it applies to every
+     * entry whose key 'startsWith' the given prefix
+     *
      * @param prefix
-     * @throws InterruptedException 
+     * @throws InterruptedException
      */
     public void invalidateByPrefix(String prefix) throws InterruptedException {
         // subito rimuoviamo dal locale
@@ -603,20 +677,30 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Put an entry on the local cache. This method will also notify of the change to all other clients which hold the same entry locally.
+     * Put an entry on the local cache. This method will also notify of the
+     * change to all other clients which hold the same entry locally.
+     *
      * @param key
      * @param data
-     * @param expireTime This is the UNIX timestamp at which the entry should be invalidated automatically. Use 0 in order to create an immortal entry
+     * @param expireTime This is the UNIX timestamp at which the entry should be
+     * invalidated automatically. Use 0 in order to create an immortal entry
      * @return
-     * @throws InterruptedException     
-     * @throws CacheException 
-     * @see #touchEntry(java.lang.String, long) 
+     * @throws InterruptedException
+     * @throws CacheException
+     * @see #touchEntry(java.lang.String, long)
      */
     public boolean put(String key, byte[] data, long expireTime) throws InterruptedException, CacheException {
+        return put(key, data, expireTime, null);
+    }
+
+    public boolean put(String key, byte[] data, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
         Channel _chanel = channel;
         if (_chanel == null) {
             LOGGER.log(Level.SEVERE, "cache put failed " + key + ", not connected");
             return false;
+        }
+        if (lock != null && !lock.getKey().equals(key)) {
+            throw new CacheException("lock " + lock + " is not for key " + key);
         }
         try {
             CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime);
@@ -625,7 +709,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 actualMemory.addAndGet(-prev.getSerializedData().length);
             }
             actualMemory.addAndGet(data.length);
-            Message response = _chanel.sendMessageWithReply(Message.PUT_ENTRY(clientId, key, data, expireTime), invalidateTimeout);
+            Message request = Message.PUT_ENTRY(clientId, key, data, expireTime);
+            if (lock != null) {
+                request.setParameter("lockId", lock.getLockId());
+            }
+            Message response = _chanel.sendMessageWithReply(request, invalidateTimeout);
             if (response.type != Message.TYPE_ACK) {
                 throw new CacheException("error while putting key " + key + " (" + response + ")");
             }
@@ -645,10 +733,51 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     }
 
+    public KeyLock lock(String key) throws InterruptedException, CacheException {
+        Channel _chanel = channel;
+        if (_chanel == null) {
+            LOGGER.log(Level.SEVERE, "cache lock failed " + key + ", not connected");
+            return null;
+        }
+        try {
+            Message response = _chanel.sendMessageWithReply(Message.LOCK(clientId, key), invalidateTimeout);
+            if (response.type != Message.TYPE_ACK) {
+                throw new CacheException("error while locking key " + key + " (" + response + ")");
+            }
+            String lockId = (String) response.parameters.get("lockId");
+            KeyLock result = new KeyLock();
+            result.setLockId(lockId);
+            result.setKey(key);
+            return result;
+        } catch (TimeoutException timedOut) {
+            throw new CacheException("error while locking key " + key + ":" + timedOut, timedOut);
+        }
+    }
+
+    public void unlock(KeyLock keyLock) throws InterruptedException, CacheException {
+        if (keyLock == null) {
+            return;
+        }
+        Channel _chanel = channel;
+        if (_chanel == null) {
+            LOGGER.log(Level.SEVERE, "cache unlock failed " + keyLock + ", not connected. lock already got released at network failure");
+            return;
+        }
+        try {
+            Message response = _chanel.sendMessageWithReply(Message.UNLOCK(clientId, keyLock.getKey(), keyLock.getLockId()), invalidateTimeout);
+            if (response.type != Message.TYPE_ACK) {
+                throw new CacheException("error while unlocking key " + keyLock.getKey() + " with lockID " + keyLock.getLockId() + " (" + response + ")");
+            }
+        } catch (TimeoutException timedOut) {
+            throw new CacheException("error while unlockingkey " + keyLock.getKey() + " with lockID " + keyLock.getLockId() + ":" + timedOut, timedOut);
+        }
+    }
+
     /**
      * Return the local key set
+     *
      * @param prefix
-     * @return 
+     * @return
      */
     public Set<String> getLocalKeySetByPrefix(String prefix) {
         return cache.keySet().stream().filter(k -> k.startsWith(prefix)).collect(Collectors.toSet());
