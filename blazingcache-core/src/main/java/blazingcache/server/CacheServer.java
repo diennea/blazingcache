@@ -52,11 +52,12 @@ public class CacheServer implements AutoCloseable {
     private ZKClusterManager clusterManager;
     private Thread expireManager;
     private ExecutorService channelsHandlers;
+    private int channelHandlersThreads = 64;
     private final NettyChannelAcceptor server;
     private final static Logger LOGGER = Logger.getLogger(CacheServer.class.getName());
 
     public static String VERSION() {
-        return "1.4.0";
+        return "1.4.1";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
@@ -74,7 +75,24 @@ public class CacheServer implements AutoCloseable {
         this.server.setSslCiphers(sslCiphers);
     }
 
+    public int getChannelHandlersThreads() {
+        return channelHandlersThreads;
+    }
+
+    public void setChannelHandlersThreads(int channelHandlersThreads) {
+        this.channelHandlersThreads = channelHandlersThreads;
+    }
+
+    public int getCallbackThreads() {
+        return server.getCallbackThreads();
+    }
+
+    public void setCallbackThreads(int callbackThreads) {
+        server.setCallbackThreads(callbackThreads);
+    }
+
     public int getWorkerThreads() {
+
         return server.getWorkerThreads();
     }
 
@@ -113,15 +131,19 @@ public class CacheServer implements AutoCloseable {
 
     public void start() throws Exception {
         this.stopped = false;
-        this.channelsHandlers = Executors.newCachedThreadPool(new ThreadFactory() {
-            AtomicLong count = new AtomicLong();
+        if (channelHandlersThreads == 0) {
+            this.channelsHandlers = Executors.newCachedThreadPool();
+        } else {
+            this.channelsHandlers = Executors.newFixedThreadPool(channelHandlersThreads, new ThreadFactory() {
+                AtomicLong count = new AtomicLong();
 
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(r, "blazingcache-channel-handler-" + count.incrementAndGet());
-                return t;
-            }
-        });
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread t = new Thread(r, "blazingcache-channel-handler-" + count.incrementAndGet());
+                    return t;
+                }
+            });
+        }
         this.expireManager = new Thread(new Expirer(), "cache-server-expire-thread");
         this.expireManager.setDaemon(true);
         this.expireManager.start();
@@ -294,7 +316,7 @@ public class CacheServer implements AutoCloseable {
 
     public void lockKey(String key, String sourceClientId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
-            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);            
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
             cacheStatus.clientLockedKey(sourceClientId, key, lockID);
             onFinish.onResult(lockID.stamp + "", null);
         };
@@ -314,7 +336,7 @@ public class CacheServer implements AutoCloseable {
     public void unregisterEntry(String key, String clientId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
             LOGGER.log(Level.SEVERE, "client " + clientId + " evicted entry " + key);
-            final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId);            
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId);
             try {
                 cacheStatus.removeKeyForClient(key, clientId);
             } finally {
