@@ -254,10 +254,8 @@ public class CacheStatus {
     List<String> selectExpiredEntries(long now, int max) {
         lock.readLock().lock();
         try {
-            return entryExpireTime.entrySet().stream().filter(entry -> entry.getValue() < now).peek(
-                    (entry) -> {
-                        System.out.println("Entry " + entry.getKey() + ", expire: " + new java.sql.Timestamp(entry.getValue()) + " expired!");
-                    }).map(entry -> entry.getKey()).limit(max).collect(Collectors.toList());
+            return entryExpireTime.entrySet().stream().filter(entry -> entry.getValue() < now)
+                    .map(entry -> entry.getKey()).limit(max).collect(Collectors.toList());
         } finally {
             lock.readLock().unlock();
         }
