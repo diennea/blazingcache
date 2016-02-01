@@ -38,6 +38,8 @@ import java.io.File;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -62,7 +64,16 @@ public class NettyChannelAcceptor implements AutoCloseable {
     private File sslCertFile;
     private String sslCertPassword;
     private int workerThreads = 16;
-    private final ExecutorService callbackExecutor = Executors.newCachedThreadPool();
+    private int callbackThreads = 64;
+    private ExecutorService callbackExecutor;
+
+    public int getCallbackThreads() {
+        return callbackThreads;
+    }
+
+    public void setCallbackThreads(int callbackThreads) {
+        this.callbackThreads = callbackThreads;
+    }
 
     public int getWorkerThreads() {
         return workerThreads;
@@ -158,6 +169,18 @@ public class NettyChannelAcceptor implements AutoCloseable {
             }
 
         }
+        if (callbackThreads == 0) {
+            callbackExecutor = Executors.newCachedThreadPool();
+        } else {
+            callbackExecutor = Executors.newFixedThreadPool(callbackThreads, new ThreadFactory() {
+                private final AtomicLong count = new AtomicLong();
+
+                @Override
+                public Thread newThread(Runnable r) {
+                    return new Thread(r, "blazingcache-callbacks-" + count.incrementAndGet());
+                }
+            });
+        }
         bossGroup = new NioEventLoopGroup(workerThreads);
         workerGroup = new NioEventLoopGroup(workerThreads);
         ServerBootstrap b = new ServerBootstrap();
@@ -166,7 +189,7 @@ public class NettyChannelAcceptor implements AutoCloseable {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
-                        NettyChannel session = new NettyChannel(ch, callbackExecutor,null);
+                        NettyChannel session = new NettyChannel(ch, callbackExecutor, null);
                         if (acceptor != null) {
                             acceptor.createConnection(session);
                         }

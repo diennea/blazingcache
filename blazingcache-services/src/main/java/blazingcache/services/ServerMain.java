@@ -146,12 +146,14 @@ public class ServerMain implements AutoCloseable {
         String sharedsecret = configuration.getProperty("sharedsecret", "blazingcache");
         String clusteringmode = configuration.getProperty("clustering.mode", "singleserver");
         int workerthreads = Integer.parseInt(configuration.getProperty("io.worker.threads", "16"));
+        int callbackThreads = Integer.parseInt(configuration.getProperty("netty.callback.threads", "64"));
+        int channelHandlersThreads = Integer.parseInt(configuration.getProperty("channelhandlers.threads", "64"));
 
         System.out.println("Starting BlazingCache Server");
 
         Map<String, String> additionalData = new HashMap<>();
         ServerHostData data = new ServerHostData(host, port, "", ssl, additionalData);
-        cacheServer = new CacheServer(sharedsecret, data);
+        cacheServer = new CacheServer(sharedsecret, data);        
 
         switch (clusteringmode) {
             case "singleserver": {
@@ -170,6 +172,8 @@ public class ServerMain implements AutoCloseable {
 
         System.out.println("Listening for clients connections on " + host + ":" + port + " ssl=" + ssl);
         cacheServer.setWorkerThreads(workerthreads);
+        cacheServer.setChannelHandlersThreads(channelHandlersThreads);
+        cacheServer.setCallbackThreads(callbackThreads);
 
         File sslCertFile = null;
         File sslCertChainFile = null;
