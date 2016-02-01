@@ -174,12 +174,16 @@ public class CacheServer implements AutoCloseable {
 
                         CountDownLatch latch = new CountDownLatch(entries.size());
                         for (String key : entries) {
-                            LOGGER.severe("expiring entry " + key);
+                            LOGGER.log(Level.FINER, "expiring entry {0}", key);
                             invalidateKey(key, "expire-timer", null, new SimpleCallback<String>() {
 
                                 @Override
                                 public void onResult(String result, Throwable error) {
-                                    LOGGER.severe("expired entry " + key + " " + error);
+                                    if (error != null) {
+                                        LOGGER.log(Level.SEVERE, "expired entry {0} {1}", new Object[]{key, error});
+                                    } else {
+                                        LOGGER.log(Level.FINER, " OK" + "expired entry {0}", key);
+                                    }
                                     latch.countDown();
                                 }
                             });
@@ -197,6 +201,7 @@ public class CacheServer implements AutoCloseable {
                     break;
                 }
             }
+            LOGGER.log(Level.FINE, "expirer thread stopped");
         }
     }
 
