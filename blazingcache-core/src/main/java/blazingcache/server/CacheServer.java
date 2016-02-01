@@ -335,7 +335,7 @@ public class CacheServer implements AutoCloseable {
 
     public void unregisterEntry(String key, String clientId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
-            LOGGER.log(Level.SEVERE, "client " + clientId + " evicted entry " + key);
+            LOGGER.log(Level.FINER, "client " + clientId + " evicted entry " + key);
             final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId);
             try {
                 cacheStatus.removeKeyForClient(key, clientId);
