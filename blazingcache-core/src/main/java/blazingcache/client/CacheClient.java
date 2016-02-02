@@ -41,6 +41,7 @@ import blazingcache.network.ServerNotAvailableException;
 import blazingcache.network.ServerRejectedConnectionException;
 import java.util.Arrays;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Client
@@ -222,10 +223,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             while (!stopped) {
                 try {
                     try {
-                        if (channel == null || !channel.isValid()) {
+                        Channel _channel = channel;
+                        if (_channel == null || !_channel.isValid()) {
                             connect();
                         }
-
                     } catch (InterruptedException exit) {
                         continue;
                     } catch (ServerNotAvailableException | ServerRejectedConnectionException retry) {
@@ -234,8 +235,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
                     if (channel == null) {
                         try {
-                            CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "not connected, waiting 5000 ms");
-                            Thread.sleep(5000);
+                            CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "not connected, waiting 2000 ms");
+                            Thread.sleep(2000);
                         } catch (InterruptedException exit) {
                         }
                         continue;
@@ -250,7 +251,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     try {
                         // TODO: wait for IO error or stop condition before reconnect 
                         CONNECTION_MANAGER_LOGGER.log(Level.FINEST, "connected");
-                        Thread.sleep(5000);
+                        Thread.sleep(2000);
                     } catch (InterruptedException exit) {
                         continue;
                     }
@@ -322,7 +323,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             CountDownLatch count = new CountDownLatch(evictable.size());
             for (CacheEntry entry : evictable) {
                 String key = entry.getKey();
-                LOGGER.severe("evict " + key + " size " + entry.getSerializedData().length + " bytes lastAccessDate " + entry.getLastGetTime());
+                LOGGER.log(Level.SEVERE, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{key, entry.getSerializedData().length, entry.getLastGetTime()});
                 CacheEntry removed = cache.remove(key);
                 if (removed != null) {
                     actualMemory.addAndGet(-removed.getSerializedData().length);
@@ -345,9 +346,22 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     count.countDown();
                 }
             }
-            LOGGER.severe("waiting for evict ack from server");
-            count.await();
-            LOGGER.severe("eviction finished");
+
+            int countWait = 0;
+            while (true) {
+                LOGGER.log(Level.SEVERE, "waiting for evict ack from server (#{0})", countWait);
+                boolean done = count.await(1, TimeUnit.SECONDS);
+                if (done) {
+                    break;
+                }
+                Channel _channel = channel;
+                if (_channel == null || !_channel.isValid()) {
+                    LOGGER.log(Level.SEVERE, "channel closed during eviction");
+                    break;
+                }
+                countWait++;
+            }
+            LOGGER.log(Level.SEVERE, "eviction finished");
         }
     }
 
