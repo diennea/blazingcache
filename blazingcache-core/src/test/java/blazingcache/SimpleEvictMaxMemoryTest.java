@@ -51,7 +51,7 @@ public class SimpleEvictMaxMemoryTest {
                     client1.setMaxMemory(10);
 
                     for (int i = 0; i < 100; i++) {
-                        System.out.println("client1.getActualMemory():" + client1.getActualMemory());
+//                        System.out.println("client1.getActualMemory():" + client1.getActualMemory());
                         if (client1.getActualMemory() == 8) {
                             break;
                         }
@@ -87,7 +87,7 @@ public class SimpleEvictMaxMemoryTest {
                     client1.setMaxMemory(10);
 
                     for (int i = 0; i < 100; i++) {
-                        System.out.println("client1.getActualMemory():" + client1.getActualMemory());
+//                        System.out.println("client1.getActualMemory():" + client1.getActualMemory());
                         if (client1.getActualMemory() == 8) {
                             break;
                         }
@@ -145,7 +145,7 @@ public class SimpleEvictMaxMemoryTest {
                 client1.setMaxMemory(10);
 
                 for (int i = 0; i < 100; i++) {
-                    System.out.println("client1.getActualMemory():" + client1.getActualMemory());
+//                    System.out.println("client1.getActualMemory():" + client1.getActualMemory());
                     if (client1.getActualMemory() == 8) {
                         break;
                     }
