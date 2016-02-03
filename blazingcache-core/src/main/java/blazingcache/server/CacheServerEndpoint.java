@@ -25,6 +25,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import blazingcache.network.Channel;
 import blazingcache.network.ServerSideConnectionAcceptor;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Connections manager broker-side
@@ -75,6 +77,17 @@ public class CacheServerEndpoint implements ServerSideConnectionAcceptor<CacheSe
         connections.remove(con.getConnectionId());
         if (con.getClientId() != null) {
             clientConnections.remove(con.getClientId()); // to be remove only if the connection is the current connection
+        }
+    }
+
+    void processIdleConnections() {
+        try {
+            List<CacheServerSideConnection> connections = new ArrayList<>(clientConnections.values());
+            for (CacheServerSideConnection cs : connections) {
+                cs.processIdleConnection();
+            }
+        } catch (Exception error) {
+            LOGGER.log(Level.SEVERE, "processIdleConnections error ", error);
         }
     }
 

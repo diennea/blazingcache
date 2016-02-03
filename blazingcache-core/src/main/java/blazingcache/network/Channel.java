@@ -49,14 +49,17 @@ public abstract class Channel implements AutoCloseable {
 
     public abstract void sendReplyMessage(Message inAnswerTo, Message message);
 
-    public abstract void sendMessageWithAsyncReply(Message message, ReplyCallback callback);
+    public abstract void sendMessageWithAsyncReply(Message message, long timeout, ReplyCallback callback);
+    
+    public abstract void channelIdle();
+    
 
     @Override
     public abstract void close();
 
     public Message sendMessageWithReply(Message message, long timeout) throws InterruptedException, TimeoutException {
         CompletableFuture<Message> resp = new CompletableFuture<>();
-        sendMessageWithAsyncReply(message, (Message originalMessage, Message message1, Throwable error) -> {
+        sendMessageWithAsyncReply(message, timeout, (Message originalMessage, Message message1, Throwable error) -> {
             if (error != null) {
                 resp.completeExceptionally(error);
             } else {
@@ -74,7 +77,7 @@ public abstract class Channel implements AutoCloseable {
             throw new RuntimeException(err.getCause());
         }
     }
-    
+
     public abstract boolean isValid();
 
 }

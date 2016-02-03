@@ -88,7 +88,8 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
     }
 
     public boolean validate() {
-        return channel != null && channel.isValid();
+        Channel _channel = channel;
+        return _channel != null && _channel.isValid();
     }
 
     @Override
@@ -263,7 +264,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
     @Override
     public void channelClosed() {
-        LOGGER.log(Level.SEVERE, "client " + clientId + " connection " + this + " closed");
+        LOGGER.log(Level.SEVERE, "client " + clientId + " connection closed " + this);
+        Channel _channel = channel;
+        if (_channel != null) {
+            _channel.close();
+        }
         channel = null;
         server.getAcceptor().connectionClosed(this);
         server.clientDisconnected(clientId);
@@ -271,15 +276,17 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
     void answerConnectionNotAcceptedAndClose(Message connectionRequestMessage, Throwable ex
     ) {
-        if (channel != null) {
-            channel.sendReplyMessage(connectionRequestMessage, Message.ERROR(clientId, ex));
+        Channel _channel = channel;
+        if (_channel != null) {
+            _channel.sendReplyMessage(connectionRequestMessage, Message.ERROR(clientId, ex));
         }
         close();
     }
 
     public void close() {
-        if (channel != null) {
-            channel.close();
+        Channel _channel = channel;
+        if (_channel != null) {
+            _channel.close();
         } else {
             channelClosed();
         }
@@ -287,7 +294,10 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
     void answerConnectionAccepted(Message connectionRequestMessage
     ) {
-        channel.sendReplyMessage(connectionRequestMessage, Message.ACK(clientId));
+        Channel _channel = channel;
+        if (_channel != null) {
+            _channel.sendReplyMessage(connectionRequestMessage, Message.ACK(clientId));
+        }
     }
 
     @Override
@@ -319,12 +329,12 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
     void sendKeyInvalidationMessage(String sourceClientId, String key, BroadcastRequestStatus invalidation) {
         Channel _channel = channel;
-        if (_channel == null) {
+        if (_channel == null || !_channel.isValid()) {
             // not connected, quindi cache vuota            
             invalidation.clientDone(clientId);
             return;
         }
-        _channel.sendMessageWithAsyncReply(Message.INVALIDATE(sourceClientId, key), new ReplyCallback() {
+        _channel.sendMessageWithAsyncReply(Message.INVALIDATE(sourceClientId, key), server.getSlowClientTimeout(), new ReplyCallback() {
 
             @Override
             public void replyReceived(Message originalMessage, Message message, Throwable error) {
@@ -337,12 +347,12 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
     void sendPutEntry(String sourceClientId, String key, byte[] serializedData, long expireTime, BroadcastRequestStatus invalidation) {
         Channel _channel = channel;
-        if (_channel == null) {
+        if (_channel == null || !_channel.isValid()) {
             // not connected, quindi cache vuota
             invalidation.clientDone(clientId);
             return;
         }
-        _channel.sendMessageWithAsyncReply(Message.PUT_ENTRY(sourceClientId, key, serializedData, expireTime), new ReplyCallback() {
+        _channel.sendMessageWithAsyncReply(Message.PUT_ENTRY(sourceClientId, key, serializedData, expireTime), server.getSlowClientTimeout(), new ReplyCallback() {
 
             @Override
             public void replyReceived(Message originalMessage, Message message, Throwable error) {
@@ -358,12 +368,12 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
     void sendPrefixInvalidationMessage(String sourceClientId, String prefix, BroadcastRequestStatus invalidation) {
         Channel _channel = channel;
-        if (_channel == null) {
+        if (_channel == null || !_channel.isValid()) {
             // not connected, quindi cache vuota
             invalidation.clientDone(clientId);
             return;
         }
-        _channel.sendMessageWithAsyncReply(Message.INVALIDATE_BY_PREFIX(sourceClientId, prefix), new ReplyCallback() {
+        _channel.sendMessageWithAsyncReply(Message.INVALIDATE_BY_PREFIX(sourceClientId, prefix), server.getSlowClientTimeout(), new ReplyCallback() {
 
             @Override
             public void replyReceived(Message originalMessage, Message message, Throwable error) {
@@ -379,11 +389,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
     void sendFetchKeyMessage(String remoteClientId, String key, SimpleCallback<Message> onFinish) {
         Channel _channel = channel;
-        if (_channel == null) {
+        if (_channel == null || !_channel.isValid()) {
             onFinish.onResult(Message.ERROR(clientId, new Exception("client " + clientId + " disconnected while serving fetch request")), null);
             return;
         }
-        _channel.sendMessageWithAsyncReply(Message.FETCH_ENTRY(remoteClientId, key), new ReplyCallback() {
+        _channel.sendMessageWithAsyncReply(Message.FETCH_ENTRY(remoteClientId, key), server.getSlowClientTimeout(), new ReplyCallback() {
 
             @Override
             public void replyReceived(Message originalMessage, Message message, Throwable error) {
@@ -398,6 +408,13 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 }
             }
         });
+    }
+
+    void processIdleConnection() {
+        Channel _channel = channel;
+        if (_channel != null && _channel.isValid()) {
+            _channel.channelIdle();
+        }
     }
 
 }

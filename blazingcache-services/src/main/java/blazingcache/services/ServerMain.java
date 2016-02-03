@@ -117,7 +117,7 @@ public class ServerMain implements AutoCloseable {
             runningInstance = new ServerMain(configuration);
             runningInstance.start();
             runningInstance.join();
-            
+
             System.out.println("BlazingCache Server Stopped");
         } catch (Throwable t) {
             t.printStackTrace();
@@ -148,12 +148,14 @@ public class ServerMain implements AutoCloseable {
         int workerthreads = Integer.parseInt(configuration.getProperty("io.worker.threads", "16"));
         int callbackThreads = Integer.parseInt(configuration.getProperty("netty.callback.threads", "64"));
         int channelHandlersThreads = Integer.parseInt(configuration.getProperty("channelhandlers.threads", "64"));
+        int slowClientsTimeout = Integer.parseInt(configuration.getProperty("slow.clients.timeout", "120000"));
 
         System.out.println("Starting BlazingCache Server");
 
         Map<String, String> additionalData = new HashMap<>();
         ServerHostData data = new ServerHostData(host, port, "", ssl, additionalData);
-        cacheServer = new CacheServer(sharedsecret, data);        
+        cacheServer = new CacheServer(sharedsecret, data);
+        cacheServer.setSlowClientTimeout(slowClientsTimeout);
 
         switch (clusteringmode) {
             case "singleserver": {

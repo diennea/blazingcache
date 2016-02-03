@@ -30,9 +30,11 @@ import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyChannelAcceptor;
 import blazingcache.zookeeper.LeaderShipChangeListener;
 import blazingcache.zookeeper.ZKClusterManager;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -53,11 +55,12 @@ public class CacheServer implements AutoCloseable {
     private Thread expireManager;
     private ExecutorService channelsHandlers;
     private int channelHandlersThreads = 64;
+    private long slowClientTimeout = 120000;
     private final NettyChannelAcceptor server;
     private final static Logger LOGGER = Logger.getLogger(CacheServer.class.getName());
 
     public static String VERSION() {
-        return "1.4.1";
+        return "1.4.2";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
@@ -195,6 +198,9 @@ public class CacheServer implements AutoCloseable {
                         }
                     }
                 }
+
+                acceptor.processIdleConnections();
+
                 try {
                     Thread.sleep(expirerPeriod);
                 } catch (InterruptedException exit) {
@@ -273,7 +279,7 @@ public class CacheServer implements AutoCloseable {
                 }
             });
         };
-        channelsHandlers.submit(action);
+        executeOnHandler("putEntry " + sourceClientId + "," + key, action);
     }
 
     public void invalidateKey(String key, String sourceClientId, String clientProvidedLockId, SimpleCallback<String> onFinish) {
@@ -316,7 +322,7 @@ public class CacheServer implements AutoCloseable {
             });
 
         };
-        channelsHandlers.submit(action);
+        executeOnHandler("invalidateKey " + sourceClientId + "," + key, action);
     }
 
     public void lockKey(String key, String sourceClientId, SimpleCallback<String> onFinish) {
@@ -325,7 +331,7 @@ public class CacheServer implements AutoCloseable {
             cacheStatus.clientLockedKey(sourceClientId, key, lockID);
             onFinish.onResult(lockID.stamp + "", null);
         };
-        channelsHandlers.submit(action);
+        executeOnHandler("lockKey " + sourceClientId + "," + key, action);
     }
 
     public void unlockKey(String key, String sourceClientId, String lockId, SimpleCallback<String> onFinish) {
@@ -335,21 +341,21 @@ public class CacheServer implements AutoCloseable {
             cacheStatus.clientUnlockedKey(sourceClientId, key, lockID);
             onFinish.onResult(lockID.stamp + "", null);
         };
-        channelsHandlers.submit(action);
+        executeOnHandler("unlockKey " + sourceClientId + "," + key, action);
     }
 
-    public void unregisterEntry(String key, String clientId, SimpleCallback<String> onFinish) {
-        LOGGER.log(Level.FINER, "client " + clientId + " evicted entry " + key);
+    public void unregisterEntry(String key, String sourceClientId, SimpleCallback<String> onFinish) {
+        LOGGER.log(Level.FINER, "client " + sourceClientId + " evicted entry " + key);
         Runnable action = () -> {
-            final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId);
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
             try {
-                cacheStatus.removeKeyForClient(key, clientId);
+                cacheStatus.removeKeyForClient(key, sourceClientId);
             } finally {
-                locksManager.releaseWriteLockForKey(key, clientId, lockID);
+                locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
             }
             onFinish.onResult(null, null);
         };
-        channelsHandlers.submit(action);
+        executeOnHandler("unregisterEntry " + sourceClientId + "," + key, action);
     }
 
     public void fetchEntry(String key, String clientId, String clientProvidedLockId, SimpleCallback<Message> onFinish) {
@@ -402,7 +408,7 @@ public class CacheServer implements AutoCloseable {
                 finishAndReleaseLock.onResult(Message.ERROR(clientId, new Exception("no connected client for key " + key)), null);
             }
         };
-        channelsHandlers.submit(action);
+        executeOnHandler("fetchEntry " + clientId + "," + key, action);
     }
 
     public void invalidateByPrefix(String prefix, String sourceClientId, SimpleCallback<String> onFinish) {
@@ -431,7 +437,15 @@ public class CacheServer implements AutoCloseable {
                 }
             });
         };
-        channelsHandlers.submit(action);
+        executeOnHandler("invalidateByPrefix " + prefix, action);
+    }
+
+    private void executeOnHandler(String name, Runnable runnable) {
+        try {
+            channelsHandlers.submit(new ManagedRunnable(name, runnable));
+        } catch (RejectedExecutionException rejected) {
+            LOGGER.log(Level.SEVERE, "rejected execution of " + name + ":" + rejected, rejected);
+        }
     }
 
     void clientDisconnected(String clientId) {
@@ -447,6 +461,18 @@ public class CacheServer implements AutoCloseable {
 
             });
         }
+    }
+
+    public KeyedLockManager getLocksManager() {
+        return locksManager;
+    }
+
+    public long getSlowClientTimeout() {
+        return slowClientTimeout;
+    }
+
+    public void setSlowClientTimeout(long slowClientTimeout) {
+        this.slowClientTimeout = slowClientTimeout;
     }
 
 }

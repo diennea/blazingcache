@@ -32,7 +32,7 @@ import java.util.logging.Logger;
  *
  * @author enrico.olivelli
  */
-class KeyedLockManager {
+public class KeyedLockManager {
 
     private static final Logger LOGGER = Logger.getLogger(KeyedLockManager.class.getName());
 
@@ -42,6 +42,23 @@ class KeyedLockManager {
     private final ReentrantLock generalLock = new ReentrantLock(true);
     private final Map<String, StampedLock> liveLocks = new HashMap<>();
     private final Map<String, AtomicInteger> locksCounter = new HashMap<>();
+
+    /**
+     * Debug operation to see actual locked keys
+     * @return 
+     */
+    public Map<String, Integer> getLockedKeys() {
+        HashMap<String, Integer> result = new HashMap<>();
+        generalLock.lock();
+        try {
+            locksCounter.forEach((k, v) -> {
+                result.put(k, v.get());
+            });
+        } finally {
+            generalLock.unlock();
+        }
+        return result;
+    }
 
     private StampedLock makeLockForKey(String key) {
         StampedLock lock;
