@@ -31,12 +31,13 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
-import io.netty.handler.ssl.JdkSslClientContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Worker-side connector
@@ -44,6 +45,8 @@ import java.util.concurrent.Executors;
  * @author enrico.olivelli
  */
 public class NettyConnector implements AutoCloseable {
+
+    private static final Logger LOGGER = Logger.getLogger(NettyConnector.class.getName());
 
     private int port = 7000;
     private String host = "localhost";
@@ -139,9 +142,12 @@ public class NettyConnector implements AutoCloseable {
 
     @Override
     public void close() {
+        LOGGER.log(Level.SEVERE, "close channel {0}", channel);
         if (socketchannel != null) {
             try {
-                socketchannel.close();
+                socketchannel.close().await();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
             } finally {
                 socketchannel = null;
             }

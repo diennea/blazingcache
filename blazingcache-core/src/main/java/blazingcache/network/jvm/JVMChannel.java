@@ -33,7 +33,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
-
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * In-JVM comunications
@@ -42,6 +43,7 @@ import java.util.concurrent.RejectedExecutionException;
  */
 public class JVMChannel extends Channel {
 
+    private static final Logger LOGGER = Logger.getLogger(JVMChannel.class.getName());
     private volatile boolean active = false;
     private final Map<String, ReplyCallback> pendingReplyMessages = new ConcurrentHashMap<>();
     private final Map<String, Message> pendingReplyMessagesSource = new ConcurrentHashMap<>();
@@ -128,7 +130,7 @@ public class JVMChannel extends Channel {
             if (!active) {
                 System.out.println("[JVM] channel not active, discarding reply message " + _message);
                 return;
-            }            
+            }
             _message.setReplyMessageId(inAnswerTo.messageId);
             otherSide.receiveMessageFromPeer(_message);
         });
@@ -142,7 +144,7 @@ public class JVMChannel extends Channel {
     }
 
     @Override
-    public void sendMessageWithAsyncReply(Message message, ReplyCallback callback) {
+    public void sendMessageWithAsyncReply(Message message, long timeout, ReplyCallback callback) {
         message.setMessageId(UUID.randomUUID().toString());
         Message _message = cloneMessage(message);
         if (executionserializer.isShutdown()) {
@@ -167,9 +169,15 @@ public class JVMChannel extends Channel {
     public boolean isValid() {
         return active;
     }
+    private volatile boolean closed = false;
 
     @Override
     public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        LOGGER.log(Level.SEVERE, this + ": closing");
         active = false;
         pendingReplyMessages.forEach((key, callback) -> {
             sumitCallback(() -> {
@@ -187,6 +195,10 @@ public class JVMChannel extends Channel {
         executionserializer.shutdown();
         callbackexecutor.shutdown();
         messagesReceiver.channelClosed();
+    }
+
+    @Override
+    public void channelIdle() {
     }
 
 }

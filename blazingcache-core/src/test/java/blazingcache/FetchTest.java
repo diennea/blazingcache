@@ -11,9 +11,13 @@ import blazingcache.client.CacheEntry;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.SimpleFormatter;
 import org.junit.Assert;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -22,6 +26,26 @@ import org.junit.Test;
  */
 public class FetchTest {
 
+//     @Before
+//    public void setupLogger() throws Exception {
+//        Level level = Level.FINEST;
+//        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+//
+//            @Override
+//            public void uncaughtException(Thread t, Throwable e) {
+//                System.err.println("uncaughtException from thread " + t.getName() + ": " + e);
+//                e.printStackTrace();
+//            }
+//        });
+//        java.util.logging.LogManager.getLogManager().reset();
+//        ConsoleHandler ch = new ConsoleHandler();
+//        ch.setLevel(level);
+//        SimpleFormatter f = new SimpleFormatter();
+//        ch.setFormatter(f);
+//        java.util.logging.Logger.getLogger("").setLevel(level);
+//        java.util.logging.Logger.getLogger("").addHandler(ch);
+//    }
+    
     @Test
     public void basicTest() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);

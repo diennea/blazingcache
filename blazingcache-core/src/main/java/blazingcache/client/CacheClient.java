@@ -19,6 +19,7 @@
  */
 package blazingcache.client;
 
+import blazingcache.client.impl.InternalClientListener;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -84,6 +85,16 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     private final AtomicLong actualMemory = new AtomicLong();
+
+    private InternalClientListener internalClientListener;
+
+    InternalClientListener getInternalClientListener() {
+        return internalClientListener;
+    }
+
+    void setInternalClientListener(InternalClientListener internalClientListener) {
+        this.internalClientListener = internalClientListener;
+    }
 
     public long getActualMemory() {
         return actualMemory.get();
@@ -192,6 +203,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         channel = brokerLocator.connect(this, this);
         connectionTimestamp = System.currentTimeMillis();
         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connected, channel:" + channel);
+        if (internalClientListener != null) {
+            internalClientListener.onConnection(channel);
+        }
     }
 
     /**
@@ -248,6 +262,12 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                             continue;
                         }
                     }
+
+                    Channel _channel = channel;
+                    if (_channel != null) {
+                        _channel.channelIdle();
+                    }
+
                     try {
                         // TODO: wait for IO error or stop condition before reconnect 
                         CONNECTION_MANAGER_LOGGER.log(Level.FINEST, "connected");
@@ -329,7 +349,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     actualMemory.addAndGet(-removed.getSerializedData().length);
                     Channel _channel = channel;
                     if (_channel != null) {
-                        _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, key), new ReplyCallback() {
+                        _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, key), invalidateTimeout, new ReplyCallback() {
 
                             @Override
                             public void replyReceived(Message originalMessage, Message message, Throwable error) {
@@ -367,6 +387,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     @Override
     public void messageReceived(Message message) {
+        if (internalClientListener != null) {
+            // hook for tests
+            boolean proceed = internalClientListener.messageReceived(message);
+            if (!proceed) {
+                return;
+            }
+        }
         LOGGER.log(Level.FINER, "{0} messageReceived {1}", new Object[]{clientId, message});
         switch (message.type) {
             case Message.TYPE_INVALIDATE: {
