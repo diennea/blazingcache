@@ -45,7 +45,7 @@ public class LockOnLostFetchMessageAndSlowClientTest {
 
         ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
-            cacheServer.setSlowClientTimeout(1000);
+            cacheServer.setClientFetchTimeout(1000);
             cacheServer.start();
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
                     CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
