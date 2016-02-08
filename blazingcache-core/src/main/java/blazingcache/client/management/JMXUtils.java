@@ -88,7 +88,7 @@ public final class JMXUtils {
      * @param client the cache client on which statistics of the mbean refer to
      * @param bean the mbean providing cache client statistics
      */
-    public static void registerClientStatisticsMXBean(final CacheClient client, final BlazingCacheClientStatisticsMXBean bean) {
+    public static void registerClientStatisticsMXBean(final CacheClient client, final CacheClientStatisticsMXBean bean) {
         if (platformMBeanServer == null) {
             throw new CacheClientManagementException("PlatformMBeanServer not available", mBeanServerLookupError);
         }
@@ -142,7 +142,7 @@ public final class JMXUtils {
      * @param client the cache client on which status provided by the mbean refer to
      * @param bean the mbean providing cache client status
      */
-    public static void registerClientStatusMXBean(final CacheClient client, final BlazingCacheClientStatusMXBean bean) {
+    public static void registerClientStatusMXBean(final CacheClient client, final CacheClientStatusMXBean bean) {
         if (platformMBeanServer == null) {
             throw new CacheClientManagementException("PlatformMBeanServer not available", mBeanServerLookupError);
         }
