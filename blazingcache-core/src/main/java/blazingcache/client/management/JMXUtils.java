@@ -111,7 +111,7 @@ public final class JMXUtils {
     }
 
     /**
-     * Unregister the mbean providing the statistics related to the specified {@see CacheClient}.
+     * Unregister the mbean providing the statistics related to the specified {@link CacheClient}.
      *
      * @param client the client on which statistics mbean has to be unregistered
      */
@@ -165,7 +165,7 @@ public final class JMXUtils {
     }
 
     /**
-     * Unregister the mbean providing the status related to the specified {@see CacheClient}.
+     * Unregister the mbean providing the status related to the specified {@link CacheClient}.
      *
      * @param client the client on which status mbean has to be unregistered
      */

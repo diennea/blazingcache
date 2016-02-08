@@ -48,6 +48,7 @@ public class CacheClientBuilder {
     private Object cacheServer;
     private int port = 1025;
     private boolean ssl = false;
+    private boolean jmx = false;
 
     public static enum Mode {
         SINGLESERVER,
@@ -65,7 +66,7 @@ public class CacheClientBuilder {
 
     /**
      * The the ID of the client, it MUST be unique, it represent the peer on the
-     * network
+     * network.
      *
      * @param clientId
      * @return
@@ -76,7 +77,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Zookeeper Path for discovery
+     * Zookeeper Path for discovery.
      *
      * @param zkPath
      * @return
@@ -87,7 +88,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Zookeeper connection string
+     * Zookeeper connection string.
      *
      * @param zkConnectString
      * @return
@@ -98,7 +99,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Pass a custom local CacheServer for LOCAL mode
+     * Pass a custom local CacheServer for LOCAL mode.
      *
      * @param cacheServer
      * @return
@@ -109,7 +110,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Timeout for the Zookeeper client
+     * Timeout for the Zookeeper client.
      */
     public CacheClientBuilder zkSessionTimeout(int zkSessionTimeout) {
         this.zkSessionTimeout = zkSessionTimeout;
@@ -118,7 +119,7 @@ public class CacheClientBuilder {
 
     /**
      * Limit on the memory retained by the cache, the value is expressed in
-     * bytes
+     * bytes.
      *
      * @param maxMemory
      * @return
@@ -129,7 +130,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Port of the server for the SINGLESERVER mode
+     * Port of the server for the SINGLESERVER mode.
      *
      * @param port
      * @return
@@ -140,7 +141,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Host of the server for the SINGLESERVER mode
+     * Host of the server for the SINGLESERVER mode.
      *
      * @param host
      * @return
@@ -151,7 +152,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * SSL mode for the SINGLESERVER mode
+     * SSL mode for the SINGLESERVER mode.
      *
      * @param ssl
      * @return
@@ -162,7 +163,20 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Connection timeout for sockets
+     * JMX flag to enable publishing of JMX status and statistics.
+     *
+     * @param jmx
+     *            true in order to enable publication of status and statistics
+     *            mbeans on JMX
+     * @return the instance of {@see CacheClientBuilder}
+     */
+    public CacheClientBuilder jmx(final boolean jmx) {
+        this.jmx = jmx;
+        return this;
+    }
+
+    /**
+     * Connection timeout for sockets.
      *
      * @param connectTimeout
      * @return
@@ -173,7 +187,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Socket timeout for sockets
+     * Socket timeout for sockets.
      *
      * @param socketTimeout
      * @return
@@ -184,7 +198,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Discovery mode
+     * Discovery mode.
      *
      * @param mode
      * @return
@@ -196,7 +210,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Secret for autentication to the CacheServer
+     * Secret for autentication to the CacheServer.
      *
      * @param clientSecret
      * @return
@@ -208,45 +222,47 @@ public class CacheClientBuilder {
 
     /**
      * Builds up the client. in LOCAL mode eventually a local embedded
-     * CacheServer will be started too.
-     * The returned Client MUST be started in order to work
+     * CacheServer will be started too. The returned Client MUST be started in
+     * order to work.
      *
-     * @return
-     * @see CacheClient#start() 
-     * @see CacheClient#waitForConnection(int) 
+     * @return the new instance of {@see CacheClient}
+     * @see CacheClient#start()
+     * @see CacheClient#waitForConnection(int)
      */
     public CacheClient build() {
         switch (mode) {
-            case SINGLESERVER:
-                locator = new NettyCacheServerLocator(host, port, ssl);
-                ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
-                ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
-                break;
-            case CLUSTERED:
-                locator = new ZKCacheServerLocator(zkConnectString, zkSessionTimeout, zkPath);
-                ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
-                ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
-                break;
-            case LOCAL:
-                if (cacheServer == null) {
-                    cacheServer = new CacheServer(clientSecret, ServerHostData.LOCAL());
-                    CacheServer cs = (CacheServer) cacheServer;
-                    try {
-                        cs.start();
-                    } catch (Throwable t) {
-                        throw new RuntimeException(t);
-                    }
-                    locator = new JVMServerLocator(cs, true);
-                } else {
-                    CacheServer cs = (CacheServer) cacheServer;
-                    locator = new JVMServerLocator(cs, false);
+        case SINGLESERVER:
+            locator = new NettyCacheServerLocator(host, port, ssl);
+            ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
+            ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
+            break;
+        case CLUSTERED:
+            locator = new ZKCacheServerLocator(zkConnectString, zkSessionTimeout, zkPath);
+            ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
+            ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
+            break;
+        case LOCAL:
+            if (cacheServer == null) {
+                cacheServer = new CacheServer(clientSecret, ServerHostData.LOCAL());
+                CacheServer cs = (CacheServer) cacheServer;
+                try {
+                    cs.start();
+                } catch (Throwable t) {
+                    throw new RuntimeException(t);
                 }
-                break;
-            default:
-                throw new IllegalArgumentException("invalid mode " + mode);
+                locator = new JVMServerLocator(cs, true);
+            } else {
+                CacheServer cs = (CacheServer) cacheServer;
+                locator = new JVMServerLocator(cs, false);
+            }
+            break;
+        default:
+            throw new IllegalArgumentException("invalid mode " + mode);
         }
-        CacheClient res = new CacheClient(clientId, clientSecret, locator);
+        final CacheClient res = new CacheClient(clientId, clientSecret, locator);
         res.setMaxMemory(maxMemory);
+        res.setStatisticsEnabled(this.jmx);
+        res.setStatusEnabled(this.jmx);
         return res;
     }
 }
