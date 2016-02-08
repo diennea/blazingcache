@@ -169,7 +169,7 @@ public final class JMXUtils {
      *
      * @param client the client on which status mbean has to be unregistered
      */
-    public static void unregisterClientStatuMXBean(final CacheClient client) {
+    public static void unregisterClientStatusMXBean(final CacheClient client) {
         if (platformMBeanServer == null) {
             return;
         }
