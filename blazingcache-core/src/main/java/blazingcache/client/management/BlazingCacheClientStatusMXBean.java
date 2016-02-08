@@ -47,8 +47,7 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
      */
     @Override
     public long getCurrentTimestamp() {
-        // TODO Auto-generated method stub
-        return 0;
+        return System.currentTimeMillis();
     }
 
     /**
@@ -56,8 +55,7 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
      */
     @Override
     public long getLastConnectionTimestamp() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getConnectionTimestamp();
     }
 
     /**
@@ -65,8 +63,7 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
      */
     @Override
     public boolean isClientConnected() {
-        // TODO Auto-generated method stub
-        return false;
+        return this.client.isConnected();
     }
 
     /**
@@ -74,8 +71,7 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
      */
     @Override
     public long getCacheConfiguredMaxMemory() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getMaxMemory();
     }
 
     /**
@@ -83,17 +79,15 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
      */
     @Override
     public long getCacheUsedMemory() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getActualMemory();
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public long getCacheNumberOfKeys() {
-        // TODO Auto-generated method stub
-        return 0;
+    public int getCacheSize() {
+        return this.client.getCacheSize();
     }
 
     /**
@@ -101,8 +95,7 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
      */
     @Override
     public long getCacheOldestKeyTimestamp() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getOldestKeyTimestamp();
     }
 
 }

@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
@@ -198,6 +199,23 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public int getCacheSize() {
         return this.cache.size();
+    }
+
+    public long getOldestKeyTimestamp() {
+        long oldestTimestamp = 0;
+        final Optional<CacheEntry> oldest = this.cache.values().stream().min(
+                (o1, o2) -> {
+                    long diff = o1.lastGetTime - o2.lastGetTime;
+                    if (diff == 0) {
+                        return 0;
+                    }
+                    return diff > 0 ? 1 : -1;
+                }
+       );
+       if(oldest.isPresent()) {
+           oldestTimestamp = oldest.get().getLastGetTime();
+       }
+       return oldestTimestamp;
     }
 
     private void connect() throws InterruptedException, ServerNotAvailableException, ServerRejectedConnectionException {
