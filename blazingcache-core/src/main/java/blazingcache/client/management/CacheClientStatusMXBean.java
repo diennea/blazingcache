@@ -42,7 +42,7 @@ public interface CacheClientStatusMXBean {
      *
      * @return the last connection timestamp
      */
-    long getLastConnectionToServerTimestamp();
+    long getLastConnectionTimestamp();
 
     /**
      * The status of client connection to the server.
