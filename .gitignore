@@ -2,3 +2,9 @@
 /blazingcache-jcache/target/
 /blazingcache-services/target/
 /target/
+**/.checkstyle
+**/.classpath
+**/.pmd
+**/.project
+**/.settings/
+
