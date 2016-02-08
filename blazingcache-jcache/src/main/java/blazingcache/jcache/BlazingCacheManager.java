@@ -71,6 +71,7 @@ public class BlazingCacheManager implements CacheManager {
             this.valuesSerializer.configure(properties);
             String clientId = properties.getProperty("blazingcache.clientId", "client");
             String secret = properties.getProperty("blazingcache.secret", "blazingcache");
+            final boolean jmx = Boolean.parseBoolean(properties.getProperty("blazingcache.jmx", "false"));
             if (clientId.isEmpty()) {
                 try {
                     clientId = InetAddress.getLocalHost().getCanonicalHostName();
@@ -117,6 +118,8 @@ public class BlazingCacheManager implements CacheManager {
             if (embeddedServer != null) {
                 embeddedServer.start();
             }
+            client.setStatisticsEnabled(jmx);
+            client.setStatusEnabled(jmx);
             client.setMaxMemory(maxmemory);
             client.start();
             client.waitForConnection(10000);

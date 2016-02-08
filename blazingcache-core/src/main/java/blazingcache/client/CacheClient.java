@@ -20,6 +20,11 @@
 package blazingcache.client;
 
 import blazingcache.client.impl.InternalClientListener;
+import blazingcache.client.management.BlazingCacheClientStatisticsMXBean;
+import blazingcache.client.management.BlazingCacheClientStatusMXBean;
+import blazingcache.client.management.CacheClientStatisticsMXBean;
+import blazingcache.client.management.CacheClientStatusMXBean;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -45,7 +50,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Client
+ * Client.
  *
  * @author enrico.olivelli
  */
@@ -58,6 +63,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final Thread coreThread;
     private final String clientId;
     private final String sharedSecret;
+    private final CacheClientStatisticsMXBean statisticsMXBean;
+    private final CacheClientStatusMXBean statusMXBean;
+
     private volatile boolean stopped = false;
     private Channel channel;
     private long connectionTimestamp;
@@ -115,6 +123,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.coreThread = new Thread(new ConnectionManager(), "cache-connection-manager-" + clientId);
         this.coreThread.setDaemon(true);
         this.clientId = clientId + "_" + System.nanoTime();
+        this.statisticsMXBean = new BlazingCacheClientStatisticsMXBean(this);
+        this.statusMXBean = new BlazingCacheClientStatusMXBean(this);
     }
 
     public ServerLocator getBrokerLocator() {
@@ -822,6 +832,36 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public Set<String> getLocalKeySetByPrefix(String prefix) {
         return cache.keySet().stream().filter(k -> k.startsWith(prefix)).collect(Collectors.toSet());
+    }
+
+    /**
+     * Register the statistics mbean related to this client if the input param is set to true.
+     * <p>
+     * If the param is false, the statistics mbean would not be enabled.
+     *
+     * @param enabled true in order to enable statistics publishing on JMX
+     */
+    public void setStatisticsEnabled(final boolean enabled) {
+        if (enabled) {
+            blazingcache.client.management.JMXUtils.registerClientStatisticsMXBean(this, statisticsMXBean);
+        } else {
+            blazingcache.client.management.JMXUtils.unregisterClientStatisticsMXBean(this);
+        }
+    }
+
+    /**
+     * Register the status mbean related to this client if the input param is set to true.
+     * <p>
+     * If the param is false, the status mbean would not be enabled.
+     *
+     * @param enabled true in order to enable status publishing on JMX
+     */
+    public void setStatusEnabled(final boolean enabled) {
+        if (enabled) {
+            blazingcache.client.management.JMXUtils.registerClientStatusMXBean(this, statusMXBean);
+        } else {
+            blazingcache.client.management.JMXUtils.unregisterClientStatusMXBean(this);
+        }
     }
 
 }
