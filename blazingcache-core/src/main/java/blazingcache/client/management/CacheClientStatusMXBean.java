@@ -70,7 +70,7 @@ public interface CacheClientStatusMXBean {
      *
      * @return the numbers of keys in cache
      */
-    long getCacheNumberOfKeys();
+    int getCacheSize();
 
     /**
      * The timestamp corresponding to the oldest key currently stored in client's cache.
