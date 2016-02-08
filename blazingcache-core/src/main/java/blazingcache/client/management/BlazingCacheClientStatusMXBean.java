@@ -55,7 +55,7 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
      * {@inheritDoc}
      */
     @Override
-    public long getLastConnectionToServerTimestamp() {
+    public long getLastConnectionTimestamp() {
         // TODO Auto-generated method stub
         return 0;
     }
