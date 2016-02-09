@@ -117,6 +117,9 @@ public final class ManagementStatusMXBeanTest {
 
             final ObjectName statusBeanName = new ObjectName(MessageFormat.format(STATUS_MBEAN_PATTERN, client.getClientId()));
             try {
+                final String clientId = (String)JMXUtils.getMBeanServer().getAttribute(statusBeanName, "ClientId");
+                assertEquals(client.getClientId(), clientId);
+
                 Long connectionTimeStamp = (Long)JMXUtils.getMBeanServer().getAttribute(statusBeanName, "LastConnectionTimestamp");
                 assertTrue(connectionTimeStamp > connectionBeforeTs && connectionTimeStamp < connectionAfterTs);
 

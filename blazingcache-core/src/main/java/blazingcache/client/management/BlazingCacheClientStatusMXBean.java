@@ -45,7 +45,6 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
     /**
      * {@inheritDoc}
      */
-    @Override
     public long getCurrentTimestamp() {
         return this.client.getCurrentTimestamp();
     }
@@ -53,7 +52,6 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
     /**
      * {@inheritDoc}
      */
-    @Override
     public long getLastConnectionTimestamp() {
         return this.client.getConnectionTimestamp();
     }
@@ -61,7 +59,6 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
     /**
      * {@inheritDoc}
      */
-    @Override
     public boolean isClientConnected() {
         return this.client.isConnected();
     }
@@ -69,7 +66,6 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
     /**
      * {@inheritDoc}
      */
-    @Override
     public long getCacheConfiguredMaxMemory() {
         return this.client.getMaxMemory();
     }
@@ -77,7 +73,6 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
     /**
      * {@inheritDoc}
      */
-    @Override
     public long getCacheUsedMemory() {
         return this.client.getActualMemory();
     }
@@ -85,7 +80,6 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
     /**
      * {@inheritDoc}
      */
-    @Override
     public int getCacheSize() {
         return this.client.getCacheSize();
     }
@@ -93,9 +87,15 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
     /**
      * {@inheritDoc}
      */
-    @Override
     public long getCacheOldestEvictedKeyAge() {
         return this.client.getOldestEvictedKeyAge();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String getClientId() {
+        return this.client.getClientId();
     }
 
 }
