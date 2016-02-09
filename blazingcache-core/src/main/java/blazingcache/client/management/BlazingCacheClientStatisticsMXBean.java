@@ -101,7 +101,7 @@ public class BlazingCacheClientStatisticsMXBean implements CacheClientStatistics
     /**
      * {@inheritDoc}
      */
-    public long getClientMissToFetches() {
+    public long getClientMissedGetsToSuccessfulFetches() {
         // TODO Auto-generated method stub
         return 0;
     }
@@ -109,7 +109,7 @@ public class BlazingCacheClientStatisticsMXBean implements CacheClientStatistics
     /**
      * {@inheritDoc}
      */
-    public long getClientMissesToMisses() {
+    public long getClientMissedGetsToMissedFetches() {
         // TODO Auto-generated method stub
         return 0;
     }

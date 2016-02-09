@@ -70,7 +70,17 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private volatile boolean stopped = false;
     private Channel channel;
     private long connectionTimestamp;
+
     private AtomicLong oldestEvictedKeyAge;
+    private AtomicLong clientPuts;
+    private AtomicLong clientTouches;
+    private AtomicLong clientGets;
+    private AtomicLong clientFetches;
+    private AtomicLong clientEvictions;
+    private AtomicLong clientInvalidations;
+    private AtomicLong clientHits;
+    private AtomicLong clientMissedGetsToOkFetches;
+    private AtomicLong clientMissedGetsToMissedFetches;
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to

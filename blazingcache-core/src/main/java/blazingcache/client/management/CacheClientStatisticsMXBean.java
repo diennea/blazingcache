@@ -86,25 +86,17 @@ public interface CacheClientStatisticsMXBean {
      * <p>
      * The value is devised since client's last reboot.
      *
-     * @return the no. of miss to fetches
+     * @return the no. of missed gets followed by a successful fetch
      */
-    long getClientMissToFetches();
+    long getClientMissedGetsToSuccessfulFetches();
 
     /**
-     * The total number of misses calculated as the sum of missed gets and corresponding
-     * missed fetches.
+     * The total number of misses gets followed by a corresponding missed fetch.
      * <p>
      * This value is devised considering client's last reboot.
      *
-     * @return the no. of miss to misses
+     * @return the no. of missed gets followed by a missed fetch
      */
-    long getClientMissesToMisses();
-
-    /**
-     * The number of conflicts detected by the client since last reboot.
-     *
-     * @return the no. of conflicts detected
-     */
-    long getClientConflicts();
+    long getClientMissedGetsToMissedFetches();
 
 }
