@@ -393,7 +393,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             onFinish.onResult(Message.ERROR(clientId, new Exception("client " + clientId + " disconnected while serving fetch request")), null);
             return;
         }
-        _channel.sendMessageWithAsyncReply(Message.FETCH_ENTRY(remoteClientId, key), server.getSlowClientTimeout(), new ReplyCallback() {
+        _channel.sendMessageWithAsyncReply(Message.FETCH_ENTRY(remoteClientId, key), server.getClientFetchTimeout(), new ReplyCallback() {
 
             @Override
             public void replyReceived(Message originalMessage, Message message, Throwable error) {

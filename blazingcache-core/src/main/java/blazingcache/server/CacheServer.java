@@ -56,6 +56,7 @@ public class CacheServer implements AutoCloseable {
     private ExecutorService channelsHandlers;
     private int channelHandlersThreads = 64;
     private long slowClientTimeout = 120000;
+    private long clientFetchTimeout = 2000;
     private final NettyChannelAcceptor server;
     private final static Logger LOGGER = Logger.getLogger(CacheServer.class.getName());
 
@@ -473,6 +474,14 @@ public class CacheServer implements AutoCloseable {
 
     public void setSlowClientTimeout(long slowClientTimeout) {
         this.slowClientTimeout = slowClientTimeout;
+    }
+
+    public long getClientFetchTimeout() {
+        return clientFetchTimeout;
+    }
+
+    public void setClientFetchTimeout(long clientFetchTimeout) {
+        this.clientFetchTimeout = clientFetchTimeout;
     }
 
 }
