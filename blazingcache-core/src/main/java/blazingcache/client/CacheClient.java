@@ -58,7 +58,8 @@ import java.util.concurrent.TimeUnit;
 public class CacheClient implements ChannelEventListener, ConnectionRequestInfo, AutoCloseable {
 
     private static final Logger LOGGER = Logger.getLogger(CacheClient.class.getName());
-
+    private static final long NANOS_IN_MILLIS = 1000000L;
+    
     private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
     private final ServerLocator brokerLocator;
     private final Thread coreThread;
@@ -70,7 +71,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private volatile boolean stopped = false;
     private Channel channel;
     private long connectionTimestamp;
-    private Optional<CacheEntry> oldestEntry;
+    private AtomicLong oldestEvictedKeyAge;
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
@@ -109,6 +110,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public long getActualMemory() {
         return actualMemory.get();
     }
+  
+    public long getOldestEvictedKeyAge() {
+        return this.oldestEvictedKeyAge.get();
+    }
 
     public String getStatus() {
         Channel _channel = channel;
@@ -125,7 +130,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.coreThread = new Thread(new ConnectionManager(), "cache-connection-manager-" + clientId);
         this.coreThread.setDaemon(true);
         this.clientId = clientId + "_" + System.nanoTime();
-        this.oldestEntry = Optional.empty();
+        this.oldestEvictedKeyAge = new AtomicLong();
         this.statisticsMXBean = new BlazingCacheClientStatisticsMXBean(this);
         this.statusMXBean = new BlazingCacheClientStatusMXBean(this);
     }
@@ -196,7 +201,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns the timestamp of the last successful connection to the server.
+     * Returns the timestamp in ns of the last successful connection to the server.
      * <p>
      * In case of the client being currently disconnected, the value returned will be 0.
      *
@@ -204,6 +209,15 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public long getConnectionTimestamp() {
         return connectionTimestamp;
+    }
+
+    /**
+     * Return the current client timestamp in ns.
+     *
+     * @return the current client timestamp
+     */
+    public long getCurrentTimestamp() {
+        return System.nanoTime();
     }
 
     /**
@@ -216,40 +230,23 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Retrieves the timestamp of the oldest entry present in the local cache.
+     * Retrieves the timestamp of the oldest-stored entry in the local cache.
      * <p>
      * If no entry is currently stored in the local cache, the value returned corresponds to 0.
      *
      * @return the timestamp corresponding to the oldest entry in local cache; 0 if no entry is present
      */
     public long getOldestKeyTimestamp() {
-        Optional<Long> oldestTs = this.oldestEntry.map(entry -> entry.getLastGetTime());
-        final Optional<String> oldestKey = this.oldestEntry.map(entry -> entry.getKey());
-
-        final Optional<Long> tsUpToDate = oldestTs.filter(timestamp1 -> {
-            final Optional<CacheEntry> oldestEntryInCache = Optional.ofNullable(this.cache.get(oldestKey));
-            final Optional<Long> oldestTsInCache = oldestEntryInCache.map(entry -> entry.getLastGetTime());
-            return oldestTsInCache.filter(timestamp2 -> timestamp2.equals(timestamp1)).isPresent();
-        });
-
-        if (tsUpToDate.isPresent()) {
-            return oldestTs.get().longValue();
-        }
-
-        this.oldestEntry = Optional.empty();
-        final Optional<CacheEntry> oldest = this.cache.values().stream().min(
+        final Optional<Long> oldestTimestamp = this.cache.values().stream().min(
                 (entry1, entry2) -> {
-                    long diff = entry1.lastGetTime - entry2.lastGetTime;
+                    long diff = entry1.getPutTime() - entry2.getPutTime();
                     if (diff == 0) {
                         return 0;
                     }
                     return diff > 0 ? 1 : -1;
                 }
-       );
-
-       oldestTs = oldest.map(entry -> entry.getLastGetTime());
-       oldestTs.ifPresent(timestamp -> this.oldestEntry = oldest);
-       return oldestTs.orElse(0L);
+       ).map(entry -> entry.getPutTime());
+       return oldestTimestamp.orElse(0L);
     }
 
     private void connect() throws InterruptedException, ServerNotAvailableException, ServerRejectedConnectionException {
@@ -263,7 +260,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connecting, clientId=" + this.clientId);
         disconnect();
         channel = brokerLocator.connect(this, this);
-        connectionTimestamp = System.currentTimeMillis();
+        connectionTimestamp = System.nanoTime();
         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connected, channel:" + channel);
         if (internalClientListener != null) {
             internalClientListener.onConnection(channel);
@@ -387,7 +384,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
                 @Override
                 public int compare(CacheEntry o1, CacheEntry o2) {
-                    long diff = o1.lastGetTime - o2.lastGetTime;
+                    long diff = o1.getLastGetTime() - o2.getLastGetTime();
                     if (diff == 0) {
                         return 0;
                     }
@@ -402,14 +399,18 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         LOGGER.severe("found " + evictable.size() + " evictable entries");
 
         if (!evictable.isEmpty()) {
+            //update the age of the oldest evicted key
+            //the oldest one is the first entry in evictable
+            this.oldestEvictedKeyAge.getAndSet(System.nanoTime() - evictable.get(0).getLastGetTime());
+
             CountDownLatch count = new CountDownLatch(evictable.size());
-            for (CacheEntry entry : evictable) {
-                String key = entry.getKey();
+            for (final CacheEntry entry : evictable) {
+                final String key = entry.getKey();
                 LOGGER.log(Level.SEVERE, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{key, entry.getSerializedData().length, entry.getLastGetTime()});
-                CacheEntry removed = cache.remove(key);
+                final CacheEntry removed = cache.remove(key);
                 if (removed != null) {
                     actualMemory.addAndGet(-removed.getSerializedData().length);
-                    Channel _channel = channel;
+                    final Channel _channel = channel;
                     if (_channel != null) {
                         _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, key), invalidateTimeout, new ReplyCallback() {
 
@@ -436,7 +437,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 if (done) {
                     break;
                 }
-                Channel _channel = channel;
+                final Channel _channel = channel;
                 if (_channel == null || !_channel.isValid()) {
                     LOGGER.log(Level.SEVERE, "channel closed during eviction");
                     break;
@@ -596,7 +597,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
         CacheEntry entry = cache.get(key);
         if (entry != null) {
-            entry.lastGetTime = System.nanoTime();
+            entry.setLastGetTime(System.nanoTime());
             return entry;
         }
         try {
@@ -687,7 +688,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
         CacheEntry entry = cache.get(key);
         if (entry != null) {
-            entry.lastGetTime = System.nanoTime();
+            entry.setLastGetTime(System.nanoTime());
             return entry;
         }
         return null;

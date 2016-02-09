@@ -31,14 +31,14 @@ package blazingcache.client.management;
 public interface CacheClientStatusMXBean {
 
     /**
-     * The current timestamp of the client in milliseconds.
+     * The current timestamp of the client in ns.
      *
      * @return the current timestamp
      */
     long getCurrentTimestamp();
 
     /**
-     * The timestamp of the last time the client connected to the server.
+     * The timestamp in ns of the last time the client connected to the server.
      *
      * @return the last connection timestamp
      */
@@ -73,10 +73,19 @@ public interface CacheClientStatusMXBean {
     int getCacheSize();
 
     /**
-     * The timestamp corresponding to the oldest key currently stored in client's cache.
+     * The timestamp in ns corresponding to the oldest key currently stored in local cache.
      *
      * @return the timestamp of the oldest key
      */
     long getCacheOldestKeyTimestamp();
+
+    /**
+     * The timestamp in ns correponding to the oldest evicted key in local cache.
+     * <p>
+     * In case of no eviction executed on the cache yet, 0 will be returned.
+     *
+     * @return the timestamp of the oldest evicted key.
+     */
+    long getCacheOldestEvictedKeyTimestamp();
 
 }

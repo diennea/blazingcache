@@ -26,14 +26,16 @@ package blazingcache.client;
  */
 public final class CacheEntry {
 
+    private long lastGetTime;
+    private final long putTime;
     private final String key;
-    public long lastGetTime;
     private final byte[] serializedData;
     private final long expiretime;
 
     public CacheEntry(String key, long lastGetTimeNanos, byte[] serializedData, long expiretime) {
         this.key = key;
         this.lastGetTime = lastGetTimeNanos;
+        this.putTime = lastGetTimeNanos;
         this.serializedData = serializedData;
         this.expiretime = expiretime;
     }
@@ -42,8 +44,16 @@ public final class CacheEntry {
         return key;
     }
 
+    public long getPutTime() {
+        return putTime;
+    }
+
     public long getLastGetTime() {
         return lastGetTime;
+    }
+
+    public void setLastGetTime(final long lastGetTimeNanos) {
+        this.lastGetTime = lastGetTimeNanos;
     }
 
     public byte[] getSerializedData() {
