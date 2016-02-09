@@ -139,9 +139,20 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.coreThread = new Thread(new ConnectionManager(), "cache-connection-manager-" + clientId);
         this.coreThread.setDaemon(true);
         this.clientId = clientId + "_" + System.nanoTime();
-        this.oldestEvictedKeyAge = new AtomicLong();
+
         this.statisticsMXBean = new BlazingCacheClientStatisticsMXBean(this);
         this.statusMXBean = new BlazingCacheClientStatusMXBean(this);
+
+        this.oldestEvictedKeyAge = new AtomicLong();
+        this.clientPuts = new AtomicLong();
+        this.clientTouches = new AtomicLong();
+        this.clientGets = new AtomicLong();
+        this.clientFetches = new AtomicLong();
+        this.clientEvictions = new AtomicLong();
+        this.clientInvalidations = new AtomicLong();
+        this.clientHits = new AtomicLong();
+        this.clientMissedGetsToOkFetches = new AtomicLong();
+        this.clientMissedGetsToMissedFetches = new AtomicLong();
     }
 
     public ServerLocator getBrokerLocator() {
@@ -398,6 +409,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 LOGGER.log(Level.SEVERE, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{key, entry.getSerializedData().length, entry.getLastGetTime()});
                 final CacheEntry removed = cache.remove(key);
                 if (removed != null) {
+                    this.clientEvictions.incrementAndGet();
                     actualMemory.addAndGet(-removed.getSerializedData().length);
                     final Channel _channel = channel;
                     if (_channel != null) {
@@ -584,9 +596,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.log(Level.SEVERE, "fetch failed {0}, not connected", key);
             return null;
         }
+        this.clientFetches.incrementAndGet();
         CacheEntry entry = cache.get(key);
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
+            this.clientHits.incrementAndGet();
             return entry;
         }
         try {
@@ -656,6 +670,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 public void messageSent(Message originalMessage, Throwable error) {
                     if (error != null) {
                         LOGGER.log(Level.SEVERE, "touch " + key + " failed ", error);
+                    } else {
+                        clientTouches.incrementAndGet();
                     }
                 }
             });
@@ -675,9 +691,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.log(Level.SEVERE, "get failed " + key + ", not connected");
             return null;
         }
+        this.clientGets.incrementAndGet();
         CacheEntry entry = cache.get(key);
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
+            this.clientHits.incrementAndGet();
             return entry;
         }
         return null;
@@ -723,6 +741,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     }
                     Message response = _channel.sendMessageWithReply(request, invalidateTimeout);
                     LOGGER.log(Level.FINEST, "invalidate " + key + ", -> " + response);
+                    this.clientInvalidations.incrementAndGet();
                     return;
                 } catch (TimeoutException error) {
                     LOGGER.log(Level.SEVERE, "invalidate " + key + ", timeout " + error);
@@ -811,7 +830,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 throw new CacheException("error while putting key " + key + " (" + response + ")");
             }
             // race condition: if two clients perform a put on the same entry maybe after the network trip we get another value, different from the expected one.
-            // it is better to invalidate the entry for alll
+            // it is better to invalidate the entry for all
             CacheEntry afterNetwork = cache.get(key);
             if (afterNetwork != null) {
                 if (!Arrays.equals(afterNetwork.getSerializedData(), data)) {
@@ -819,6 +838,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     invalidate(key);
                 }
             }
+            this.clientPuts.incrementAndGet();
             return true;
         } catch (TimeoutException timedOut) {
             throw new CacheException("error while putting for key " + key + ":" + timedOut, timedOut);
@@ -906,4 +926,59 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
+    /**
+     *
+     * @return number of puts executed since client boot
+     */
+    public long getClientPuts() {
+        return this.clientPuts.get();
+    }
+
+    /**
+    *
+    * @return number of touches executed since client boot
+    */
+   public long getClientTouches() {
+       return this.clientTouches.get();
+   }
+
+    /**
+    *
+    * @return number of gets executed since client boot
+    */
+    public long getClientGets() {
+       return this.clientGets.get();
+    }
+
+    /**
+    *
+    * @return number of fetches executed since client boot
+    */
+    public long getClientFetches() {
+        return this.clientFetches.get();
+    }
+
+    /**
+    *
+    * @return number of evictions executed since client boot
+    */
+    public long getClientEvictions() {
+        return this.clientEvictions.get();
+    }
+
+    /**
+    *
+    * @return number of invalidations executed since client boot
+    */
+    public long getClientInvalidations() {
+        return this.clientInvalidations.get();
+    }
+
+    /**
+    *
+    * @return number of hits occurred since client boot
+    */
+    public long getClientHits() {
+        return this.clientHits.get();
+    }
 }

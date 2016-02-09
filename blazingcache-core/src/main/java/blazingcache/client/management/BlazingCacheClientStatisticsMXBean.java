@@ -46,56 +46,49 @@ public class BlazingCacheClientStatisticsMXBean implements CacheClientStatistics
      * {@inheritDoc}
      */
     public long getClientPuts() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getClientPuts();
     }
 
     /**
      * {@inheritDoc}
      */
     public long getClientTouches() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getClientTouches();
     }
 
     /**
      * {@inheritDoc}
      */
     public long getClientGets() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getClientGets();
     }
 
     /**
      * {@inheritDoc}
      */
     public long getClientFetches() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getClientFetches();
     }
 
     /**
      * {@inheritDoc}
      */
     public long getClientEvictions() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getClientEvictions();
     }
 
     /**
      * {@inheritDoc}
      */
     public long getClientInvalidations() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getClientInvalidations();
     }
 
     /**
      * {@inheritDoc}
      */
     public long getClientHits() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getClientHits();
     }
 
     /**
