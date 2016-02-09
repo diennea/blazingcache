@@ -58,8 +58,7 @@ import java.util.concurrent.TimeUnit;
 public class CacheClient implements ChannelEventListener, ConnectionRequestInfo, AutoCloseable {
 
     private static final Logger LOGGER = Logger.getLogger(CacheClient.class.getName());
-    private static final long NANOS_IN_MILLIS = 1000000L;
-    
+
     private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
     private final ServerLocator brokerLocator;
     private final Thread coreThread;
@@ -229,26 +228,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return this.cache.size();
     }
 
-    /**
-     * Retrieves the timestamp of the oldest-stored entry in the local cache.
-     * <p>
-     * If no entry is currently stored in the local cache, the value returned corresponds to 0.
-     *
-     * @return the timestamp corresponding to the oldest entry in local cache; 0 if no entry is present
-     */
-    public long getOldestKeyTimestamp() {
-        final Optional<Long> oldestTimestamp = this.cache.values().stream().min(
-                (entry1, entry2) -> {
-                    long diff = entry1.getPutTime() - entry2.getPutTime();
-                    if (diff == 0) {
-                        return 0;
-                    }
-                    return diff > 0 ? 1 : -1;
-                }
-       ).map(entry -> entry.getPutTime());
-       return oldestTimestamp.orElse(0L);
-    }
-
     private void connect() throws InterruptedException, ServerNotAvailableException, ServerRejectedConnectionException {
         if (channel != null) {
             try {
@@ -401,7 +380,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         if (!evictable.isEmpty()) {
             //update the age of the oldest evicted key
             //the oldest one is the first entry in evictable
-            this.oldestEvictedKeyAge.getAndSet(System.nanoTime() - evictable.get(0).getLastGetTime());
+            this.oldestEvictedKeyAge.getAndSet(System.nanoTime() - evictable.get(0).getPutTime());
 
             CountDownLatch count = new CountDownLatch(evictable.size());
             for (final CacheEntry entry : evictable) {
