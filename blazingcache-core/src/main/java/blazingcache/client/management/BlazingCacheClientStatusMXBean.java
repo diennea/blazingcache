@@ -47,7 +47,7 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
      */
     @Override
     public long getCurrentTimestamp() {
-        return System.currentTimeMillis();
+        return this.client.getCurrentTimestamp();
     }
 
     /**
@@ -96,6 +96,14 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
     @Override
     public long getCacheOldestKeyTimestamp() {
         return this.client.getOldestKeyTimestamp();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public long getCacheOldestEvictedKeyTimestamp() {
+        return this.client.getOldestEvictedKeyAge();
     }
 
 }
