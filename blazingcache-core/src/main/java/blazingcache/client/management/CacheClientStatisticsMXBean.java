@@ -82,20 +82,20 @@ public interface CacheClientStatisticsMXBean {
     long getClientHits();
 
     /**
-     * The number unsuccessful gets followed by a corresponding successful fetch.
+     * The number successful reads followed that required a remote read.
      * <p>
      * The value is devised since client's last reboot.
      *
-     * @return the no. of missed gets followed by a successful fetch
+     * @return the no. of missed gets to successful fetch
      */
     long getClientMissedGetsToSuccessfulFetches();
 
     /**
-     * The total number of misses gets followed by a corresponding missed fetch.
+     * The total number of unsuccessful reads: the data requested was present neither locally nor remotely.
      * <p>
      * This value is devised considering client's last reboot.
      *
-     * @return the no. of missed gets followed by a missed fetch
+     * @return the no. of missed gets to missed fetch
      */
     long getClientMissedGetsToMissedFetches();
 
