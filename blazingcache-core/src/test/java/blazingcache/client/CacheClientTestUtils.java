@@ -34,8 +34,7 @@ public final class CacheClientTestUtils {
     }
 
     /**
-     * Fill the local cache of the specified client with the number of entries
-     * specified, adopting as a value the byte array specifed by dataPattern.
+     * Fill the local cache of the specified client with the number of entries specified, adopting as a value the byte array specifed by dataPattern.
      * <p>
      * For each entry, the method takes care of generate a unique key, corresponding to the insertion nanotime.
      *
@@ -47,7 +46,7 @@ public final class CacheClientTestUtils {
      * @param numberOfEntries
      *            the number of entries to put into the cache
      * @param expireTime
-     *            expire time to be applyed to every inserted entry
+     *            expire time to be applied to every inserted entry
      * @return the set of automatically generated keys
      */
     public static Set<String> fillCacheWithTestData(final CacheClient client, final byte[] dataPattern, final int numberOfEntries,

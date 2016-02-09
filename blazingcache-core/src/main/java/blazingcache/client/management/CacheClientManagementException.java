@@ -20,7 +20,7 @@ package blazingcache.client.management;
  * Blazing cache statistics and status MBeans.
  *
  * @author matteo.casadei
- * @since 1.4.2
+ * @since 1.5.0
  *
  */
 public class CacheClientManagementException extends RuntimeException {
