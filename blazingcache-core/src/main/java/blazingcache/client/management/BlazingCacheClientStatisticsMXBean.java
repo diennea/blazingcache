@@ -21,7 +21,7 @@ import blazingcache.client.CacheClient;
  * BlazingCache client statistics on JMX.
  *
  * @author matteo.casadei
- * @since 1.4.2
+ * @since 1.5.0
  *
  */
 public class BlazingCacheClientStatisticsMXBean implements CacheClientStatisticsMXBean {

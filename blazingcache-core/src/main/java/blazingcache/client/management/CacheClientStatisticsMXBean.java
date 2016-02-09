@@ -28,7 +28,7 @@ package blazingcache.client.management;
  * <p>
  *
  * @author matteo.casadei
- * @since 1.4.2
+ * @since 1.5.0
  */
 public interface CacheClientStatisticsMXBean {
 
