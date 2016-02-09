@@ -18,7 +18,7 @@ package blazingcache.client.management;
 /**
  * BlazingCache client's status information.
  * <p>
- * Each cache's status object is registered with an unique ObjectName with
+ * Each client cache's status object is registered with an unique ObjectName with
  * the following type:
  * <p>
  * Type:
@@ -26,7 +26,7 @@ package blazingcache.client.management;
  * <p>
  *
  * @author matteo.casadei
- * @since 1.4.2
+ * @since 1.5.0
  */
 public interface CacheClientStatusMXBean {
 
@@ -38,14 +38,14 @@ public interface CacheClientStatusMXBean {
     String getClientId();
     
     /**
-     * The current timestamp of the client in ns.
+     * The current timestamp of the client.
      *
      * @return the current timestamp
      */
     long getCurrentTimestamp();
 
     /**
-     * The timestamp in ns of the last time the client connected to the server.
+     * The timestamp of the last time the client connected to the server.
      *
      * @return the last connection timestamp
      */
@@ -59,32 +59,32 @@ public interface CacheClientStatusMXBean {
     boolean isClientConnected();
 
     /**
-     * The maximum size of the cache memory configured on the client.
+     * The maximum cache size in bytes configured on the client.
      *
      * @return the cache's max memory size
      */
     long getCacheConfiguredMaxMemory();
 
     /**
-     * The amount of memory used by the client's cache.
+     * The amount of memory currently used by client's local cache.
      *
-     * @return the amount of cache used memory
+     * @return the amount memory used by the local cache
      */
     long getCacheUsedMemory();
 
     /**
-     * The number of keys currently stored in client's cache.
+     * The number of keys currently stored in client's local cache.
      *
      * @return the numbers of keys in cache
      */
     int getCacheSize();
 
     /**
-     * The age in ns of the oldest evicted key in local cache.
+     * The age in ns of the oldest key evicted from the local cache.
      * <p>
      * In case of no eviction executed on the cache yet, 0 will be returned.
      *
-     * @return the timestamp of the oldest evicted key.
+     * @return the age of the oldest evicted key.
      */
     long getCacheOldestEvictedKeyAge();
 

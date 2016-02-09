@@ -210,7 +210,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns the timestamp in ns of the last successful connection to the server.
+     * Returns the timestamp in ms of the last successful connection to the server.
      * <p>
      * In case of the client being currently disconnected, the value returned will be 0.
      *
@@ -221,12 +221,12 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Return the current client timestamp in ns.
+     * Return the current client timestamp in ms.
      *
      * @return the current client timestamp
      */
     public long getCurrentTimestamp() {
-        return System.nanoTime();
+        return System.currentTimeMillis();
     }
 
     /**
@@ -249,7 +249,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connecting, clientId=" + this.clientId);
         disconnect();
         channel = brokerLocator.connect(this, this);
-        connectionTimestamp = System.nanoTime();
+        connectionTimestamp = System.currentTimeMillis();
         CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "connected, channel:" + channel);
         if (internalClientListener != null) {
             internalClientListener.onConnection(channel);
