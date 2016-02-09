@@ -70,6 +70,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private volatile boolean stopped = false;
     private Channel channel;
     private long connectionTimestamp;
+    private Optional<CacheEntry> oldestEntry;
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
@@ -124,6 +125,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.coreThread = new Thread(new ConnectionManager(), "cache-connection-manager-" + clientId);
         this.coreThread.setDaemon(true);
         this.clientId = clientId + "_" + System.nanoTime();
+        this.oldestEntry = Optional.empty();
         this.statisticsMXBean = new BlazingCacheClientStatisticsMXBean(this);
         this.statusMXBean = new BlazingCacheClientStatusMXBean(this);
     }
@@ -184,38 +186,70 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return clientId;
     }
 
+    /**
+     * Returns true if the client is currently connected to the server.
+     *
+     * @return true if the client is connected to the server; false otherwise
+     */
     public boolean isConnected() {
         return channel != null;
     }
 
+    /**
+     * Returns the timestamp of the last successful connection to the server.
+     * <p>
+     * In case of the client being currently disconnected, the value returned will be 0.
+     *
+     * @return the timestamp of the last successful connection to the server
+     */
     public long getConnectionTimestamp() {
         return connectionTimestamp;
     }
 
     /**
-     * Actual number of entries in the local cache
+     * Actual number of entries in the local cache.
      *
-     * @return
+     * @return the number of entry stored in the local cache
      */
     public int getCacheSize() {
         return this.cache.size();
     }
 
+    /**
+     * Retrieves the timestamp of the oldest entry present in the local cache.
+     * <p>
+     * If no entry is currently stored in the local cache, the value returned corresponds to 0.
+     *
+     * @return the timestamp corresponding to the oldest entry in local cache; 0 if no entry is present
+     */
     public long getOldestKeyTimestamp() {
-        long oldestTimestamp = 0;
+        Optional<Long> oldestTs = this.oldestEntry.map(entry -> entry.getLastGetTime());
+        final Optional<String> oldestKey = this.oldestEntry.map(entry -> entry.getKey());
+
+        final Optional<Long> tsUpToDate = oldestTs.filter(timestamp1 -> {
+            final Optional<CacheEntry> oldestEntryInCache = Optional.ofNullable(this.cache.get(oldestKey));
+            final Optional<Long> oldestTsInCache = oldestEntryInCache.map(entry -> entry.getLastGetTime());
+            return oldestTsInCache.filter(timestamp2 -> timestamp2.equals(timestamp1)).isPresent();
+        });
+
+        if (tsUpToDate.isPresent()) {
+            return oldestTs.get().longValue();
+        }
+
+        this.oldestEntry = Optional.empty();
         final Optional<CacheEntry> oldest = this.cache.values().stream().min(
-                (o1, o2) -> {
-                    long diff = o1.lastGetTime - o2.lastGetTime;
+                (entry1, entry2) -> {
+                    long diff = entry1.lastGetTime - entry2.lastGetTime;
                     if (diff == 0) {
                         return 0;
                     }
                     return diff > 0 ? 1 : -1;
                 }
        );
-       if(oldest.isPresent()) {
-           oldestTimestamp = oldest.get().getLastGetTime();
-       }
-       return oldestTimestamp;
+
+       oldestTs = oldest.map(entry -> entry.getLastGetTime());
+       oldestTs.ifPresent(timestamp -> this.oldestEntry = oldest);
+       return oldestTs.orElse(0L);
     }
 
     private void connect() throws InterruptedException, ServerNotAvailableException, ServerRejectedConnectionException {
