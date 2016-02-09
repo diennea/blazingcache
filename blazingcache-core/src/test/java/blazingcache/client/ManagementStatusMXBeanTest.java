@@ -110,10 +110,10 @@ public final class ManagementStatusMXBeanTest {
                 .jmx(true)
                 .host(SERVER_HOST).port(SERVER_PORT).build();) {
 
-            final long connectionBeforeTs = System.nanoTime();
+            final long connectionBeforeTs = System.currentTimeMillis();
             client.start();
             assertTrue(client.waitForConnection(CLIENT_CONNECTION_TIMEOUT));
-            final long connectionAfterTs = System.nanoTime();
+            final long connectionAfterTs = System.currentTimeMillis();
 
             final ObjectName statusBeanName = new ObjectName(MessageFormat.format(STATUS_MBEAN_PATTERN, client.getClientId()));
             try {
@@ -121,7 +121,7 @@ public final class ManagementStatusMXBeanTest {
                 assertEquals(client.getClientId(), clientId);
 
                 Long connectionTimeStamp = (Long)JMXUtils.getMBeanServer().getAttribute(statusBeanName, "LastConnectionTimestamp");
-                assertTrue(connectionTimeStamp > connectionBeforeTs && connectionTimeStamp < connectionAfterTs);
+                assertTrue(connectionTimeStamp >= connectionBeforeTs && connectionTimeStamp <= connectionAfterTs);
 
                 Long oldestEvictedKeyAge = (Long)JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheOldestEvictedKeyAge");
                 assertEquals(0, oldestEvictedKeyAge.longValue());
@@ -129,9 +129,9 @@ public final class ManagementStatusMXBeanTest {
                 boolean isConnected = (Boolean) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "ClientConnected");
                 assertTrue(isConnected);
 
-                final long beforeCurrentTs = System.nanoTime();
+                final long beforeCurrentTs = System.currentTimeMillis();
                 long currentTs = (Long)JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CurrentTimestamp");
-                assertTrue(currentTs > beforeCurrentTs && currentTs < System.nanoTime());
+                assertTrue(currentTs >= beforeCurrentTs && currentTs <= System.currentTimeMillis());
 
                 int numberOfkeys = (Integer) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheSize");
                 assertEquals(0, numberOfkeys);
@@ -142,10 +142,12 @@ public final class ManagementStatusMXBeanTest {
                 long usedMemory = (Long) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheUsedMemory");
                 assertEquals(0, usedMemory);
 
-                //fill cache with test value so as to check that memory usage goes up
+                //fill cache with test values so as to check that memory usage goes up
                 final Set<String> insertedKeys = CacheClientTestUtils.fillCacheWithTestData(client, TEST_DATA, MAX_NO_OF_ENTRIES_BEFORE_EVICTION, 0);
+
                 usedMemory = (Long) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheUsedMemory");
                 assertEquals(TEST_DATA.length * MAX_NO_OF_ENTRIES_BEFORE_EVICTION, usedMemory);
+
                 numberOfkeys = (Integer) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheSize");
                 assertEquals(MAX_NO_OF_ENTRIES_BEFORE_EVICTION, numberOfkeys);
 
@@ -157,8 +159,9 @@ public final class ManagementStatusMXBeanTest {
                     return diff > 0 ? 1 : -1;
                 }).collect(Collectors.toList());
 
-                //trigger eviction
+                //prepare for eviction
                 CacheClientTestUtils.fillCacheWithTestData(client, TEST_DATA, 1, 0).stream().findFirst().get();
+
                 usedMemory = (Long) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheUsedMemory");
                 assertEquals(TEST_DATA.length * MAX_NO_OF_ENTRIES_BEFORE_EVICTION + TEST_DATA.length, usedMemory);
 
