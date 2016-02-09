@@ -94,15 +94,7 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
      * {@inheritDoc}
      */
     @Override
-    public long getCacheOldestKeyTimestamp() {
-        return this.client.getOldestKeyTimestamp();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public long getCacheOldestEvictedKeyTimestamp() {
+    public long getCacheOldestEvictedKeyAge() {
         return this.client.getOldestEvictedKeyAge();
     }
 

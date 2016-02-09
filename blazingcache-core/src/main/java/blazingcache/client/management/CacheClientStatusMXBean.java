@@ -73,19 +73,12 @@ public interface CacheClientStatusMXBean {
     int getCacheSize();
 
     /**
-     * The timestamp in ns corresponding to the oldest key currently stored in local cache.
-     *
-     * @return the timestamp of the oldest key
-     */
-    long getCacheOldestKeyTimestamp();
-
-    /**
-     * The timestamp in ns correponding to the oldest evicted key in local cache.
+     * The age in ns of the oldest evicted key in local cache.
      * <p>
      * In case of no eviction executed on the cache yet, 0 will be returned.
      *
      * @return the timestamp of the oldest evicted key.
      */
-    long getCacheOldestEvictedKeyTimestamp();
+    long getCacheOldestEvictedKeyAge();
 
 }
