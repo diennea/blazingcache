@@ -79,7 +79,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private AtomicLong clientEvictions;
     private AtomicLong clientInvalidations;
     private AtomicLong clientHits;
-    private AtomicLong clientMissedGetsToOkFetches;
+    private AtomicLong clientMissedGetsToSuccessfulFetches;
     private AtomicLong clientMissedGetsToMissedFetches;
 
     /**
@@ -90,7 +90,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
-     * disable
+     * disable.
      */
     public long getMaxMemory() {
         return maxMemory;
@@ -151,8 +151,23 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.clientEvictions = new AtomicLong();
         this.clientInvalidations = new AtomicLong();
         this.clientHits = new AtomicLong();
-        this.clientMissedGetsToOkFetches = new AtomicLong();
+        this.clientMissedGetsToSuccessfulFetches = new AtomicLong();
         this.clientMissedGetsToMissedFetches = new AtomicLong();
+    }
+
+    /**
+     * Resets client cache's statistics.
+     */
+    public void clearStatistics() {
+        this.clientPuts.set(0);
+        this.clientTouches.set(0);
+        this.clientGets.set(0);
+        this.clientFetches.set(0);
+        this.clientEvictions.set(0);
+        this.clientInvalidations.set(0);
+        this.clientHits.set(0);
+        this.clientMissedGetsToSuccessfulFetches.set(0);
+        this.clientMissedGetsToMissedFetches.set(0);
     }
 
     public ServerLocator getBrokerLocator() {
@@ -580,7 +595,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns an entry from the local cache, if not found asks to the
+     * Returns an entry from the local cache, if not found asks the
      * CacheServer to find the entry on other clients.
      *
      * @param key
@@ -596,8 +611,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.log(Level.SEVERE, "fetch failed {0}, not connected", key);
             return null;
         }
-        this.clientFetches.incrementAndGet();
         CacheEntry entry = cache.get(key);
+        this.clientFetches.incrementAndGet();
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
             this.clientHits.incrementAndGet();
@@ -619,11 +634,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 long expiretime = (long) message.parameters.get("expiretime");
                 entry = new CacheEntry(key, System.nanoTime(), data, expiretime);
                 storeEntry(entry);
+                this.clientMissedGetsToSuccessfulFetches.incrementAndGet();
+                this.clientHits.incrementAndGet();
                 return entry;
             }
         } catch (TimeoutException err) {
             LOGGER.log(Level.SEVERE, "fetch failed " + key + ": " + err);
         }
+        this.clientMissedGetsToMissedFetches.incrementAndGet();
         return null;
 
     }
@@ -691,8 +709,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.log(Level.SEVERE, "get failed " + key + ", not connected");
             return null;
         }
-        this.clientGets.incrementAndGet();
         CacheEntry entry = cache.get(key);
+        this.clientGets.incrementAndGet();
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
             this.clientHits.incrementAndGet();
@@ -980,5 +998,21 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     */
     public long getClientHits() {
         return this.clientHits.get();
+    }
+
+    /**
+    *
+    * @return number of missed gets ending with a successful remote read.
+    */
+    public long getClientMissedGetsToSuccessfulFetches() {
+        return this.clientMissedGetsToSuccessfulFetches.get();
+    }
+
+    /**
+    *
+    * @return number of missed gets that ended with an unsuccessful remote read as well.
+    */
+    public long getClientMissedGetsToMissedFetches() {
+        return this.clientMissedGetsToMissedFetches.get();
     }
 }

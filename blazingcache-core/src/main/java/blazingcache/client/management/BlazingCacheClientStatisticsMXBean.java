@@ -45,6 +45,13 @@ public class BlazingCacheClientStatisticsMXBean implements CacheClientStatistics
     /**
      * {@inheritDoc}
      */
+    public void clear() {
+        this.client.clearStatistics();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public long getClientPuts() {
         return this.client.getClientPuts();
     }
@@ -95,24 +102,21 @@ public class BlazingCacheClientStatisticsMXBean implements CacheClientStatistics
      * {@inheritDoc}
      */
     public long getClientMissedGetsToSuccessfulFetches() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getClientMissedGetsToSuccessfulFetches();
     }
 
     /**
      * {@inheritDoc}
      */
     public long getClientMissedGetsToMissedFetches() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.client.getClientMissedGetsToMissedFetches();
     }
 
     /**
      * {@inheritDoc}
      */
     public long getClientConflicts() {
-        // TODO Auto-generated method stub
-        return 0;
+        throw new UnsupportedOperationException("Value not supported yet!");
     }
 
 }

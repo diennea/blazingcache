@@ -33,6 +33,11 @@ package blazingcache.client.management;
 public interface CacheClientStatisticsMXBean {
 
     /**
+     * Reset all the statistics.
+     */
+    void clear();
+
+    /**
      * The number of puts performed by the client since last reboot.
      *
      * @return the no. of puts
@@ -82,7 +87,7 @@ public interface CacheClientStatisticsMXBean {
     long getClientHits();
 
     /**
-     * The number successful reads followed that required a remote read.
+     * The number successful reads that required a remote read, i.e. successful fetches requiring a remote connection.
      * <p>
      * The value is devised since client's last reboot.
      *
@@ -91,7 +96,7 @@ public interface CacheClientStatisticsMXBean {
     long getClientMissedGetsToSuccessfulFetches();
 
     /**
-     * The total number of unsuccessful reads: the data requested was present neither locally nor remotely.
+     * The total number of unsuccessful reads: the data requested via fetch was present neither locally nor remotely.
      * <p>
      * This value is devised considering client's last reboot.
      *

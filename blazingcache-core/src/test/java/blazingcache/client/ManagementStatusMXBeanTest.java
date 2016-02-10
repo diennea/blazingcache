@@ -190,7 +190,7 @@ public final class ManagementStatusMXBeanTest {
                 numberOfkeys = (Integer) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheSize");
                 assertEquals(MAX_NO_OF_ENTRIES_BEFORE_EVICTION, numberOfkeys);
 
-                client.disconnect();
+                client.close();
                 assertTrue(client.waitForDisconnection(CLIENT_CONNECTION_TIMEOUT));
                 isConnected = (Boolean) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "ClientConnected");
                 assertFalse(isConnected);
