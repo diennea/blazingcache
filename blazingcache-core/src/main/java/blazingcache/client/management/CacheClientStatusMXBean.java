@@ -32,11 +32,11 @@ public interface CacheClientStatusMXBean {
 
     /**
      * The id of the client.
-     * 
+     *
      * @return the id of the client
      */
     String getClientId();
-    
+
     /**
      * The current timestamp of the client.
      *
