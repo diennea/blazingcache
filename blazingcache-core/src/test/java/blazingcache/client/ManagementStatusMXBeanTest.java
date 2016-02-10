@@ -97,7 +97,9 @@ public final class ManagementStatusMXBeanTest {
     }
 
     /**
-     * Check that jmx status bean is registered when jmx enabled on ClientCache.
+     * Checks that jmx status bean is registered when jmx enabled on ClientCache.
+     * <p>
+     * Performs also a few tests to make sure status values provided by the mbean are consistent.
      *
      * @throws Exception
      */
@@ -170,7 +172,7 @@ public final class ManagementStatusMXBeanTest {
 
                 //ensuring eviction has been executed
                 boolean evictionExecuted = false;
-                for(int i=0; i< 100; i++) {
+                for (int i = 0; i < 100; i++) {
                     if (client.getActualMemory() == TEST_DATA.length * MAX_NO_OF_ENTRIES_BEFORE_EVICTION) {
                         evictionExecuted = true;
                         break;
@@ -198,7 +200,6 @@ public final class ManagementStatusMXBeanTest {
                 assertEquals(0, connectionTimeStamp.longValue());
 
             } catch (InstanceNotFoundException ex) {
-                ex.printStackTrace();
                 fail("BlazingCacheClientStatusMXBean is expected to be present as jmx is enabled");
             }
         }
