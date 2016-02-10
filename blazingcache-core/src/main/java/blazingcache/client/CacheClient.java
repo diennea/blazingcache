@@ -689,6 +689,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     if (error != null) {
                         LOGGER.log(Level.SEVERE, "touch " + key + " failed ", error);
                     } else {
+                        LOGGER.log(Level.FINEST, "touch " + key);
                         clientTouches.incrementAndGet();
                     }
                 }
@@ -796,6 +797,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 try {
                     Message response = _channel.sendMessageWithReply(Message.INVALIDATE_BY_PREFIX(clientId, prefix), invalidateTimeout);
                     LOGGER.log(Level.FINEST, "invalidateByPrefix " + prefix + ", -> " + response);
+                    this.clientInvalidations.incrementAndGet();
                     return;
                 } catch (TimeoutException error) {
                     LOGGER.log(Level.SEVERE, "invalidateByPrefix " + prefix + ", timeout " + error);
