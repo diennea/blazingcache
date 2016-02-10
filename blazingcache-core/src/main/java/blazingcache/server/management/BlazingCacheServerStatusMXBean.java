@@ -46,8 +46,7 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
      * {@inheritDoc}
      */
     public long getCurrentTimestamp() {
-        // TODO Auto-generated method stub
-        return 0;
+        return this.server.getCurrentTimestamp();
     }
 
     /**

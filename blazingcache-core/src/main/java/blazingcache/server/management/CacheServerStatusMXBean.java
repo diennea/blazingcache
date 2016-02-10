@@ -22,7 +22,7 @@ package blazingcache.server.management;
  * the following type:
  * <p>
  * Type:
- * <code>blazingcache.client.management:type=CacheServerStatus</code>
+ * <code>blazingcache.server.management:type=CacheServerStatus</code>
  * <p>
  * Required Attributes:
  * <ul>

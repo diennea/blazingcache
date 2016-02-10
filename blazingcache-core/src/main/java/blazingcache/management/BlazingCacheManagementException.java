@@ -13,32 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package blazingcache.server.management;
+package blazingcache.management;
 
 /**
  * Used to model a (runtime) error on initializing MBeanServer neeed to publish
- * Blazing cache server MBeans.
+ * Blazing cache statistics and status MBeans.
  *
  * @author matteo.casadei
  * @since 1.5.0
  *
  */
-public class CacheServerManagementException extends RuntimeException {
+public class BlazingCacheManagementException extends RuntimeException {
 
     /**
      *
      */
     private static final long serialVersionUID = 1L;
 
-    public CacheServerManagementException(final String message) {
+    public BlazingCacheManagementException(final String message) {
         super(message);
     }
 
-    public CacheServerManagementException(final Throwable cause) {
+    public BlazingCacheManagementException(final Throwable cause) {
         super(cause);
     }
 
-    public CacheServerManagementException(final String message, final Throwable cause) {
+    public BlazingCacheManagementException(final String message, final Throwable cause) {
         super(message, cause);
     }
 }

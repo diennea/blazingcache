@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
@@ -925,9 +924,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public void setStatisticsEnabled(final boolean enabled) {
         if (enabled) {
-            blazingcache.client.management.JMXUtils.registerClientStatisticsMXBean(this, statisticsMXBean);
+            blazingcache.management.JMXUtils.registerClientStatisticsMXBean(this, statisticsMXBean);
         } else {
-            blazingcache.client.management.JMXUtils.unregisterClientStatisticsMXBean(this);
+            blazingcache.management.JMXUtils.unregisterClientStatisticsMXBean(this);
         }
     }
 
@@ -940,9 +939,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public void setStatusEnabled(final boolean enabled) {
         if (enabled) {
-            blazingcache.client.management.JMXUtils.registerClientStatusMXBean(this, statusMXBean);
+            blazingcache.management.JMXUtils.registerClientStatusMXBean(this, statusMXBean);
         } else {
-            blazingcache.client.management.JMXUtils.unregisterClientStatusMXBean(this);
+            blazingcache.management.JMXUtils.unregisterClientStatusMXBean(this);
         }
     }
 
