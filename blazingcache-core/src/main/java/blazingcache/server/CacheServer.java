@@ -21,25 +21,27 @@ package blazingcache.server;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import blazingcache.network.Message;
-import blazingcache.network.ServerHostData;
-import blazingcache.network.netty.NettyChannelAcceptor;
-import blazingcache.zookeeper.LeaderShipChangeListener;
-import blazingcache.zookeeper.ZKClusterManager;
-import java.util.ArrayList;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import blazingcache.network.Message;
+import blazingcache.network.ServerHostData;
+import blazingcache.network.netty.NettyChannelAcceptor;
+import blazingcache.server.management.BlazingCacheServerStatusMXBean;
+import blazingcache.server.management.CacheServerStatusMXBean;
+import blazingcache.zookeeper.LeaderShipChangeListener;
+import blazingcache.zookeeper.ZKClusterManager;
 
 /**
- * The CacheServer core
+ * The CacheServer core.
  *
  * @author enrico.olivelli
  */
@@ -53,6 +55,7 @@ public class CacheServer implements AutoCloseable {
     private final CacheStatus cacheStatus = new CacheStatus();
     private final KeyedLockManager locksManager = new KeyedLockManager();
     private final NettyChannelAcceptor server;
+    private final CacheServerStatusMXBean statusMXBean;
 
     private volatile boolean leader;
     private volatile boolean stopped;
@@ -75,6 +78,7 @@ public class CacheServer implements AutoCloseable {
         this.server.setAcceptor(acceptor);
         this.leader = true;
         this.serverId = serverHostData.getHost() + "_" + serverHostData.getPort();
+        this.statusMXBean = new BlazingCacheServerStatusMXBean(this);
     }
 
     public void setupSsl(File certificateFile, String password, File certificateChain, List<String> sslCiphers) {
@@ -491,6 +495,21 @@ public class CacheServer implements AutoCloseable {
 
     public void setClientFetchTimeout(long clientFetchTimeout) {
         this.clientFetchTimeout = clientFetchTimeout;
+    }
+
+    /**
+     * Register the status mbean related to this server if the input param is true.
+     * <p>
+     * If the param is false, the status mbean would not be enabled.
+     *
+     * @param enabled true in order to enable publishing on JMX
+     */
+    public void setStatusEnabled(final boolean enabled) {
+        if (enabled) {
+            blazingcache.server.management.JMXUtils.registerServerStatusMXBean(this, statusMXBean);
+        } else {
+            blazingcache.server.management.JMXUtils.unregisterServerStatusMXBean(this);
+        }
     }
 
 }

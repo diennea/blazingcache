@@ -23,6 +23,11 @@ package blazingcache.server.management;
  * <p>
  * Type:
  * <code>blazingcache.client.management:type=CacheServerStatus</code>
+ * <p>
+ * Required Attributes:
+ * <ul>
+ * <li>CacheServer the id of the cache server</li>
+ * </ul>
  *
  * @author matteo.casadei
  * @since 1.5.0
