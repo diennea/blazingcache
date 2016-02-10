@@ -473,6 +473,10 @@ public class CacheServer implements AutoCloseable {
         }
     }
 
+    public long getCurrentTimestamp() {
+        return System.currentTimeMillis();
+    }
+
     public String getServerId() {
         return this.serverId;
     }
@@ -506,9 +510,9 @@ public class CacheServer implements AutoCloseable {
      */
     public void setStatusEnabled(final boolean enabled) {
         if (enabled) {
-            blazingcache.server.management.JMXUtils.registerServerStatusMXBean(this, statusMXBean);
+            blazingcache.management.JMXUtils.registerServerStatusMXBean(this, statusMXBean);
         } else {
-            blazingcache.server.management.JMXUtils.unregisterServerStatusMXBean(this);
+            blazingcache.management.JMXUtils.unregisterServerStatusMXBean(this);
         }
     }
 

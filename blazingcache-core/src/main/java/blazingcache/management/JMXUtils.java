@@ -17,7 +17,7 @@
  under the License.
 
  */
-package blazingcache.client.management;
+package blazingcache.management;
 
 import java.util.logging.Logger;
 
@@ -31,6 +31,10 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 
 import blazingcache.client.CacheClient;
+import blazingcache.client.management.CacheClientStatisticsMXBean;
+import blazingcache.client.management.CacheClientStatusMXBean;
+import blazingcache.server.CacheServer;
+import blazingcache.server.management.CacheServerStatusMXBean;
 
 /**
  * Utility for MBeans registration.
@@ -40,6 +44,7 @@ import blazingcache.client.CacheClient;
 public final class JMXUtils {
 
     private static final Logger LOGGER = Logger.getLogger(JMXUtils.class.getName());
+    private static final String REGISTRATION_FAILURE_MSG = "Could not register MXBean";
 
     private static MBeanServer platformMBeanServer;
     private static Throwable mBeanServerLookupError;
@@ -90,7 +95,7 @@ public final class JMXUtils {
      */
     public static void registerClientStatisticsMXBean(final CacheClient client, final CacheClientStatisticsMXBean bean) {
         if (platformMBeanServer == null) {
-            throw new CacheClientManagementException("PlatformMBeanServer not available", mBeanServerLookupError);
+            throw new BlazingCacheManagementException("PlatformMBeanServer not available", mBeanServerLookupError);
         }
         final String cacheClientId = safeName(client.getClientId());
 
@@ -106,7 +111,7 @@ public final class JMXUtils {
             }
             platformMBeanServer.registerMBean(bean, name);
         } catch (MalformedObjectNameException | InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) {
-            throw new CacheClientManagementException("Could not register MXBean ", e);
+            throw new BlazingCacheManagementException(REGISTRATION_FAILURE_MSG, e);
         }
     }
 
@@ -122,7 +127,7 @@ public final class JMXUtils {
         final String cacheClientId = safeName(client.getClientId());
 
         try {
-            ObjectName name = new ObjectName("blazingcache.client.management:type=CacheClientStatistics,CacheClient=" + cacheClientId);
+            final ObjectName name = new ObjectName("blazingcache.client.management:type=CacheClientStatistics,CacheClient=" + cacheClientId);
 
             if (platformMBeanServer.isRegistered(name)) {
                 try {
@@ -132,7 +137,7 @@ public final class JMXUtils {
                 }
             }
         } catch (MalformedObjectNameException | MBeanRegistrationException e) {
-            throw new CacheClientManagementException("Could not register MXBean ", e);
+            throw new BlazingCacheManagementException(REGISTRATION_FAILURE_MSG, e);
         }
     }
 
@@ -144,12 +149,12 @@ public final class JMXUtils {
      */
     public static void registerClientStatusMXBean(final CacheClient client, final CacheClientStatusMXBean bean) {
         if (platformMBeanServer == null) {
-            throw new CacheClientManagementException("PlatformMBeanServer not available", mBeanServerLookupError);
+            throw new BlazingCacheManagementException("PlatformMBeanServer not available", mBeanServerLookupError);
         }
         final String cacheClientId = safeName(client.getClientId());
 
         try {
-            ObjectName name = new ObjectName("blazingcache.client.management:type=CacheClientStatus,CacheClient=" + cacheClientId);
+           final ObjectName name = new ObjectName("blazingcache.client.management:type=CacheClientStatus,CacheClient=" + cacheClientId);
 
             if (platformMBeanServer.isRegistered(name)) {
                 try {
@@ -160,7 +165,7 @@ public final class JMXUtils {
             }
             platformMBeanServer.registerMBean(bean, name);
         } catch (MalformedObjectNameException | InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) {
-            throw new CacheClientManagementException("Could not register MXBean " + e);
+            throw new BlazingCacheManagementException(REGISTRATION_FAILURE_MSG + e);
         }
     }
 
@@ -176,7 +181,7 @@ public final class JMXUtils {
         final String cacheClientId = safeName(client.getClientId());
 
         try {
-            ObjectName name = new ObjectName("blazingcache.client.management:type=CacheClientStatus,CacheClient=" + cacheClientId);
+            final ObjectName name = new ObjectName("blazingcache.client.management:type=CacheClientStatus,CacheClient=" + cacheClientId);
 
             if (platformMBeanServer.isRegistered(name)) {
                 try {
@@ -186,7 +191,61 @@ public final class JMXUtils {
                 }
             }
         } catch (MalformedObjectNameException | MBeanRegistrationException e) {
-            throw new CacheClientManagementException("Could not register MXBean ", e);
+            throw new BlazingCacheManagementException(REGISTRATION_FAILURE_MSG, e);
+        }
+    }
+
+    /**
+     * Register the status MBean for the specified cache server on the platform mbean server.
+     *
+     * @param server the cache server on which status provided by the mbean refers to
+     * @param bean the mbean providing cache server status
+     */
+    public static void registerServerStatusMXBean(final CacheServer server, final CacheServerStatusMXBean bean) {
+        if (platformMBeanServer == null) {
+            throw new BlazingCacheManagementException("PlatformMBeanServer not available", mBeanServerLookupError);
+        }
+        final String cacheServerId = safeName(server.getServerId());
+
+        try {
+            final ObjectName name = new ObjectName("blazingcache.server.management:type=CacheServerStatus,CacheServer=" + cacheServerId);
+
+            if (platformMBeanServer.isRegistered(name)) {
+                try {
+                    platformMBeanServer.unregisterMBean(name);
+                } catch (InstanceNotFoundException noProblem) {
+                    LOGGER.warning("Impossible to unregister non-registered mbean: " + name + ". Cause: " + noProblem);
+                }
+            }
+            platformMBeanServer.registerMBean(bean, name);
+        } catch (MalformedObjectNameException | InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) {
+            throw new BlazingCacheManagementException(REGISTRATION_FAILURE_MSG + e);
+        }
+    }
+
+    /**
+     * Unregister the mbean providing the status related to the specified {@link CacheServer}.
+     *
+     * @param server the server on which requesting status mbean unregistering
+     */
+    public static void unregisterServerStatusMXBean(final CacheServer server) {
+        if (platformMBeanServer == null) {
+            return;
+        }
+        final String cacheServerId = safeName(server.getServerId());
+
+        try {
+            final ObjectName name = new ObjectName("blazingcache.server.management:type=CacheServerStatus,CacheServer=" + cacheServerId);
+
+            if (platformMBeanServer.isRegistered(name)) {
+                try {
+                    platformMBeanServer.unregisterMBean(name);
+                } catch (InstanceNotFoundException noProblem) {
+                    LOGGER.warning("Impossible to unregister non-registered mbean: " + name + ". Cause: " + noProblem);
+                }
+            }
+        } catch (MalformedObjectNameException | MBeanRegistrationException e) {
+            throw new BlazingCacheManagementException("Could not unregister MXBean ", e);
         }
     }
 }

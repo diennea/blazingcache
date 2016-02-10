@@ -35,7 +35,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import blazingcache.client.CacheClientBuilder.Mode;
-import blazingcache.client.management.JMXUtils;
+import blazingcache.management.JMXUtils;
 import blazingcache.network.ServerHostData;
 import blazingcache.server.CacheServer;
 
