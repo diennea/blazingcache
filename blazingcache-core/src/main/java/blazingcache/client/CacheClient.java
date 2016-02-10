@@ -203,7 +203,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Waits for the client to be disconnected
+     * Waits for the client to be disconnected.
      *
      * @param timeout
      * @return

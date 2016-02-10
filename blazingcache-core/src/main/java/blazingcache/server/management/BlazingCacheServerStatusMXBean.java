@@ -53,48 +53,42 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
      * {@inheritDoc}
      */
     public boolean isLeader() {
-        // TODO Auto-generated method stub
-        return false;
+        return this.server.isLeader();
     }
 
     /**
      * {@inheritDoc}
      */
-    public long lastStateChangeTimestamp() {
-        // TODO Auto-generated method stub
-        return 0;
+    public long getStateChangeTimestamp() {
+        return this.server.getStateChangeTimestamp();
     }
 
     /**
      * {@inheritDoc}
      */
-    public long getGlobalCacheSize() {
-        // TODO Auto-generated method stub
-        return 0;
+    public int getGlobalCacheSize() {
+        return this.server.getGlobalCacheSize();
     }
 
     /**
      * {@inheritDoc}
      */
-    public int getNumberOfConnectedClients() {
-        // TODO Auto-generated method stub
-        return 0;
+    public int getConnectedClients() {
+        return this.server.getNumberOfConnectedClients();
     }
 
     /**
      * {@inheritDoc}
      */
-    public long getNumberOfLockedEntries() {
-        // TODO Auto-generated method stub
-        return 0;
+    public int getLockedEntries() {
+        return this.server.getNumberOfLockedKeys();
     }
 
     /**
      * {@inheritDoc}
      */
-    public long getNumberOfPendingOperation() {
-        // TODO Auto-generated method stub
-        return 0;
+    public long getPendingOperations() {
+        return this.server.getPendingOperations();
     }
 
 }
