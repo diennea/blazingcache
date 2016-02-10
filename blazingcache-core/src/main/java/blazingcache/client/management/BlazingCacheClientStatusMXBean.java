@@ -27,12 +27,12 @@ import blazingcache.client.CacheClient;
 public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
 
     /**
-     * the cache client the provided statistics refers to.
+     * the cache client the provided status refers to.
      */
     private final CacheClient client;
 
     /**
-     * Construct a new MXBean to publish client status on JMX.
+     * Constructs a new MXBean to publish client status on JMX.
      *
      * @param client
      *            the {@see CacheClient} instance the status published by this
