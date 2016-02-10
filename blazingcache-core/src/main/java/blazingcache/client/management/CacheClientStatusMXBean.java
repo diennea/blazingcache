@@ -22,8 +22,12 @@ package blazingcache.client.management;
  * the following type:
  * <p>
  * Type:
- * <code>blazingcache.client.management:type=BlazingCacheClientStatus</code>
+ * <code>blazingcache.client.management:type=CacheClientStatus</code>
  * <p>
+ * Required Attributes:
+ * <ul>
+ * <li>CacheClient the id of the client cache</li>
+ * </ul>
  *
  * @author matteo.casadei
  * @since 1.5.0

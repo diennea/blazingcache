@@ -45,10 +45,15 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class CacheServer implements AutoCloseable {
 
+    private final static Logger LOGGER = Logger.getLogger(CacheServer.class.getName());
+
+    private final String serverId;
     private final String sharedSecret;
     private final CacheServerEndpoint acceptor;
     private final CacheStatus cacheStatus = new CacheStatus();
     private final KeyedLockManager locksManager = new KeyedLockManager();
+    private final NettyChannelAcceptor server;
+
     private volatile boolean leader;
     private volatile boolean stopped;
     private ZKClusterManager clusterManager;
@@ -57,8 +62,7 @@ public class CacheServer implements AutoCloseable {
     private int channelHandlersThreads = 64;
     private long slowClientTimeout = 120000;
     private long clientFetchTimeout = 2000;
-    private final NettyChannelAcceptor server;
-    private final static Logger LOGGER = Logger.getLogger(CacheServer.class.getName());
+
 
     public static String VERSION() {
         return "1.4.2";
@@ -70,6 +74,7 @@ public class CacheServer implements AutoCloseable {
         this.server = new NettyChannelAcceptor(serverHostData.getHost(), serverHostData.getPort(), serverHostData.isSsl());
         this.server.setAcceptor(acceptor);
         this.leader = true;
+        this.serverId = serverHostData.getHost() + "_" + serverHostData.getPort();
     }
 
     public void setupSsl(File certificateFile, String password, File certificateChain, List<String> sslCiphers) {
@@ -462,6 +467,10 @@ public class CacheServer implements AutoCloseable {
 
             });
         }
+    }
+
+    public String getServerId() {
+        return this.serverId;
     }
 
     public KeyedLockManager getLocksManager() {
