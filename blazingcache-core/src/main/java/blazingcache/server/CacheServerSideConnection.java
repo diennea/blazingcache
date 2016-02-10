@@ -157,14 +157,17 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 this.clientId = _clientId;
                 server.getAcceptor().connectionAccepted(this);
                 answerConnectionAccepted(message);
+                this.server.addConnectedClients(1);
                 break;
             }
 
             case Message.TYPE_LOCK_ENTRY: {
                 String key = (String) message.parameters.get("key");
+                server.addPendingOperations(1);
                 server.lockKey(key, clientId, new SimpleCallback<String>() {
                     @Override
                     public void onResult(String result, Throwable error) {
+                        server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key).setParameter("lockId", result));
                     }
                 });
@@ -173,9 +176,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             case Message.TYPE_UNLOCK_ENTRY: {
                 String key = (String) message.parameters.get("key");
                 String lockId = (String) message.parameters.get("lockId");
+                server.addPendingOperations(1);
                 server.unlockKey(key, clientId, lockId, new SimpleCallback<String>() {
                     @Override
                     public void onResult(String result, Throwable error) {
+                        server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key).setParameter("lockId", result));
                     }
                 });
@@ -185,9 +190,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             case Message.TYPE_INVALIDATE: {
                 String key = (String) message.parameters.get("key");
                 String lockId = (String) message.parameters.get("lockId");
+                server.addPendingOperations(1);
                 server.invalidateKey(key, clientId, lockId, new SimpleCallback<String>() {
                     @Override
                     public void onResult(String result, Throwable error) {
+                        server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
                     }
                 });
@@ -196,9 +203,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             }
             case Message.TYPE_UNREGISTER_ENTRY: {
                 String key = (String) message.parameters.get("key");
+                server.addPendingOperations(1);
                 server.unregisterEntry(key, clientId, new SimpleCallback<String>() {
                     @Override
                     public void onResult(String result, Throwable error) {
+                        server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
                     }
                 });
@@ -208,9 +217,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             case Message.TYPE_FETCH_ENTRY: {
                 String key = (String) message.parameters.get("key");
                 String lockId = (String) message.parameters.get("lockId");
+                server.addPendingOperations(1);
                 server.fetchEntry(key, clientId, lockId, new SimpleCallback<Message>() {
                     @Override
                     public void onResult(Message result, Throwable error) {
+                        server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, result);
                     }
                 });
@@ -221,15 +232,19 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             case Message.TYPE_TOUCH_ENTRY: {
                 String key = (String) message.parameters.get("key");
                 long expiretime = (long) message.parameters.get("expiretime");
+                server.addPendingOperations(1);
                 server.touchEntry(key, clientId, expiretime);
+                server.addPendingOperations(-1);
                 break;
 
             }
             case Message.TYPE_INVALIDATE_BY_PREFIX: {
                 String prefix = (String) message.parameters.get("prefix");
+                server.addPendingOperations(1);
                 server.invalidateByPrefix(prefix, clientId, new SimpleCallback<String>() {
                     @Override
                     public void onResult(String result, Throwable error) {
+                        server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("prefix", prefix));
                     }
                 });
@@ -241,9 +256,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
                 String lockId = (String) message.parameters.get("lockId");
+                server.addPendingOperations(1);
                 server.putEntry(key, data, expiretime, clientId, lockId, new SimpleCallback<String>() {
                     @Override
                     public void onResult(String result, Throwable error) {
+                        server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
                     }
                 });
@@ -251,6 +268,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             }
             case Message.TYPE_CLIENT_SHUTDOWN:
                 LOGGER.log(Level.SEVERE, "client " + clientId + " sent shutdown message");
+                this.server.addConnectedClients(-1);
                 /// ignore
                 break;
 

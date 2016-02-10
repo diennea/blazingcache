@@ -53,34 +53,34 @@ public interface CacheServerStatusMXBean {
      *
      * @return the timestamp corresponding to last server's state change
      */
-    long lastStateChangeTimestamp();
+    long getStateChangeTimestamp();
 
     /**
      * Returns the number of keys stored in all the caches present in the system.
      *
      * @return the "global" number of keys stores in every cache
      */
-    long getGlobalCacheSize();
+    int getGlobalCacheSize();
 
     /**
      * The number of clients connected to the server.
      *
      * @return the number of connected clients
      */
-    int getNumberOfConnectedClients();
+    int getConnectedClients();
 
     /**
      * The number of entries on which clients acquired (and still hold) a lock.
      *
      * @return the number of locked entries
      */
-    long getNumberOfLockedEntries();
+    int getLockedEntries();
 
     /**
      * Number of operations requested to the server still to be completed.
      *
      * @return the number of pending operations
      */
-    long getNumberOfPendingOperation();
+    long getPendingOperations();
 
 }
