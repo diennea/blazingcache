@@ -118,7 +118,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public long getActualMemory() {
         return actualMemory.get();
     }
-  
+
     public long getOldestEvictedKeyAge() {
         return this.oldestEvictedKeyAge.get();
     }
@@ -185,7 +185,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Waits for the client to establish the first connection to the server
+     * Waits for the client to establish the first connection to the server.
      *
      * @param timeout
      * @return
@@ -582,7 +582,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Returns an entry from the local cache, if not found asks to the
-     * CacheServer to find the entry on other clients
+     * CacheServer to find the entry on other clients.
      *
      * @param key
      * @return
@@ -723,7 +723,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Invalidates an entry from the local cache and blocks until any other
-     * client which holds the same entry has invalidated the entry locally
+     * client which holds the same entry has invalidated the entry locally.
      *
      * @param key
      * @throws InterruptedException
@@ -772,7 +772,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Same as {@link #invalidate(java.lang.String) } but it applies to every
-     * entry whose key 'startsWith' the given prefix
+     * entry whose key 'startsWith' the given prefix.
      *
      * @param prefix
      * @throws InterruptedException
