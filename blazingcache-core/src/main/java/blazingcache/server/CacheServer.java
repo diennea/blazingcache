@@ -21,47 +21,59 @@ package blazingcache.server;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import blazingcache.network.Message;
-import blazingcache.network.ServerHostData;
-import blazingcache.network.netty.NettyChannelAcceptor;
-import blazingcache.zookeeper.LeaderShipChangeListener;
-import blazingcache.zookeeper.ZKClusterManager;
-import java.util.ArrayList;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import blazingcache.management.JMXUtils;
+import blazingcache.network.Message;
+import blazingcache.network.ServerHostData;
+import blazingcache.network.netty.NettyChannelAcceptor;
+import blazingcache.server.management.BlazingCacheServerStatusMXBean;
+import blazingcache.server.management.CacheServerStatusMXBean;
+import blazingcache.zookeeper.LeaderShipChangeListener;
+import blazingcache.zookeeper.ZKClusterManager;
 
 /**
- * The CacheServer core
+ * The CacheServer core.
  *
  * @author enrico.olivelli
  */
 public class CacheServer implements AutoCloseable {
 
+    private final static Logger LOGGER = Logger.getLogger(CacheServer.class.getName());
+
+    private final String serverId;
     private final String sharedSecret;
     private final CacheServerEndpoint acceptor;
     private final CacheStatus cacheStatus = new CacheStatus();
     private final KeyedLockManager locksManager = new KeyedLockManager();
+    private final NettyChannelAcceptor server;
+    private final CacheServerStatusMXBean statusMXBean;
+    private final AtomicLong pendingOperations;
+    private final AtomicInteger connectedClients;
+
     private volatile boolean leader;
     private volatile boolean stopped;
     private ZKClusterManager clusterManager;
     private Thread expireManager;
     private ExecutorService channelsHandlers;
     private int channelHandlersThreads = 64;
+    private long stateChangeTimestamp;
     private long slowClientTimeout = 120000;
     private long clientFetchTimeout = 2000;
-    private final NettyChannelAcceptor server;
-    private final static Logger LOGGER = Logger.getLogger(CacheServer.class.getName());
+
 
     public static String VERSION() {
-        return "1.4.2";
+        return "1.5.0-ALPHA";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
@@ -70,6 +82,10 @@ public class CacheServer implements AutoCloseable {
         this.server = new NettyChannelAcceptor(serverHostData.getHost(), serverHostData.getPort(), serverHostData.isSsl());
         this.server.setAcceptor(acceptor);
         this.leader = true;
+        this.serverId = serverHostData.getHost() + "_" + serverHostData.getPort();
+        this.statusMXBean = new BlazingCacheServerStatusMXBean(this);
+        this.pendingOperations = new AtomicLong();
+        this.connectedClients = new AtomicInteger();
     }
 
     public void setupSsl(File certificateFile, String password, File certificateChain, List<String> sslCiphers) {
@@ -117,11 +133,13 @@ public class CacheServer implements AutoCloseable {
         @Override
         public void leadershipLost() {
             leader = false;
+            CacheServer.this.stateChangeTimestamp = System.currentTimeMillis();
         }
 
         @Override
         public void leadershipAcquired() {
             leader = true;
+            CacheServer.this.stateChangeTimestamp = System.currentTimeMillis();
         }
 
     }
@@ -210,6 +228,14 @@ public class CacheServer implements AutoCloseable {
             }
             LOGGER.log(Level.FINE, "expirer thread stopped");
         }
+    }
+
+    void addConnectedClients(final int delta) {
+        this.connectedClients.addAndGet(delta);
+    }
+
+    void addPendingOperations(final long delta) {
+        this.pendingOperations.addAndGet(delta);
     }
 
     public CacheServerEndpoint getAcceptor() {
@@ -321,7 +347,6 @@ public class CacheServer implements AutoCloseable {
                     connection.sendKeyInvalidationMessage(sourceClientId, key, invalidation);
                 }
             });
-
         };
         executeOnHandler("invalidateKey " + sourceClientId + "," + key, action);
     }
@@ -464,8 +489,36 @@ public class CacheServer implements AutoCloseable {
         }
     }
 
+    public long getCurrentTimestamp() {
+        return System.currentTimeMillis();
+    }
+
+    public long getStateChangeTimestamp() {
+        return this.stateChangeTimestamp;
+    }
+
+    public int getGlobalCacheSize() {
+        return this.cacheStatus.getTotalEntryCount();
+    }
+
+    public int getNumberOfConnectedClients() {
+        return this.connectedClients.get();
+    }
+
+    public long getPendingOperations() {
+        return this.pendingOperations.get();
+    }
+
+    public String getServerId() {
+        return this.serverId;
+    }
+
     public KeyedLockManager getLocksManager() {
         return locksManager;
+    }
+
+    public int getNumberOfLockedKeys() {
+        return this.locksManager.getNumberOfLockedKeys();
     }
 
     public long getSlowClientTimeout() {
@@ -482,6 +535,21 @@ public class CacheServer implements AutoCloseable {
 
     public void setClientFetchTimeout(long clientFetchTimeout) {
         this.clientFetchTimeout = clientFetchTimeout;
+    }
+
+    /**
+     * Register the status mbean related to this server if the input param is true.
+     * <p>
+     * If the param is false, the status mbean would not be enabled.
+     *
+     * @param enabled true in order to enable publishing on JMX
+     */
+    public void setStatusEnabled(final boolean enabled) {
+        if (enabled) {
+            JMXUtils.registerServerStatusMXBean(this, statusMXBean);
+        } else {
+            JMXUtils.unregisterServerStatusMXBean(this);
+        }
     }
 
 }

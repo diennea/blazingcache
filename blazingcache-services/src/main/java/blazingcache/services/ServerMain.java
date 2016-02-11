@@ -139,6 +139,7 @@ public class ServerMain implements AutoCloseable {
         String host = configuration.getProperty("server.host", "127.0.0.1");
         int port = Integer.parseInt(configuration.getProperty("server.port", "1025"));
         boolean ssl = Boolean.parseBoolean(configuration.getProperty("server.ssl", "false"));
+        boolean jmx = Boolean.parseBoolean(configuration.getProperty("server.jmx", "false"));
         String certfile = configuration.getProperty("server.ssl.certificatefile", "");
         String certchainfile = configuration.getProperty("server.ssl.certificatechainfile", "");
         String certpassword = configuration.getProperty("server.ssl.certificatefilepassword", null);
@@ -158,6 +159,7 @@ public class ServerMain implements AutoCloseable {
         cacheServer = new CacheServer(sharedsecret, data);
         cacheServer.setSlowClientTimeout(slowClientsTimeout);
         cacheServer.setClientFetchTimeout(fetchClientsTimeout);
+        cacheServer.setStatusEnabled(jmx);
 
         switch (clusteringmode) {
             case "singleserver": {

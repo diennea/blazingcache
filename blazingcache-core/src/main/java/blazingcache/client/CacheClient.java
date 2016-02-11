@@ -20,6 +20,11 @@
 package blazingcache.client;
 
 import blazingcache.client.impl.InternalClientListener;
+import blazingcache.client.management.BlazingCacheClientStatisticsMXBean;
+import blazingcache.client.management.BlazingCacheClientStatusMXBean;
+import blazingcache.client.management.CacheClientStatisticsMXBean;
+import blazingcache.client.management.CacheClientStatusMXBean;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -45,7 +50,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Client
+ * Client.
  *
  * @author enrico.olivelli
  */
@@ -58,9 +63,23 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final Thread coreThread;
     private final String clientId;
     private final String sharedSecret;
+    private final CacheClientStatisticsMXBean statisticsMXBean;
+    private final CacheClientStatusMXBean statusMXBean;
+
     private volatile boolean stopped = false;
     private Channel channel;
     private long connectionTimestamp;
+
+    private AtomicLong oldestEvictedKeyAge;
+    private AtomicLong clientPuts;
+    private AtomicLong clientTouches;
+    private AtomicLong clientGets;
+    private AtomicLong clientFetches;
+    private AtomicLong clientEvictions;
+    private AtomicLong clientInvalidations;
+    private AtomicLong clientHits;
+    private AtomicLong clientMissedGetsToSuccessfulFetches;
+    private AtomicLong clientMissedGetsToMissedFetches;
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
@@ -70,7 +89,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
-     * disable
+     * disable.
      */
     public long getMaxMemory() {
         return maxMemory;
@@ -100,6 +119,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return actualMemory.get();
     }
 
+    public long getOldestEvictedKeyAge() {
+        return this.oldestEvictedKeyAge.get();
+    }
+
     public String getStatus() {
         Channel _channel = channel;
         if (_channel != null) {
@@ -115,6 +138,35 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.coreThread = new Thread(new ConnectionManager(), "cache-connection-manager-" + clientId);
         this.coreThread.setDaemon(true);
         this.clientId = clientId + "_" + System.nanoTime();
+
+        this.statisticsMXBean = new BlazingCacheClientStatisticsMXBean(this);
+        this.statusMXBean = new BlazingCacheClientStatusMXBean(this);
+
+        this.oldestEvictedKeyAge = new AtomicLong();
+        this.clientPuts = new AtomicLong();
+        this.clientTouches = new AtomicLong();
+        this.clientGets = new AtomicLong();
+        this.clientFetches = new AtomicLong();
+        this.clientEvictions = new AtomicLong();
+        this.clientInvalidations = new AtomicLong();
+        this.clientHits = new AtomicLong();
+        this.clientMissedGetsToSuccessfulFetches = new AtomicLong();
+        this.clientMissedGetsToMissedFetches = new AtomicLong();
+    }
+
+    /**
+     * Resets client cache's statistics.
+     */
+    public void clearStatistics() {
+        this.clientPuts.set(0);
+        this.clientTouches.set(0);
+        this.clientGets.set(0);
+        this.clientFetches.set(0);
+        this.clientEvictions.set(0);
+        this.clientInvalidations.set(0);
+        this.clientHits.set(0);
+        this.clientMissedGetsToSuccessfulFetches.set(0);
+        this.clientMissedGetsToMissedFetches.set(0);
     }
 
     public ServerLocator getBrokerLocator() {
@@ -133,7 +185,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Waits for the client to establish the first connection to the server
+     * Waits for the client to establish the first connection to the server.
      *
      * @param timeout
      * @return
@@ -151,7 +203,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Waits for the client to be disconnected
+     * Waits for the client to be disconnected.
      *
      * @param timeout
      * @return
@@ -173,18 +225,39 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return clientId;
     }
 
+    /**
+     * Returns true if the client is currently connected to the server.
+     *
+     * @return true if the client is connected to the server; false otherwise
+     */
     public boolean isConnected() {
         return channel != null;
     }
 
+    /**
+     * Returns the timestamp in ms of the last successful connection to the server.
+     * <p>
+     * In case of the client being currently disconnected, the value returned will be 0.
+     *
+     * @return the timestamp of the last successful connection to the server
+     */
     public long getConnectionTimestamp() {
         return connectionTimestamp;
     }
 
     /**
-     * Actual number of entries in the local cache
+     * Return the current client timestamp in ms.
      *
-     * @return
+     * @return the current client timestamp
+     */
+    public long getCurrentTimestamp() {
+        return System.currentTimeMillis();
+    }
+
+    /**
+     * Actual number of entries in the local cache.
+     *
+     * @return the number of entry stored in the local cache
      */
     public int getCacheSize() {
         return this.cache.size();
@@ -325,7 +398,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
                 @Override
                 public int compare(CacheEntry o1, CacheEntry o2) {
-                    long diff = o1.lastGetTime - o2.lastGetTime;
+                    long diff = o1.getLastGetTime() - o2.getLastGetTime();
                     if (diff == 0) {
                         return 0;
                     }
@@ -340,14 +413,19 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         LOGGER.severe("found " + evictable.size() + " evictable entries");
 
         if (!evictable.isEmpty()) {
+            //update the age of the oldest evicted key
+            //the oldest one is the first entry in evictable
+            this.oldestEvictedKeyAge.getAndSet(System.nanoTime() - evictable.get(0).getPutTime());
+
             CountDownLatch count = new CountDownLatch(evictable.size());
-            for (CacheEntry entry : evictable) {
-                String key = entry.getKey();
+            for (final CacheEntry entry : evictable) {
+                final String key = entry.getKey();
                 LOGGER.log(Level.SEVERE, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{key, entry.getSerializedData().length, entry.getLastGetTime()});
-                CacheEntry removed = cache.remove(key);
+                final CacheEntry removed = cache.remove(key);
                 if (removed != null) {
+                    this.clientEvictions.incrementAndGet();
                     actualMemory.addAndGet(-removed.getSerializedData().length);
-                    Channel _channel = channel;
+                    final Channel _channel = channel;
                     if (_channel != null) {
                         _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, key), invalidateTimeout, new ReplyCallback() {
 
@@ -374,7 +452,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 if (done) {
                     break;
                 }
-                Channel _channel = channel;
+                final Channel _channel = channel;
                 if (_channel == null || !_channel.isValid()) {
                     LOGGER.log(Level.SEVERE, "channel closed during eviction");
                     break;
@@ -504,7 +582,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Returns an entry from the local cache, if not found asks to the
-     * CacheServer to find the entry on other clients
+     * CacheServer to find the entry on other clients.
      *
      * @param key
      * @return
@@ -516,7 +594,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns an entry from the local cache, if not found asks to the
+     * Returns an entry from the local cache, if not found asks the
      * CacheServer to find the entry on other clients.
      *
      * @param key
@@ -533,8 +611,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return null;
         }
         CacheEntry entry = cache.get(key);
+        this.clientFetches.incrementAndGet();
         if (entry != null) {
-            entry.lastGetTime = System.nanoTime();
+            entry.setLastGetTime(System.nanoTime());
+            this.clientHits.incrementAndGet();
             return entry;
         }
         try {
@@ -553,11 +633,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 long expiretime = (long) message.parameters.get("expiretime");
                 entry = new CacheEntry(key, System.nanoTime(), data, expiretime);
                 storeEntry(entry);
+                this.clientMissedGetsToSuccessfulFetches.incrementAndGet();
+                this.clientHits.incrementAndGet();
                 return entry;
             }
         } catch (TimeoutException err) {
             LOGGER.log(Level.SEVERE, "fetch failed " + key + ": " + err);
         }
+        this.clientMissedGetsToMissedFetches.incrementAndGet();
         return null;
 
     }
@@ -604,6 +687,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 public void messageSent(Message originalMessage, Throwable error) {
                     if (error != null) {
                         LOGGER.log(Level.SEVERE, "touch " + key + " failed ", error);
+                    } else {
+                        LOGGER.log(Level.FINEST, "touch " + key);
+                        clientTouches.incrementAndGet();
                     }
                 }
             });
@@ -624,8 +710,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return null;
         }
         CacheEntry entry = cache.get(key);
+        this.clientGets.incrementAndGet();
         if (entry != null) {
-            entry.lastGetTime = System.nanoTime();
+            entry.setLastGetTime(System.nanoTime());
+            this.clientHits.incrementAndGet();
             return entry;
         }
         return null;
@@ -635,7 +723,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Invalidates an entry from the local cache and blocks until any other
-     * client which holds the same entry has invalidated the entry locally
+     * client which holds the same entry has invalidated the entry locally.
      *
      * @param key
      * @throws InterruptedException
@@ -671,6 +759,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     }
                     Message response = _channel.sendMessageWithReply(request, invalidateTimeout);
                     LOGGER.log(Level.FINEST, "invalidate " + key + ", -> " + response);
+                    this.clientInvalidations.incrementAndGet();
                     return;
                 } catch (TimeoutException error) {
                     LOGGER.log(Level.SEVERE, "invalidate " + key + ", timeout " + error);
@@ -683,7 +772,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Same as {@link #invalidate(java.lang.String) } but it applies to every
-     * entry whose key 'startsWith' the given prefix
+     * entry whose key 'startsWith' the given prefix.
      *
      * @param prefix
      * @throws InterruptedException
@@ -707,6 +796,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 try {
                     Message response = _channel.sendMessageWithReply(Message.INVALIDATE_BY_PREFIX(clientId, prefix), invalidateTimeout);
                     LOGGER.log(Level.FINEST, "invalidateByPrefix " + prefix + ", -> " + response);
+                    this.clientInvalidations.incrementAndGet();
                     return;
                 } catch (TimeoutException error) {
                     LOGGER.log(Level.SEVERE, "invalidateByPrefix " + prefix + ", timeout " + error);
@@ -759,7 +849,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 throw new CacheException("error while putting key " + key + " (" + response + ")");
             }
             // race condition: if two clients perform a put on the same entry maybe after the network trip we get another value, different from the expected one.
-            // it is better to invalidate the entry for alll
+            // it is better to invalidate the entry for all
             CacheEntry afterNetwork = cache.get(key);
             if (afterNetwork != null) {
                 if (!Arrays.equals(afterNetwork.getSerializedData(), data)) {
@@ -767,6 +857,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     invalidate(key);
                 }
             }
+            this.clientPuts.incrementAndGet();
             return true;
         } catch (TimeoutException timedOut) {
             throw new CacheException("error while putting for key " + key + ":" + timedOut, timedOut);
@@ -824,4 +915,105 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return cache.keySet().stream().filter(k -> k.startsWith(prefix)).collect(Collectors.toSet());
     }
 
+    /**
+     * Register the statistics mbean related to this client if the input param is set to true.
+     * <p>
+     * If the param is false, the statistics mbean would not be enabled.
+     *
+     * @param enabled true in order to enable statistics publishing on JMX
+     */
+    public void setStatisticsEnabled(final boolean enabled) {
+        if (enabled) {
+            blazingcache.management.JMXUtils.registerClientStatisticsMXBean(this, statisticsMXBean);
+        } else {
+            blazingcache.management.JMXUtils.unregisterClientStatisticsMXBean(this);
+        }
+    }
+
+    /**
+     * Register the status mbean related to this client if the input param is set to true.
+     * <p>
+     * If the param is false, the status mbean would not be enabled.
+     *
+     * @param enabled true in order to enable status publishing on JMX
+     */
+    public void setStatusEnabled(final boolean enabled) {
+        if (enabled) {
+            blazingcache.management.JMXUtils.registerClientStatusMXBean(this, statusMXBean);
+        } else {
+            blazingcache.management.JMXUtils.unregisterClientStatusMXBean(this);
+        }
+    }
+
+    /**
+     *
+     * @return number of puts executed since client boot
+     */
+    public long getClientPuts() {
+        return this.clientPuts.get();
+    }
+
+    /**
+    *
+    * @return number of touches executed since client boot
+    */
+   public long getClientTouches() {
+       return this.clientTouches.get();
+   }
+
+    /**
+    *
+    * @return number of gets executed since client boot
+    */
+    public long getClientGets() {
+       return this.clientGets.get();
+    }
+
+    /**
+    *
+    * @return number of fetches executed since client boot
+    */
+    public long getClientFetches() {
+        return this.clientFetches.get();
+    }
+
+    /**
+    *
+    * @return number of evictions executed since client boot
+    */
+    public long getClientEvictions() {
+        return this.clientEvictions.get();
+    }
+
+    /**
+    *
+    * @return number of invalidations executed since client boot
+    */
+    public long getClientInvalidations() {
+        return this.clientInvalidations.get();
+    }
+
+    /**
+    *
+    * @return number of hits occurred since client boot
+    */
+    public long getClientHits() {
+        return this.clientHits.get();
+    }
+
+    /**
+    *
+    * @return number of missed gets ending with a successful remote read.
+    */
+    public long getClientMissedGetsToSuccessfulFetches() {
+        return this.clientMissedGetsToSuccessfulFetches.get();
+    }
+
+    /**
+    *
+    * @return number of missed gets that ended with an unsuccessful remote read as well.
+    */
+    public long getClientMissedGetsToMissedFetches() {
+        return this.clientMissedGetsToMissedFetches.get();
+    }
 }

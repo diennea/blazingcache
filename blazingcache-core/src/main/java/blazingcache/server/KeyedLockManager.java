@@ -60,6 +60,19 @@ public class KeyedLockManager {
         return result;
     }
 
+    /**
+     *
+     * @return the number of currently locked keys
+     */
+    public int getNumberOfLockedKeys() {
+        this.generalLock.lock();
+        try {
+            return this.locksCounter.size();
+        } finally {
+            this.generalLock.unlock();
+        }
+    }
+
     private StampedLock makeLockForKey(String key) {
         StampedLock lock;
         generalLock.lock();
