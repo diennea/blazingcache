@@ -73,7 +73,7 @@ public class CacheServer implements AutoCloseable {
 
 
     public static String VERSION() {
-        return "1.4.2";
+        return "1.5.0-ALPHA";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
