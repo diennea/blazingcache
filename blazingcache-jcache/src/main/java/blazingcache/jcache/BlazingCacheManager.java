@@ -118,8 +118,9 @@ public class BlazingCacheManager implements CacheManager {
             if (embeddedServer != null) {
                 embeddedServer.start();
             }
-            client.setStatisticsEnabled(jmx);
-            client.setStatusEnabled(jmx);
+            if (jmx) {
+                client.enableJmx(true);
+            }
             client.setMaxMemory(maxmemory);
             client.start();
             client.waitForConnection(10000);

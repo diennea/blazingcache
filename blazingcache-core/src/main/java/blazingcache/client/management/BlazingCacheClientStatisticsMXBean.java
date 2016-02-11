@@ -34,9 +34,8 @@ public class BlazingCacheClientStatisticsMXBean implements CacheClientStatistics
     /**
      * Construct a new MXBean to publish client statistics on JMX.
      *
-     * @param client
-     *            the {@see CacheClient} instance on which statistics will be
-     *            retrieved
+     * @param client the {
+     * @see CacheClient} instance on which statistics will be retrieved
      */
     public BlazingCacheClientStatisticsMXBean(final CacheClient client) {
         this.client = client;
@@ -110,13 +109,6 @@ public class BlazingCacheClientStatisticsMXBean implements CacheClientStatistics
      */
     public long getClientMissedGetsToMissedFetches() {
         return this.client.getClientMissedGetsToMissedFetches();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public long getClientConflicts() {
-        throw new UnsupportedOperationException("Value not supported yet!");
     }
 
 }

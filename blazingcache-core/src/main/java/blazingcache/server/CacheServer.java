@@ -544,7 +544,7 @@ public class CacheServer implements AutoCloseable {
      *
      * @param enabled true in order to enable publishing on JMX
      */
-    public void setStatusEnabled(final boolean enabled) {
+    public void enableJmx(final boolean enabled) {
         if (enabled) {
             JMXUtils.registerServerStatusMXBean(this, statusMXBean);
         } else {
