@@ -556,4 +556,12 @@ public class CacheServer implements AutoCloseable {
         }
     }
 
+    /**
+     * Access lowlevel information about pending network requests
+     * @return 
+     */
+    public BroadcastRequestStatusMonitor getNetworkRequestsStatusMonitor() {
+        return networkRequestsStatusMonitor;
+    }
+
 }
