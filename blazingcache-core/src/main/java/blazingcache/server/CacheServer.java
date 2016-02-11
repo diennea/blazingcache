@@ -60,6 +60,7 @@ public class CacheServer implements AutoCloseable {
     private final CacheServerStatusMXBean statusMXBean;
     private final AtomicLong pendingOperations;
     private final AtomicInteger connectedClients;
+    private final BroadcastRequestStatusMonitor networkRequestsStatusMonitor = new BroadcastRequestStatusMonitor();
 
     private volatile boolean leader;
     private volatile boolean stopped;
@@ -70,7 +71,6 @@ public class CacheServer implements AutoCloseable {
     private long stateChangeTimestamp;
     private long slowClientTimeout = 120000;
     private long clientFetchTimeout = 2000;
-
 
     public static String VERSION() {
         return "1.5.0-ALPHA";
@@ -294,7 +294,7 @@ public class CacheServer implements AutoCloseable {
                 return;
             }
             BroadcastRequestStatus propagation = new BroadcastRequestStatus("putEntry " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, finishAndReleaseLock, null);
-            BroadcastRequestStatusMonitor.register(propagation);
+            networkRequestsStatusMonitor.register(propagation);
 
             clientsForKey.forEach((clientId) -> {
                 CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
@@ -336,7 +336,7 @@ public class CacheServer implements AutoCloseable {
             BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateKey " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, finishAndReleaseLock, (clientId, error) -> {
                 cacheStatus.removeKeyForClient(key, clientId);
             });
-            BroadcastRequestStatusMonitor.register(invalidation);
+            networkRequestsStatusMonitor.register(invalidation);
 
             clientsForKey.forEach((clientId) -> {
                 CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
@@ -412,10 +412,13 @@ public class CacheServer implements AutoCloseable {
             for (String remoteClientId : clientsForKey) {
                 CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(remoteClientId);
                 if (connection != null) {
+                    UnicastRequestStatus unicastRequestStatus = new UnicastRequestStatus(clientId, remoteClientId, "fetch " + key);
+                    networkRequestsStatusMonitor.register(unicastRequestStatus);
                     connection.sendFetchKeyMessage(remoteClientId, key, new SimpleCallback<Message>() {
 
                         @Override
                         public void onResult(Message result, Throwable error) {
+                            networkRequestsStatusMonitor.unregister(unicastRequestStatus);
                             LOGGER.log(Level.FINE, "client " + remoteClientId + " answer to fetch :" + result, error);
                             if (result.type == Message.TYPE_ACK) {
                                 // da questo momento consideriamo che il client abbia la entry in memoria
@@ -452,7 +455,7 @@ public class CacheServer implements AutoCloseable {
                 cacheStatus.removeKeyByPrefixForClient(prefix, clientId);
             });
 
-            BroadcastRequestStatusMonitor.register(invalidation);
+            networkRequestsStatusMonitor.register(invalidation);
             clients.forEach((clientId) -> {
                 CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
                 if (connection == null) {
@@ -538,7 +541,8 @@ public class CacheServer implements AutoCloseable {
     }
 
     /**
-     * Register the status mbean related to this server if the input param is true.
+     * Register the status mbean related to this server if the input param is
+     * true.
      * <p>
      * If the param is false, the status mbean would not be enabled.
      *

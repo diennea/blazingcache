@@ -31,18 +31,33 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class BroadcastRequestStatusMonitor {
 
-    private static Map<Long, BroadcastRequestStatus> actual = new ConcurrentHashMap<>();
+    private final Map<Long, BroadcastRequestStatus> broadcasts = new ConcurrentHashMap<>();
+    private final Map<Long, UnicastRequestStatus> unicasts = new ConcurrentHashMap<>();
 
-    public static void register(BroadcastRequestStatus status) {
-        actual.put(status.getId(), status);
+    public void register(BroadcastRequestStatus status) {
+        broadcasts.put(status.getId(), status);
+        status.setBroadcastRequestStatusMonitor(this);
     }
 
-    public static void unregister(BroadcastRequestStatus status) {
-        actual.remove(status.getId());
+    public void unregister(BroadcastRequestStatus status) {
+        broadcasts.remove(status.getId());
     }
 
-    public static List<BroadcastRequestStatus> getActual() {
-        return new ArrayList<>(actual.values());
+    public List<BroadcastRequestStatus> getActualBroadcasts() {
+        return new ArrayList<>(broadcasts.values());
+    }
+
+    public void register(UnicastRequestStatus status) {
+        unicasts.put(status.getId(), status);
+        status.setBroadcastRequestStatusMonitor(this);
+    }
+
+    public void unregister(UnicastRequestStatus status) {
+        unicasts.remove(status.getId());
+    }
+
+    public List<UnicastRequestStatus> getActualUnicasts() {
+        return new ArrayList<>(unicasts.values());
     }
 
 }
