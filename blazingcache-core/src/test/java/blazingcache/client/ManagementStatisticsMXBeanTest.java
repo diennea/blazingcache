@@ -293,6 +293,28 @@ public final class ManagementStatisticsMXBeanTest {
                 evictions = (Long) JMXUtils.getMBeanServer().getAttribute(statisticsBeanName, "ClientEvictions");
                 assertEquals(7, evictions);
 
+                //clear stats
+                JMXUtils.getMBeanServer().invoke(statisticsBeanName, "clear", null, null);
+                evictions = (Long) JMXUtils.getMBeanServer().getAttribute(statisticsBeanName, "ClientEvictions");
+                assertEquals(0, evictions);
+                invalidations = (Long) JMXUtils.getMBeanServer().getAttribute(statisticsBeanName, "ClientInvalidations");
+                assertEquals(0, invalidations);
+                touches = (Long) JMXUtils.getMBeanServer().getAttribute(statisticsBeanName, "ClientTouches");
+                assertEquals(0, touches);
+                puts = (Long) JMXUtils.getMBeanServer().getAttribute(statisticsBeanName, "ClientPuts");
+                assertEquals(0, puts);
+                hits = (Long) JMXUtils.getMBeanServer().getAttribute(statisticsBeanName, "ClientHits");
+                assertEquals(0, hits);
+                missedGetsToSuccessfulFetches = (Long) JMXUtils.getMBeanServer().getAttribute(statisticsBeanName, "ClientMissedGetsToSuccessfulFetches");
+                assertEquals(0, missedGetsToSuccessfulFetches);
+                fetches = (Long) JMXUtils.getMBeanServer().getAttribute(statisticsBeanName, "ClientFetches");
+                assertEquals(0, fetches);
+                gets = (Long) JMXUtils.getMBeanServer().getAttribute(statisticsBeanName, "ClientGets");
+                assertEquals(0, gets);
+                missedGetsToMissedFetches = (Long) JMXUtils.getMBeanServer().getAttribute(statisticsBeanName, "ClientMissedGetsToMissedFetches");
+                assertEquals(0, missedGetsToMissedFetches);
+
+
             } catch (InstanceNotFoundException ex) {
                 fail("BlazingCacheClientStatusMXBean is expected to be present as jmx is enabled");
             }
