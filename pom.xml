@@ -39,6 +39,11 @@
             <name>Diego Salvi</name>
             <organization>Diennea</organization>
         </developer>
+        <developer>
+            <id>matteo.casadei</id>
+            <name>Matteo Casadei</name>
+            <organization>Diennea</organization>
+        </developer>
     </developers>
     <issueManagement>
         <url>https://dev.blazingcache.org/jira</url>		

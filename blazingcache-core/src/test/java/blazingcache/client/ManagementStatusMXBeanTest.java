@@ -125,7 +125,7 @@ public final class ManagementStatusMXBeanTest {
                 Long connectionTimeStamp = (Long)JMXUtils.getMBeanServer().getAttribute(statusBeanName, "LastConnectionTimestamp");
                 assertTrue(connectionTimeStamp >= connectionBeforeTs && connectionTimeStamp <= connectionAfterTs);
 
-                Long oldestEvictedKeyAge = (Long)JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheOldestEvictedKeyAge");
+                Long oldestEvictedKeyAge = (Long)JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheLastEvictionOldestKeyAge");
                 assertEquals(0, oldestEvictedKeyAge.longValue());
 
                 boolean isConnected = (Boolean) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "ClientConnected");
@@ -183,7 +183,7 @@ public final class ManagementStatusMXBeanTest {
                 //ensure the evicted key is now null
                 assertNull(client.get(timeSortedInsertedKeys.get(0)));
 
-                final long lastEvictedKeyAge = (Long) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheOldestEvictedKeyAge");
+                final long lastEvictedKeyAge = (Long) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheLastEvictionOldestKeyAge");
                 assertTrue(lastEvictedKeyAge > 0);
 
                 configuredMaxMemory = (Long) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheConfiguredMaxMemory");
