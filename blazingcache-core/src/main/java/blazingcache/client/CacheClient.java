@@ -70,16 +70,16 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private Channel channel;
     private long connectionTimestamp;
 
-    private AtomicLong oldestEvictedKeyAge;
-    private AtomicLong clientPuts;
-    private AtomicLong clientTouches;
-    private AtomicLong clientGets;
-    private AtomicLong clientFetches;
-    private AtomicLong clientEvictions;
-    private AtomicLong clientInvalidations;
-    private AtomicLong clientHits;
-    private AtomicLong clientMissedGetsToSuccessfulFetches;
-    private AtomicLong clientMissedGetsToMissedFetches;
+    private final AtomicLong oldestEvictedKeyAge;
+    private final AtomicLong clientPuts;
+    private final AtomicLong clientTouches;
+    private final AtomicLong clientGets;
+    private final AtomicLong clientFetches;
+    private final AtomicLong clientEvictions;
+    private final AtomicLong clientInvalidations;
+    private final AtomicLong clientHits;
+    private final AtomicLong clientMissedGetsToSuccessfulFetches;
+    private final AtomicLong clientMissedGetsToMissedFetches;
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
@@ -235,9 +235,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns the timestamp in ms of the last successful connection to the server.
+     * Returns the timestamp in ms of the last successful connection to the
+     * server.
      * <p>
-     * In case of the client being currently disconnected, the value returned will be 0.
+     * In case of the client being currently disconnected, the value returned
+     * will be 0.
      *
      * @return the timestamp of the last successful connection to the server
      */
@@ -594,8 +596,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns an entry from the local cache, if not found asks the
-     * CacheServer to find the entry on other clients.
+     * Returns an entry from the local cache, if not found asks the CacheServer
+     * to find the entry on other clients.
      *
      * @param key
      * @param lock previouly acquired lock
@@ -916,31 +918,19 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Register the statistics mbean related to this client if the input param is set to true.
+     * Register the statistics mbean related to this client if the input param
+     * is set to true.
      * <p>
      * If the param is false, the statistics mbean would not be enabled.
      *
      * @param enabled true in order to enable statistics publishing on JMX
      */
-    public void setStatisticsEnabled(final boolean enabled) {
+    public void enableJmx(final boolean enabled) {
         if (enabled) {
             blazingcache.management.JMXUtils.registerClientStatisticsMXBean(this, statisticsMXBean);
-        } else {
-            blazingcache.management.JMXUtils.unregisterClientStatisticsMXBean(this);
-        }
-    }
-
-    /**
-     * Register the status mbean related to this client if the input param is set to true.
-     * <p>
-     * If the param is false, the status mbean would not be enabled.
-     *
-     * @param enabled true in order to enable status publishing on JMX
-     */
-    public void setStatusEnabled(final boolean enabled) {
-        if (enabled) {
             blazingcache.management.JMXUtils.registerClientStatusMXBean(this, statusMXBean);
         } else {
+            blazingcache.management.JMXUtils.unregisterClientStatisticsMXBean(this);
             blazingcache.management.JMXUtils.unregisterClientStatusMXBean(this);
         }
     }
@@ -954,66 +944,78 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-    *
-    * @return number of touches executed since client boot
-    */
-   public long getClientTouches() {
-       return this.clientTouches.get();
-   }
-
-    /**
-    *
-    * @return number of gets executed since client boot
-    */
-    public long getClientGets() {
-       return this.clientGets.get();
+     *
+     * @return number of touches executed since client boot
+     */
+    public long getClientTouches() {
+        return this.clientTouches.get();
     }
 
     /**
-    *
-    * @return number of fetches executed since client boot
-    */
+     *
+     * @return number of gets executed since client boot
+     */
+    public long getClientGets() {
+        return this.clientGets.get();
+    }
+
+    /**
+     *
+     * @return number of fetches executed since client boot
+     */
     public long getClientFetches() {
         return this.clientFetches.get();
     }
 
     /**
-    *
-    * @return number of evictions executed since client boot
-    */
+     *
+     * @return number of evictions executed since client boot
+     */
     public long getClientEvictions() {
         return this.clientEvictions.get();
     }
 
     /**
-    *
-    * @return number of invalidations executed since client boot
-    */
+     *
+     * @return number of invalidations executed since client boot
+     */
     public long getClientInvalidations() {
         return this.clientInvalidations.get();
     }
 
     /**
-    *
-    * @return number of hits occurred since client boot
-    */
+     *
+     * @return number of hits occurred since client boot
+     */
     public long getClientHits() {
         return this.clientHits.get();
     }
 
     /**
-    *
-    * @return number of missed gets ending with a successful remote read.
-    */
+     *
+     * @return number of missed gets ending with a successful remote read.
+     */
     public long getClientMissedGetsToSuccessfulFetches() {
         return this.clientMissedGetsToSuccessfulFetches.get();
     }
 
     /**
-    *
-    * @return number of missed gets that ended with an unsuccessful remote read as well.
-    */
+     *
+     * @return number of missed gets that ended with an unsuccessful remote read
+     * as well.
+     */
     public long getClientMissedGetsToMissedFetches() {
         return this.clientMissedGetsToMissedFetches.get();
     }
+
+    /**
+     * Return actual statistics. Statistics are always computed even if not
+     * enabled
+     *
+     * @return actual statistics
+     */
+    public CacheClientStatisticsMXBean getStatistics() {
+        return statisticsMXBean;
+    }
+
 }

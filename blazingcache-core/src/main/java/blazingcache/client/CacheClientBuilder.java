@@ -165,10 +165,10 @@ public class CacheClientBuilder {
     /**
      * JMX flag to enable publishing of JMX status and statistics.
      *
-     * @param jmx
-     *            true in order to enable publication of status and statistics
-     *            mbeans on JMX
-     * @return the instance of {@see CacheClientBuilder}
+     * @param jmx true in order to enable publication of status and statistics
+     * mbeans on JMX
+     * @return the instance of {
+     * @see CacheClientBuilder}
      */
     public CacheClientBuilder jmx(final boolean jmx) {
         this.jmx = jmx;
@@ -225,44 +225,46 @@ public class CacheClientBuilder {
      * CacheServer will be started too. The returned Client MUST be started in
      * order to work.
      *
-     * @return the new instance of {@see CacheClient}
+     * @return the new instance of {
+     * @see CacheClient}
      * @see CacheClient#start()
      * @see CacheClient#waitForConnection(int)
      */
     public CacheClient build() {
         switch (mode) {
-        case SINGLESERVER:
-            locator = new NettyCacheServerLocator(host, port, ssl);
-            ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
-            ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
-            break;
-        case CLUSTERED:
-            locator = new ZKCacheServerLocator(zkConnectString, zkSessionTimeout, zkPath);
-            ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
-            ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
-            break;
-        case LOCAL:
-            if (cacheServer == null) {
-                cacheServer = new CacheServer(clientSecret, ServerHostData.LOCAL());
-                CacheServer cs = (CacheServer) cacheServer;
-                try {
-                    cs.start();
-                } catch (Throwable t) {
-                    throw new RuntimeException(t);
+            case SINGLESERVER:
+                locator = new NettyCacheServerLocator(host, port, ssl);
+                ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
+                ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
+                break;
+            case CLUSTERED:
+                locator = new ZKCacheServerLocator(zkConnectString, zkSessionTimeout, zkPath);
+                ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
+                ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
+                break;
+            case LOCAL:
+                if (cacheServer == null) {
+                    cacheServer = new CacheServer(clientSecret, ServerHostData.LOCAL());
+                    CacheServer cs = (CacheServer) cacheServer;
+                    try {
+                        cs.start();
+                    } catch (Throwable t) {
+                        throw new RuntimeException(t);
+                    }
+                    locator = new JVMServerLocator(cs, true);
+                } else {
+                    CacheServer cs = (CacheServer) cacheServer;
+                    locator = new JVMServerLocator(cs, false);
                 }
-                locator = new JVMServerLocator(cs, true);
-            } else {
-                CacheServer cs = (CacheServer) cacheServer;
-                locator = new JVMServerLocator(cs, false);
-            }
-            break;
-        default:
-            throw new IllegalArgumentException("invalid mode " + mode);
+                break;
+            default:
+                throw new IllegalArgumentException("invalid mode " + mode);
         }
         final CacheClient res = new CacheClient(clientId, clientSecret, locator);
         res.setMaxMemory(maxMemory);
-        res.setStatisticsEnabled(this.jmx);
-        res.setStatusEnabled(this.jmx);
+        if (this.jmx) {
+            res.enableJmx(true);
+        }
         return res;
     }
 }
