@@ -25,7 +25,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * Stato invalidazione
+ * Status of a request which as been sent to many clients. This is the core
+ * function of the server, when the a "Broadcast Request" has been acked by all
+ * client it the server sends an ack to the originating client
  *
  * @author enrico.olivelli
  */
@@ -39,6 +41,7 @@ public final class BroadcastRequestStatus {
     private final SimpleCallback<String> onClientDone;
     private final ReentrantLock lock = new ReentrantLock(false);
     private boolean done;
+    private BroadcastRequestStatusMonitor broadcastRequestStatusMonitor;
 
     public BroadcastRequestStatus(String description, Set<String> remaingClients, SimpleCallback<String> onFinish, SimpleCallback<String> onClientDone) {
         this.description = description;
@@ -88,10 +91,20 @@ public final class BroadcastRequestStatus {
             try {
                 onFinish.onResult(null, null);
             } finally {
-                BroadcastRequestStatusMonitor.unregister(this);
+                if (broadcastRequestStatusMonitor != null) {
+                    broadcastRequestStatusMonitor.unregister(this);
+                }
             }
 
         }
+    }
+
+    public BroadcastRequestStatusMonitor getBroadcastRequestStatusMonitor() {
+        return broadcastRequestStatusMonitor;
+    }
+
+    public void setBroadcastRequestStatusMonitor(BroadcastRequestStatusMonitor broadcastRequestStatusMonitor) {
+        this.broadcastRequestStatusMonitor = broadcastRequestStatusMonitor;
     }
 
 }
