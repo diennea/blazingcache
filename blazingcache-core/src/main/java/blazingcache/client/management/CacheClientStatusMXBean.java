@@ -84,12 +84,14 @@ public interface CacheClientStatusMXBean {
     int getCacheSize();
 
     /**
-     * The age in ns of the oldest key evicted from the local cache.
+     * The age in ns of the oldest key last evicted from the local cache.
+     * <p>
+     * Simply put, the oldest key is calculated referring always to last eviction execution.
      * <p>
      * In case of no eviction executed on the cache yet, 0 will be returned.
      *
      * @return the age of the oldest evicted key.
      */
-    long getCacheOldestEvictedKeyAge();
+    long getCacheLastEvictionOldestKeyAge();
 
 }
