@@ -1,4 +1,5 @@
 # [BlazingCache](http://blazingcache.org/)
+[![Build Status](https://dev.blazingcache.org/jenkins/buildStatus/icon?job=BlazingCache)](https://dev.blazingcache.org/jenkins/job/BlazingCache/)
 
 BlazingCache is a Fast Cache for distributed Java applications.
 
