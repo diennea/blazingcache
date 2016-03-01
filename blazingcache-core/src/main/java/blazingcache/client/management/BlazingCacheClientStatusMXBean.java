@@ -35,7 +35,7 @@ public class BlazingCacheClientStatusMXBean implements CacheClientStatusMXBean {
      * Constructs a new MXBean to publish client status on JMX.
      *
      * @param client
-     *            the {@see CacheClient} instance the status published by this
+     *            the {@link CacheClient} instance the status published by this
      *            MXBean refers to
      */
     public BlazingCacheClientStatusMXBean(final CacheClient client) {

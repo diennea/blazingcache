@@ -35,7 +35,7 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
      * Builds a new MXBean to publish server status on JMX.
      *
      * @param server
-     *            the {@see CacheServer} instance this
+     *            the {@link CacheServer} instance this
      *            MXBean refers to
      */
     public BlazingCacheServerStatusMXBean(final CacheServer server) {
