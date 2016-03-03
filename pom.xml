@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.blazingcache</groupId>
     <artifactId>blazingcache</artifactId>
-    <version>1.5.0</version>
+    <version>1.6.0</version>
     <packaging>pom</packaging>
     <name>BlazingCache</name>
     <url>http://blazingcache.org</url>
