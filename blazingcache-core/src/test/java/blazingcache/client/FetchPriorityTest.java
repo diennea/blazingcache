@@ -25,19 +25,19 @@ import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import org.junit.Test;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /**
  * Test for slow cclients an fetches
  *
  * @author enrico.olivelli
  */
-public class LockOnLostFetchMessageAndSlowClientTest {
+public class FetchPriorityTest {
 
     @Test
     public void basicTest() throws Exception {
@@ -50,82 +50,114 @@ public class LockOnLostFetchMessageAndSlowClientTest {
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
                     CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
                     CacheClient client3 = new CacheClient("theClient3", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                client1.setFetchPriority(1);
+                client2.setFetchPriority(5);
+                client3.setFetchPriority(2);
                 client1.start();
                 client2.start();
                 client3.start();
+
                 assertTrue(client1.waitForConnection(10000));
                 assertTrue(client2.waitForConnection(10000));
                 assertTrue(client3.waitForConnection(10000));
 
-                // client1 will "lose" fetch requests for given key
+                AtomicInteger fetchesServedByClient1 = new AtomicInteger();
+                AtomicInteger fetchesServedByClient2 = new AtomicInteger();
+                AtomicInteger fetchesServedByClient3 = new AtomicInteger();
+
                 client1.setInternalClientListener(new InternalClientListener() {
 
                     @Override
                     public boolean messageReceived(Message message) {
                         if (message.type == Message.TYPE_FETCH_ENTRY) {
-                            String key = (String) message.parameters.get("key");
-                            if (key.equals("lost-fetch")) {
-                                return false;
-                            }
+                            fetchesServedByClient1.incrementAndGet();
                         }
                         return true;
                     }
                 });
 
-                client1.put("lost-fetch", data, 0);
+                client2.setInternalClientListener(new InternalClientListener() {
 
-                CountDownLatch latch_before_2 = new CountDownLatch(1);
-                CountDownLatch latch_2 = new CountDownLatch(1);
-                Thread thread_2 = new Thread(new Runnable() {
                     @Override
-                    public void run() {
-                        try {
-                            latch_before_2.countDown();
-                            CacheEntry remoteLoad = client2.fetch("lost-fetch");
-                            assertTrue(remoteLoad == null);
-                            latch_2.countDown();
-                        } catch (Throwable t) {
-                            t.printStackTrace();
-                            fail(t + "");
+                    public boolean messageReceived(Message message) {
+                        if (message.type == Message.TYPE_FETCH_ENTRY) {
+                            fetchesServedByClient2.incrementAndGet();
                         }
+                        return true;
                     }
                 });
-                thread_2.start();
 
-                // wait to enter the wait
-                assertTrue(latch_before_2.await(10, TimeUnit.SECONDS));
+                client3.setInternalClientListener(new InternalClientListener() {
 
-                // a new client issues the fetch, it MUST wait on the lock on the 'lost-fetch' key
-                CountDownLatch latch_before_3 = new CountDownLatch(1);
-                CountDownLatch latch_3 = new CountDownLatch(1);
-                Thread thread_3 = new Thread(new Runnable() {
                     @Override
-                    public void run() {
-                        try {
-                            latch_before_3.countDown();
-                            CacheEntry remoteLoad = client3.fetch("lost-fetch");
-                            assertTrue(remoteLoad == null);
-                            latch_3.countDown();
-                        } catch (Throwable t) {
-                            t.printStackTrace();
-                            fail(t + "");
+                    public boolean messageReceived(Message message) {
+                        if (message.type == Message.TYPE_FETCH_ENTRY) {
+                            fetchesServedByClient3.incrementAndGet();
                         }
+                        return true;
                     }
                 });
-                thread_3.start();
 
-                // wait to enter the wait
-                assertTrue(latch_before_3.await(10, TimeUnit.SECONDS));
+                assertNull(client1.get("foo"));
+                assertNull(client2.get("foo"));
+                assertNull(client3.get("foo"));
+                client2.put("foo", data, 0);
+                client3.put("foo", data, 0);
+                assertNull(client1.get("foo"));
+                assertNotNull(client2.get("foo"));
+                assertNotNull(client3.get("foo"));
+                client1.fetch("foo");
+                assertEquals(0, fetchesServedByClient1.get());
+                assertEquals(1, fetchesServedByClient2.get());
+                assertEquals(0, fetchesServedByClient3.get());
 
-                // wait to exit the wait
-                assertTrue(latch_2.await(10, TimeUnit.SECONDS));
-                assertTrue(latch_3.await(10, TimeUnit.SECONDS));
+                // change priority and reset, client3 now is the best choice for fetches
+                client3.setFetchPriority(100);
 
-                assertTrue(cacheServer.getLocksManager().getLockedKeys().isEmpty());
+                fetchesServedByClient1.set(0);
+                fetchesServedByClient2.set(0);
+                fetchesServedByClient3.set(0);
+                client1.disconnect();
+                client2.disconnect();
+                client3.disconnect();
+                assertTrue(client1.waitForConnection(10000));
+                assertTrue(client2.waitForConnection(10000));
+                assertTrue(client3.waitForConnection(10000));
 
-                // clean up test
-                thread_2.join();
-                thread_3.join();
+                assertNull(client1.get("foo"));
+                assertNull(client2.get("foo"));
+                assertNull(client3.get("foo"));
+                client2.put("foo", data, 0);
+                client3.put("foo", data, 0);
+                assertNotNull(client1.fetch("foo"));
+                assertEquals(1, fetchesServedByClient3.get());
+                assertEquals(0, fetchesServedByClient2.get());
+                assertEquals(0, fetchesServedByClient1.get());
+
+                // change priority and reset, no client will serve fetches any more
+                client3.setFetchPriority(0);
+                client2.setFetchPriority(0);
+
+                fetchesServedByClient1.set(0);
+                fetchesServedByClient2.set(0);
+                fetchesServedByClient3.set(0);
+                client1.disconnect();
+                client2.disconnect();
+                client3.disconnect();
+                assertTrue(client1.waitForConnection(10000));
+                assertTrue(client2.waitForConnection(10000));
+                assertTrue(client3.waitForConnection(10000));
+
+                assertNull(client1.get("foo"));
+                assertNull(client2.get("foo"));
+                assertNull(client3.get("foo"));
+                client2.put("foo", data, 0);
+                client3.put("foo", data, 0);
+                assertNull(client1.fetch("foo")); // no one can serve fetches!
+                assertEquals(0, fetchesServedByClient3.get());
+                assertEquals(0, fetchesServedByClient2.get());
+                assertEquals(0, fetchesServedByClient1.get());
+
             }
 
         }

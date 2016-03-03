@@ -30,5 +30,7 @@ public interface ConnectionRequestInfo {
     String getClientId();
         
     String getSharedSecret();
+    
+    int getFetchPriority();
 
 }

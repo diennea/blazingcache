@@ -65,6 +65,13 @@ public class ChannelBenchTest {
                     public String getSharedSecret() {
                         return "secret";
                     }
+
+                    @Override
+                    public int getFetchPriority() {
+                        return 10;
+                    }
+                    
+                    
                 });) {
                     for (int i = 0; i < 100; i++) {
                         Message result = client.sendMessageWithReply(Message.ACK("clientId"), 10000);

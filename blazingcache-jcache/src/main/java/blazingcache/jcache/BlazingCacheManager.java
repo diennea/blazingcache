@@ -51,6 +51,7 @@ public class BlazingCacheManager implements CacheManager {
     private final CacheClient client;
     private final CacheServer embeddedServer;
     private final boolean usefetch;
+    private final int fetchPriority;
     private final Serializer<Object, String> keysSerializer;
     private final Serializer<Object, byte[]> valuesSerializer;
     private final Map<String, BlazingCacheCache> caches = new HashMap<>();
@@ -60,6 +61,7 @@ public class BlazingCacheManager implements CacheManager {
             this.provider = provider;
             this.uri = uri;
             this.usefetch = Boolean.parseBoolean(properties.getProperty("blazingcache.usefetch", "true"));
+            this.fetchPriority = Integer.parseInt(properties.getProperty("blazingcache.fetchpriority", "10"));
             this.classLoader = classLoader;
             this.properties = properties;
             String keySerializerClass = properties.getProperty("blazingcache.jcache.keyserializer", "blazingcache.jcache.StandardKeySerializer");
@@ -122,6 +124,7 @@ public class BlazingCacheManager implements CacheManager {
                 client.enableJmx(true);
             }
             client.setMaxMemory(maxmemory);
+            client.setFetchPriority(fetchPriority);
             client.start();
             client.waitForConnection(10000);
 

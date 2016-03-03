@@ -39,6 +39,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
     private static final Logger LOGGER = Logger.getLogger(CacheServerSideConnection.class.getName());
 
     private String clientId;
+    private int fetchPriority;
     private long connectionId;
     private Channel channel;
     private CacheServer server;
@@ -106,6 +107,10 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 LOGGER.log(Level.INFO, "connection request from {0}", message.clientId);
                 String challenge = (String) message.parameters.get("challenge");
                 String ts = (String) message.parameters.get("ts");
+                int fetchPriority = 10;
+                if (message.parameters.containsKey("fetchPriority")) {
+                    fetchPriority = Integer.parseInt(message.parameters.get("fetchPriority") + "");
+                }
                 if (challenge != null && ts != null) {
                     String expectedChallenge = HashUtils.sha1(ts + "#" + server.getSharedSecret());
                     if (!challenge.equals(expectedChallenge)) {
@@ -153,7 +158,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                         return;
                     }
                 }
-
+                this.fetchPriority = fetchPriority;
                 this.clientId = _clientId;
                 server.getAcceptor().connectionAccepted(this);
                 answerConnectionAccepted(message);
@@ -433,6 +438,10 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         if (_channel != null && _channel.isValid()) {
             _channel.channelIdle();
         }
+    }
+
+    public int getFetchPriority() {
+        return fetchPriority;
     }
 
 }

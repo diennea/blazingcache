@@ -80,7 +80,7 @@ public abstract class GenericNettyBrokerLocator implements ServerLocator {
                 throw new ServerNotAvailableException(e);
             }
 
-            Message acceptMessage = Message.CLIENT_CONNECTION_REQUEST(workerInfo.getClientId(), workerInfo.getSharedSecret());
+            Message acceptMessage = Message.CLIENT_CONNECTION_REQUEST(workerInfo.getClientId(), workerInfo.getSharedSecret(),workerInfo.getFetchPriority());
             try {
                 Message connectionResponse = channel.sendMessageWithReply(acceptMessage, 10000);
                 if (connectionResponse.type == Message.TYPE_ACK) {

@@ -40,6 +40,7 @@ public class CacheClientBuilder {
     private long maxMemory = 0;
     private int connectTimeout = 10000;
     private int socketTimeout = 0;
+    private int fetchPriority = 10;
     private ServerLocator locator;
     private String zkConnectString = "localhost:1281";
     private int zkSessionTimeout = 40000;
@@ -73,6 +74,16 @@ public class CacheClientBuilder {
      */
     public CacheClientBuilder clientId(String clientId) {
         this.clientId = clientId;
+        return this;
+    }
+    
+    /**
+     * Assign a priority to be used when a client is to be choosen for serving a remote fetch. Setting fetchPriority to 0 will prevent this client from being asked to serve fetch requests from other clients
+     * @param fetchPriority
+     * @return 
+     */
+    public CacheClientBuilder fetchPriority(int fetchPriority) {
+        this.fetchPriority = fetchPriority;
         return this;
     }
 

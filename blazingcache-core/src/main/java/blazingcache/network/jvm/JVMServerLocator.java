@@ -58,7 +58,7 @@ public class JVMServerLocator implements ServerLocator {
         cacheServer.getAcceptor().createConnection(brokerSide);
         brokerSide.setOtherSide(workerSide);
         workerSide.setOtherSide(brokerSide);
-        Message acceptMessage = Message.CLIENT_CONNECTION_REQUEST(workerInfo.getClientId(), workerInfo.getSharedSecret());
+        Message acceptMessage = Message.CLIENT_CONNECTION_REQUEST(workerInfo.getClientId(), workerInfo.getSharedSecret(),workerInfo.getFetchPriority());
         try {
             Message connectionResponse = workerSide.sendMessageWithReply(acceptMessage, 10000);
             if (connectionResponse.type == Message.TYPE_ACK) {
