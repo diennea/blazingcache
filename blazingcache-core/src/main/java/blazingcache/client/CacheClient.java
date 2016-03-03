@@ -69,6 +69,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private volatile boolean stopped = false;
     private Channel channel;
     private long connectionTimestamp;
+    private int fetchPriority = 10;
 
     private final AtomicLong oldestEvictedKeyAge;
     private final AtomicLong clientPuts;
@@ -101,6 +102,19 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public void setMaxMemory(long maxMemory) {
         this.maxMemory = maxMemory;
+    }
+
+    @Override
+    public int getFetchPriority() {
+        return fetchPriority;
+    }
+
+    /**
+     * Assign a priority to be used when a client is to be choosen for serving a remote fetch. Setting fetchPriority to 0 will prevent this client from being asked to serve fetch requests from other clients
+     * @param fetchPriority 
+     */
+    public void setFetchPriority(int fetchPriority) {
+        this.fetchPriority = fetchPriority;
     }
 
     private final AtomicLong actualMemory = new AtomicLong();

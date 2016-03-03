@@ -71,11 +71,12 @@ public final class Message {
         return new Message(clientId, TYPE_ERROR, params);
     }
 
-    public static Message CLIENT_CONNECTION_REQUEST(String clientId, String secret) {
+    public static Message CLIENT_CONNECTION_REQUEST(String clientId, String secret, int fetchPriority) {
         HashMap<String, Object> data = new HashMap<>();
         String ts = System.currentTimeMillis() + "";
         data.put("ts", ts);
         data.put("challenge", HashUtils.sha1(ts + "#" + secret));
+        data.put("fetchPriority", fetchPriority);
         return new Message(clientId, TYPE_CLIENT_CONNECTION_REQUEST, data);
     }
 

@@ -41,6 +41,8 @@ import blazingcache.server.management.BlazingCacheServerStatusMXBean;
 import blazingcache.server.management.CacheServerStatusMXBean;
 import blazingcache.zookeeper.LeaderShipChangeListener;
 import blazingcache.zookeeper.ZKClusterManager;
+import java.util.ArrayList;
+import java.util.Comparator;
 
 /**
  * The CacheServer core.
@@ -408,30 +410,40 @@ public class CacheServer implements AutoCloseable {
                 return;
             }
 
-            boolean foundOneGoodClientConnected = false;
+            List<CacheServerSideConnection> candidates = new ArrayList<>();
             for (String remoteClientId : clientsForKey) {
                 CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(remoteClientId);
-                if (connection != null) {
-                    UnicastRequestStatus unicastRequestStatus = new UnicastRequestStatus(clientId, remoteClientId, "fetch " + key);
-                    networkRequestsStatusMonitor.register(unicastRequestStatus);
-                    connection.sendFetchKeyMessage(remoteClientId, key, new SimpleCallback<Message>() {
-
-                        @Override
-                        public void onResult(Message result, Throwable error) {
-                            networkRequestsStatusMonitor.unregister(unicastRequestStatus);
-                            LOGGER.log(Level.FINE, "client " + remoteClientId + " answer to fetch :" + result, error);
-                            if (result.type == Message.TYPE_ACK) {
-                                // da questo momento consideriamo che il client abbia la entry in memoria
-                                // anche se di fatto potrebbe succedere che il messaggio di risposta non arrivi mai
-                                long expiretime = (long) result.parameters.get("expiretime");
-                                cacheStatus.registerKeyForClient(key, clientId, expiretime);
-                            }
-                            finishAndReleaseLock.onResult(result, error);
-                        }
-                    });
-                    foundOneGoodClientConnected = true;
-                    break;
+                if (connection != null && connection.getFetchPriority() > 0) {
+                    candidates.add(connection);
                 }
+            }
+            candidates.sort((a, b) -> {
+                return b.getFetchPriority() - a.getFetchPriority();
+            });            
+
+            boolean foundOneGoodClientConnected = false;
+            for (CacheServerSideConnection connection : candidates) {
+                String remoteClientId = connection.getClientId();
+
+                UnicastRequestStatus unicastRequestStatus = new UnicastRequestStatus(clientId, remoteClientId, "fetch " + key);
+                networkRequestsStatusMonitor.register(unicastRequestStatus);
+                connection.sendFetchKeyMessage(remoteClientId, key, new SimpleCallback<Message>() {
+
+                    @Override
+                    public void onResult(Message result, Throwable error) {
+                        networkRequestsStatusMonitor.unregister(unicastRequestStatus);
+                        LOGGER.log(Level.FINE, "client " + remoteClientId + " answer to fetch :" + result, error);
+                        if (result.type == Message.TYPE_ACK) {
+                            // da questo momento consideriamo che il client abbia la entry in memoria
+                            // anche se di fatto potrebbe succedere che il messaggio di risposta non arrivi mai
+                            long expiretime = (long) result.parameters.get("expiretime");
+                            cacheStatus.registerKeyForClient(key, clientId, expiretime);
+                        }
+                        finishAndReleaseLock.onResult(result, error);
+                    }
+                });
+                foundOneGoodClientConnected = true;
+                break;
             }
             if (!foundOneGoodClientConnected) {
                 finishAndReleaseLock.onResult(Message.ERROR(clientId, new Exception("no connected client for key " + key)), null);
@@ -558,7 +570,8 @@ public class CacheServer implements AutoCloseable {
 
     /**
      * Access lowlevel information about pending network requests
-     * @return 
+     *
+     * @return
      */
     public BroadcastRequestStatusMonitor getNetworkRequestsStatusMonitor() {
         return networkRequestsStatusMonitor;
