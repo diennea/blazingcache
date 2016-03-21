@@ -28,6 +28,7 @@ import blazingcache.network.HashUtils;
 import blazingcache.network.Message;
 import blazingcache.network.ReplyCallback;
 import blazingcache.network.ServerSideConnection;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Connection to a node from the server side
@@ -357,11 +358,18 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             invalidation.clientDone(clientId);
             return;
         }
+        long _start = System.currentTimeMillis();
         _channel.sendMessageWithAsyncReply(Message.INVALIDATE(sourceClientId, key), server.getSlowClientTimeout(), new ReplyCallback() {
 
             @Override
             public void replyReceived(Message originalMessage, Message message, Throwable error) {
-                LOGGER.log(Level.FINEST, clientId + " answered to invalidate " + key + ": " + message + ", " + error);
+                if (error != null) {
+                    long _delta = System.currentTimeMillis() - _start;
+                    LOGGER.log(Level.SEVERE, clientId + " not answered in time (elapsed " + _delta + " ms) to invalidation " + key + ": " + message + ", " + error);
+                    error.printStackTrace();
+                } else {
+                    LOGGER.log(Level.FINEST, clientId + " answered to put " + key + ": " + message + ", " + error);
+                }
                 // in ogni caso il client ha finito
                 invalidation.clientDone(clientId);
             }
@@ -375,18 +383,23 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             invalidation.clientDone(clientId);
             return;
         }
+        long _start = System.currentTimeMillis();
         _channel.sendMessageWithAsyncReply(Message.PUT_ENTRY(sourceClientId, key, serializedData, expireTime), server.getSlowClientTimeout(), new ReplyCallback() {
 
             @Override
             public void replyReceived(Message originalMessage, Message message, Throwable error) {
-                LOGGER.log(Level.FINEST, clientId + " answered to put " + key + ": " + message + ", " + error);
                 if (error != null) {
+                    long _delta = System.currentTimeMillis() - _start;
+                    LOGGER.log(Level.SEVERE, clientId + " not answered in time (elapsed " + _delta + " ms) to put " + key + ": " + message + ", " + error);
                     error.printStackTrace();
+                } else {
+                    LOGGER.log(Level.FINEST, clientId + " answered to put " + key + ": " + message + ", " + error);
                 }
                 // in ogni caso il client ha finito
                 invalidation.clientDone(clientId);
             }
         });
+
     }
 
     void sendPrefixInvalidationMessage(String sourceClientId, String prefix, BroadcastRequestStatus invalidation) {
