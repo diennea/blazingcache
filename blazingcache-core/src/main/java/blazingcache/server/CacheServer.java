@@ -75,7 +75,7 @@ public class CacheServer implements AutoCloseable {
     private long clientFetchTimeout = 2000;
 
     public static String VERSION() {
-        return "1.6.1-BETA2";
+        return "1.6.1-BETA3";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
@@ -154,6 +154,7 @@ public class CacheServer implements AutoCloseable {
     }
 
     public void start() throws Exception {
+        JVMServersRegistry.registerServer(serverId, this);
         this.stopped = false;
         if (channelHandlersThreads == 0) {
             this.channelsHandlers = Executors.newCachedThreadPool();
@@ -254,6 +255,7 @@ public class CacheServer implements AutoCloseable {
 
     @Override
     public void close() {
+        JVMServersRegistry.unregisterServer(serverId);
         stopped = true;
         leader = false;
         if (this.server != null) {
@@ -419,7 +421,7 @@ public class CacheServer implements AutoCloseable {
             }
             candidates.sort((a, b) -> {
                 return b.getFetchPriority() - a.getFetchPriority();
-            });            
+            });
 
             boolean foundOneGoodClientConnected = false;
             for (CacheServerSideConnection connection : candidates) {
