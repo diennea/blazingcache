@@ -228,7 +228,12 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     @Override
                     public void onResult(Message result, Throwable error) {
                         server.addPendingOperations(-1);
-                        _channel.sendReplyMessage(message, result);
+                        if (error != null) {
+                            LOGGER.log(Level.SEVERE, "fetch for " + clientId + " key " + key + " failed: " + error);
+                            _channel.sendReplyMessage(message, Message.ERROR(clientId, error));
+                        } else {
+                            _channel.sendReplyMessage(message, result);
+                        }
                     }
                 });
                 break;
@@ -355,6 +360,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         Channel _channel = channel;
         if (_channel == null || !_channel.isValid()) {
             // not connected, quindi cache vuota            
+            LOGGER.log(Level.SEVERE, "client " + clientId + " without channel, considering key " + key + " invalidated");
             invalidation.clientDone(clientId);
             return;
         }
@@ -368,7 +374,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     LOGGER.log(Level.SEVERE, clientId + " not answered in time (elapsed " + _delta + " ms) to invalidation " + key + ": " + message + ", " + error);
                     error.printStackTrace();
                 } else {
-                    LOGGER.log(Level.FINEST, clientId + " answered to put " + key + ": " + message + ", " + error);
+                    LOGGER.log(Level.FINEST, clientId + " answered to invalidation " + key + ": " + message + ", " + error);
                 }
                 // in ogni caso il client ha finito
                 invalidation.clientDone(clientId);

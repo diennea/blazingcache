@@ -20,6 +20,7 @@
 package blazingcache.client;
 
 import blazingcache.client.impl.InternalClientListener;
+import blazingcache.network.Channel;
 import blazingcache.network.Message;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
@@ -68,7 +69,7 @@ public class FetchPriorityTest {
                 client1.setInternalClientListener(new InternalClientListener() {
 
                     @Override
-                    public boolean messageReceived(Message message) {
+                    public boolean messageReceived(Message message, Channel channel) {
                         if (message.type == Message.TYPE_FETCH_ENTRY) {
                             fetchesServedByClient1.incrementAndGet();
                         }
@@ -79,7 +80,7 @@ public class FetchPriorityTest {
                 client2.setInternalClientListener(new InternalClientListener() {
 
                     @Override
-                    public boolean messageReceived(Message message) {
+                    public boolean messageReceived(Message message, Channel channel) {
                         if (message.type == Message.TYPE_FETCH_ENTRY) {
                             fetchesServedByClient2.incrementAndGet();
                         }
@@ -90,7 +91,7 @@ public class FetchPriorityTest {
                 client3.setInternalClientListener(new InternalClientListener() {
 
                     @Override
-                    public boolean messageReceived(Message message) {
+                    public boolean messageReceived(Message message, Channel channel) {
                         if (message.type == Message.TYPE_FETCH_ENTRY) {
                             fetchesServedByClient3.incrementAndGet();
                         }

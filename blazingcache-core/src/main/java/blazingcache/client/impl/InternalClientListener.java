@@ -32,8 +32,11 @@ public interface InternalClientListener {
     public default void onConnection(Channel channel) {
     }
 
-    public default boolean messageReceived(Message message) {
+    public default boolean messageReceived(Message message, Channel channel) {
         return true;
+    }
+
+    public default void onFetchResponse(String key, Message message) {
     }
 
 }

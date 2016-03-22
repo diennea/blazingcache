@@ -75,7 +75,7 @@ public class CacheServer implements AutoCloseable {
     private long clientFetchTimeout = 2000;
 
     public static String VERSION() {
-        return "1.6.1-BETA3";
+        return "1.6.1-BETA4";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
@@ -435,7 +435,7 @@ public class CacheServer implements AutoCloseable {
                     public void onResult(Message result, Throwable error) {
                         networkRequestsStatusMonitor.unregister(unicastRequestStatus);
                         LOGGER.log(Level.FINE, "client " + remoteClientId + " answer to fetch :" + result, error);
-                        if (result.type == Message.TYPE_ACK) {
+                        if (result != null && result.type == Message.TYPE_ACK) {
                             // da questo momento consideriamo che il client abbia la entry in memoria
                             // anche se di fatto potrebbe succedere che il messaggio di risposta non arrivi mai
                             long expiretime = (long) result.parameters.get("expiretime");

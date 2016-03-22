@@ -20,6 +20,7 @@
 package blazingcache.client;
 
 import blazingcache.client.impl.InternalClientListener;
+import blazingcache.network.Channel;
 import blazingcache.network.Message;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
@@ -60,7 +61,7 @@ public class LockOnLostFetchMessageTest {
                 client1.setInternalClientListener(new InternalClientListener() {
 
                     @Override
-                    public boolean messageReceived(Message message) {
+                    public boolean messageReceived(Message message, Channel channel) {
                         if (message.type == Message.TYPE_FETCH_ENTRY) {
                             String key = (String) message.parameters.get("key");
                             if (key.equals("lost-fetch")) {

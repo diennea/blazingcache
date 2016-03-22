@@ -40,10 +40,10 @@ import static org.junit.Assert.fail;
  *
  * @author enrico.olivelli
  */
-public class LostFetchMessageTest {
+public class ErrorOnFetchTest {
 
     @Test
-    public void basicTest() throws Exception {
+    public void errorFromClient() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
 
         ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
@@ -62,10 +62,9 @@ public class LostFetchMessageTest {
                     @Override
                     public boolean messageReceived(Message message, Channel channel) {
                         if (message.type == Message.TYPE_FETCH_ENTRY) {
-                            String key = (String) message.parameters.get("key");
-                            if (key.equals("lost-fetch")) {
-                                return false;
-                            }
+                            channel.sendReplyMessage(message, Message.ERROR(client1.getClientId(), new Exception("mock error")));
+                            return false;
+
                         }
                         return true;
                     }
@@ -73,50 +72,48 @@ public class LostFetchMessageTest {
 
                 client1.put("lost-fetch", data, 0);
 
-                CountDownLatch latch_before = new CountDownLatch(1);
-                CountDownLatch latch = new CountDownLatch(1);
-                Thread thread = new Thread(new Runnable() {
+                CacheEntry remoteLoad = client2.fetch("lost-fetch");
+                assertTrue(remoteLoad == null);
+
+            }
+
+        }
+
+    }
+    
+    
+    @Test
+    public void networkError() throws Exception {
+        byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
+
+        ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
+        try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
+            cacheServer.start();
+            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
+                    CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                client1.start();
+                client2.start();
+                assertTrue(client1.waitForConnection(10000));
+                assertTrue(client2.waitForConnection(10000));
+
+                // client1 will "lose" fetch requests for given key
+                client1.setInternalClientListener(new InternalClientListener() {
+
                     @Override
-                    public void run() {
-                        try {
-                            latch_before.countDown();
-                            CacheEntry remoteLoad = client2.fetch("lost-fetch");
-                            assertTrue(remoteLoad == null);
-                            latch.countDown();
-                        } catch (Throwable t) {
-                            t.printStackTrace();
-                            fail(t + "");
+                    public boolean messageReceived(Message message, Channel channel) {
+                        if (message.type == Message.TYPE_FETCH_ENTRY) {
+                            channel.close();
+                            return false;
                         }
+                        return true;
                     }
                 });
-                thread.start();
 
-                // wait to enter the wait
-                assertTrue(latch_before.await(10, TimeUnit.SECONDS));
+                client1.put("lost-fetch", data, 0);
 
-                // wait for fetches to be issued on network and locks to be held
-                for (int i = 0; i < 100; i++) {
-                    Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get("lost-fetch");
-                    System.out.println("LockedKeys:" + cacheServer.getLocksManager().getLockedKeys());
-                    Thread.sleep(1000);
-                    if (locksCountOnKey != null && locksCountOnKey.intValue() == 1) {
-                        break;
-                    }
-                }
-                Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get("lost-fetch");
-                assertEquals(Integer.valueOf(1), locksCountOnKey);
+                CacheEntry remoteLoad = client2.fetch("lost-fetch");
+                assertTrue(remoteLoad == null);
 
-                // shut down the bad client, the pending fetch will be canceled
-                client1.disconnect();
-
-                // wait to exit the wait
-                assertTrue(latch.await(20, TimeUnit.SECONDS));
-
-                System.out.println("LockedKeys:" + cacheServer.getLocksManager().getLockedKeys());
-                assertTrue(cacheServer.getLocksManager().getLockedKeys().isEmpty());
-
-                // clean up test
-                thread.join();
             }
 
         }
