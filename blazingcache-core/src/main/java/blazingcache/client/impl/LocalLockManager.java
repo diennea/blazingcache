@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,15 +37,15 @@ public class LocalLockManager {
     private static final Logger LOGGER = Logger.getLogger(LocalLockManager.class.getName());
     private static final boolean ENABLE_LOCAL_LOCKS = Boolean.parseBoolean(System.getProperty("blazingcache.client.enablelocallocks", "true"));
 
-    private ReentrantLock makeLock() {
-        return new ReentrantLock();
+    private ReentrantReadWriteLock makeLock() {
+        return new ReentrantReadWriteLock();
     }
     private final ReentrantLock generalLock = new ReentrantLock(true);
-    private final Map<String, ReentrantLock> liveLocks = new HashMap<>();
+    private final Map<String, ReentrantReadWriteLock> liveLocks = new HashMap<>();
     private final Map<String, AtomicInteger> locksCounter = new HashMap<>();
 
-    private ReentrantLock makeLockForKey(String key) {
-        ReentrantLock lock;
+    private ReentrantReadWriteLock makeLockForKey(String key) {
+        ReentrantReadWriteLock lock;
         generalLock.lock();
         try {
             lock = liveLocks.get(key);
@@ -61,8 +62,8 @@ public class LocalLockManager {
         return lock;
     }
 
-    private ReentrantLock returnLockForKey(String key) throws IllegalStateException {
-        ReentrantLock lock;
+    private ReentrantReadWriteLock returnLockForKey(String key) throws IllegalStateException {
+        ReentrantReadWriteLock lock;
         generalLock.lock();
         try {
             lock = liveLocks.get(key);
@@ -81,21 +82,38 @@ public class LocalLockManager {
         return lock;
     }
 
-    public ReentrantLock acquireWriteLockForKey(String key) {
+    public ReentrantReadWriteLock acquireWriteLockForKey(String key) {
         if (!ENABLE_LOCAL_LOCKS) {
             return null;
         }
-        ReentrantLock lock = makeLockForKey(key);
-        lock.lock();
+        ReentrantReadWriteLock lock = makeLockForKey(key);
+        lock.writeLock().lock();
         return lock;
     }
 
-    public void releaseWriteLockForKey(String key, ReentrantLock lockStamp) {
+    public void releaseWriteLockForKey(String key, ReentrantReadWriteLock lockStamp) {
         if (!ENABLE_LOCAL_LOCKS) {
             return;
         }
-        ReentrantLock lock = returnLockForKey(key);
-        lock.unlock();
+        ReentrantReadWriteLock lock = returnLockForKey(key);
+        lock.writeLock().unlock();
+    }
+
+    public ReentrantReadWriteLock acquireReadLockForKey(String key) {
+        if (!ENABLE_LOCAL_LOCKS) {
+            return null;
+        }
+        ReentrantReadWriteLock lock = makeLockForKey(key);
+        lock.readLock().lock();
+        return lock;
+    }
+
+    public void releaseReadLockForKey(String key, ReentrantReadWriteLock lockStamp) {
+        if (!ENABLE_LOCAL_LOCKS) {
+            return;
+        }
+        ReentrantReadWriteLock lock = returnLockForKey(key);
+        lock.readLock().unlock();
     }
 
 }

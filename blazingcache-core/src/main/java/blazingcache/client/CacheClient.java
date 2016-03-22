@@ -49,7 +49,7 @@ import blazingcache.network.ServerRejectedConnectionException;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Client.
@@ -500,7 +500,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             case Message.TYPE_INVALIDATE: {
                 String key = (String) message.parameters.get("key");
                 LOGGER.log(Level.FINEST, clientId + " invalidate " + key + " from " + message.clientId);
-                ReentrantLock locallock = localLocks.acquireWriteLockForKey(key);
+                ReentrantReadWriteLock locallock = localLocks.acquireWriteLockForKey(key);
                 try {
                     CacheEntry removed = cache.remove(key);
                     if (removed != null) {
@@ -534,7 +534,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
             case Message.TYPE_PUT_ENTRY: {
                 String key = (String) message.parameters.get("key");
-                ReentrantLock locallock = localLocks.acquireWriteLockForKey(key);
+                ReentrantReadWriteLock locallock = localLocks.acquireWriteLockForKey(key);
                 try {
                     byte[] data = (byte[]) message.parameters.get("data");
                     long expiretime = (long) message.parameters.get("expiretime");
@@ -556,7 +556,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             break;
             case Message.TYPE_FETCH_ENTRY: {
                 String key = (String) message.parameters.get("key");
-                ReentrantLock locallock = localLocks.acquireWriteLockForKey(key);
+                ReentrantReadWriteLock locallock = localLocks.acquireReadLockForKey(key);
                 try {
                     CacheEntry entry = cache.get(key);
                     LOGGER.log(Level.FINEST, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
@@ -575,7 +575,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                         }
                     }
                 } finally {
-                    localLocks.releaseWriteLockForKey(key, locallock);
+                    localLocks.releaseReadLockForKey(key, locallock);
                 }
             }
             break;
@@ -641,7 +641,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #lock(java.lang.String)
      */
     public CacheEntry fetch(String key, KeyLock lock) throws InterruptedException {
-        ReentrantLock locallock = localLocks.acquireWriteLockForKey(key);
+        ReentrantReadWriteLock locallock = localLocks.acquireWriteLockForKey(key);
         try {
             Channel _channel = channel;
             if (_channel == null) {
@@ -666,8 +666,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 }
                 Message message = _channel.sendMessageWithReply(request_message, invalidateTimeout);
                 LOGGER.log(Level.FINEST, "fetch result " + key + ", answer is " + message);
-                if (internalClientListener != null)  {
-                    internalClientListener.onFetchResponse(key,message);
+                if (internalClientListener != null) {
+                    internalClientListener.onFetchResponse(key, message);
                 }
                 if (message.type == Message.TYPE_ACK) {
                     byte[] data = (byte[]) message.parameters.get("data");
@@ -782,7 +782,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 return;
             }
         }
-        ReentrantLock locallock = localLocks.acquireWriteLockForKey(key);
+        ReentrantReadWriteLock locallock = localLocks.acquireWriteLockForKey(key);
         try {
             // subito rimuoviamo dal locale
             CacheEntry removed = cache.remove(key);
@@ -882,7 +882,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         if (lock != null && !lock.getKey().equals(key)) {
             throw new CacheException("lock " + lock + " is not for key " + key);
         }
-        ReentrantLock locallock = localLocks.acquireWriteLockForKey(key);
+        ReentrantReadWriteLock locallock = localLocks.acquireWriteLockForKey(key);
         try {
             CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime);
             CacheEntry prev = cache.put(key, entry);

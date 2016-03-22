@@ -67,16 +67,18 @@ public class JVMChannel extends Channel {
     }
 
     private void receiveMessageFromPeer(Message message) {
-        message = cloneMessage(message);
-        if (message.getReplyMessageId() != null) {
-            handleReply(message);
+        final Message _message = cloneMessage(message);
+        if (_message.getReplyMessageId() != null) {
+            handleReply(_message);
         } else {
-            try {
-                messagesReceiver.messageReceived(message);
-            } catch (Throwable t) {
-                t.printStackTrace();
-                close();
-            }
+            submitCallback(() -> {
+                try {
+                    messagesReceiver.messageReceived(_message);
+                } catch (Throwable t) {
+                    LOGGER.log(Level.SEVERE, this + ": error " + t, t);
+                    close();
+                }
+            });
         }
     }
 
@@ -95,7 +97,7 @@ public class JVMChannel extends Channel {
         }
         executionserializer.submit(() -> {
             otherSide.receiveMessageFromPeer(_message);
-            sumitCallback(() -> {
+            submitCallback(() -> {
                 callback.messageSent(_message, null);
             });
         });
@@ -110,7 +112,7 @@ public class JVMChannel extends Channel {
             pendingReplyMessages.remove(anwermessage.getReplyMessageId());
             Message original = pendingReplyMessagesSource.remove(anwermessage.getReplyMessageId());
             if (original != null) {
-                sumitCallback(() -> {
+                submitCallback(() -> {
                     callback.replyReceived(original, anwermessage, null);
                 });
             }
@@ -136,7 +138,7 @@ public class JVMChannel extends Channel {
         });
     }
 
-    private void sumitCallback(Runnable r) {
+    private void submitCallback(Runnable r) {
         try {
             callbackexecutor.submit(r);
         } catch (RejectedExecutionException discard) {
@@ -180,7 +182,7 @@ public class JVMChannel extends Channel {
         LOGGER.log(Level.SEVERE, this + ": closing");
         active = false;
         pendingReplyMessages.forEach((key, callback) -> {
-            sumitCallback(() -> {
+            submitCallback(() -> {
                 Message original = pendingReplyMessagesSource.remove(key);
                 if (original != null) {
                     callback.replyReceived(original, null, new Exception("comunication channel closed"));

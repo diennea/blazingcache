@@ -72,12 +72,14 @@ public class NettyChannel extends Channel {
         if (message.getReplyMessageId() != null) {
             handleReply(message);
         } else {
-            try {
-                messagesReceiver.messageReceived(message);
-            } catch (Throwable t) {
-                LOGGER.log(Level.SEVERE, this + ": error " + t, t);
-                close();
-            }
+            submitCallback(() -> {
+                try {
+                    messagesReceiver.messageReceived(message);
+                } catch (Throwable t) {
+                    LOGGER.log(Level.SEVERE, this + ": error " + t, t);
+                    close();
+                }
+            });
         }
     }
 
@@ -100,7 +102,7 @@ public class NettyChannel extends Channel {
         }
         SocketChannel _socket = this.socket;
         if (_socket == null || !_socket.isOpen()) {
-            callback.messageSent(message, new Exception(this+" connection is closed"));
+            callback.messageSent(message, new Exception(this + " connection is closed"));
             return;
         }
         _socket.writeAndFlush(message).addListener(new GenericFutureListener() {
@@ -151,14 +153,14 @@ public class NettyChannel extends Channel {
         if (messagesWithNoReply.isEmpty()) {
             return;
         }
-        LOGGER.log(Level.SEVERE, this+" found " + messagesWithNoReply + " without reply");
+        LOGGER.log(Level.SEVERE, this + " found " + messagesWithNoReply + " without reply");
         for (String messageId : messagesWithNoReply) {
             Message original = pendingReplyMessagesSource.remove(messageId);
             ReplyCallback callback = pendingReplyMessages.remove(messageId);
             pendingReplyMessagesDeadline.remove(messageId);
             if (original != null && callback != null) {
                 submitCallback(() -> {
-                    callback.replyReceived(original, null, new IOException(this+" reply timeout expired"));
+                    callback.replyReceived(original, null, new IOException(this + " reply timeout expired"));
                 });
             }
         };
@@ -171,7 +173,7 @@ public class NettyChannel extends Channel {
         }
         if (!isValid()) {
             submitCallback(() -> {
-                callback.replyReceived(message, null, new Exception(this+" connection is not active"));
+                callback.replyReceived(message, null, new Exception(this + " connection is not active"));
             });
             return;
         }
