@@ -20,7 +20,7 @@
 package blazingcache.client;
 
 import blazingcache.client.impl.InternalClientListener;
-import blazingcache.client.impl.LocalLockManager;
+import blazingcache.client.impl.PendingFetchesManager;
 import blazingcache.client.management.BlazingCacheClientStatisticsMXBean;
 import blazingcache.client.management.BlazingCacheClientStatusMXBean;
 import blazingcache.client.management.CacheClientStatisticsMXBean;
@@ -49,7 +49,6 @@ import blazingcache.network.ServerRejectedConnectionException;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Client.
@@ -83,7 +82,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final AtomicLong clientHits;
     private final AtomicLong clientMissedGetsToSuccessfulFetches;
     private final AtomicLong clientMissedGetsToMissedFetches;
-    private final LocalLockManager localLocks = new LocalLockManager();
 
     /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
@@ -500,18 +498,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             case Message.TYPE_INVALIDATE: {
                 String key = (String) message.parameters.get("key");
                 LOGGER.log(Level.FINEST, clientId + " invalidate " + key + " from " + message.clientId);
-                ReentrantReadWriteLock locallock = localLocks.acquireWriteLockForKey(key);
-                try {
-                    CacheEntry removed = cache.remove(key);
-                    if (removed != null) {
-                        actualMemory.addAndGet(-removed.getSerializedData().length);
-                    }
-                    Channel _channel = channel;
-                    if (_channel != null) {
-                        _channel.sendReplyMessage(message, Message.ACK(clientId));
-                    }
-                } finally {
-                    localLocks.releaseWriteLockForKey(key, locallock);
+                runningFetches.cancelFetchesForKey(key);
+                CacheEntry removed = cache.remove(key);
+                if (removed != null) {
+                    actualMemory.addAndGet(-removed.getSerializedData().length);
+                }
+                Channel _channel = channel;
+                if (_channel != null) {
+                    _channel.sendReplyMessage(message, Message.ACK(clientId));
                 }
             }
             break;
@@ -520,6 +514,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 LOGGER.log(Level.FINEST, "{0} invalidateByPrefix {1} from {2}", new Object[]{clientId, prefix, message.clientId});
                 Collection<String> keys = cache.keySet().stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
                 keys.forEach((key) -> {
+                    runningFetches.cancelFetchesForKey(key);
                     CacheEntry removed = cache.remove(key);
                     if (removed != null) {
                         actualMemory.addAndGet(-removed.getSerializedData().length);
@@ -534,49 +529,42 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
             case Message.TYPE_PUT_ENTRY: {
                 String key = (String) message.parameters.get("key");
-                ReentrantReadWriteLock locallock = localLocks.acquireWriteLockForKey(key);
-                try {
-                    byte[] data = (byte[]) message.parameters.get("data");
-                    long expiretime = (long) message.parameters.get("expiretime");
-                    LOGGER.log(Level.FINEST, "{0} put {1} from {2}", new Object[]{clientId, key, message.clientId});
-                    CacheEntry cacheEntry = new CacheEntry(key, System.nanoTime(), data, expiretime);
-                    CacheEntry previous = cache.put(key, cacheEntry);
-                    if (previous != null) {
-                        actualMemory.addAndGet(-previous.getSerializedData().length);
-                    }
-                    actualMemory.addAndGet(data.length);
-                    Channel _channel = channel;
-                    if (_channel != null) {
-                        _channel.sendReplyMessage(message, Message.ACK(clientId));
-                    }
-                } finally {
-                    localLocks.releaseWriteLockForKey(key, locallock);
+                runningFetches.cancelFetchesForKey(key);
+                byte[] data = (byte[]) message.parameters.get("data");
+                long expiretime = (long) message.parameters.get("expiretime");
+                LOGGER.log(Level.FINEST, "{0} put {1} from {2}", new Object[]{clientId, key, message.clientId});
+                CacheEntry cacheEntry = new CacheEntry(key, System.nanoTime(), data, expiretime);
+                CacheEntry previous = cache.put(key, cacheEntry);
+                if (previous != null) {
+                    actualMemory.addAndGet(-previous.getSerializedData().length);
                 }
+                actualMemory.addAndGet(data.length);
+                Channel _channel = channel;
+                if (_channel != null) {
+                    _channel.sendReplyMessage(message, Message.ACK(clientId));
+                }
+
             }
             break;
             case Message.TYPE_FETCH_ENTRY: {
                 String key = (String) message.parameters.get("key");
-                ReentrantReadWriteLock locallock = localLocks.acquireReadLockForKey(key);
-                try {
-                    CacheEntry entry = cache.get(key);
-                    LOGGER.log(Level.FINEST, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
-                    Channel _channel = channel;
-                    if (_channel != null) {
-                        if (entry != null) {
-                            _channel.sendReplyMessage(message,
-                                    Message.ACK(clientId)
-                                    .setParameter("data", entry.getSerializedData())
-                                    .setParameter("expiretime", entry.getExpiretime())
-                            );
-                        } else {
-                            _channel.sendReplyMessage(message,
-                                    Message.ERROR(clientId, new Exception("entry " + key + " no more here"))
-                            );
-                        }
+                CacheEntry entry = cache.get(key);
+                LOGGER.log(Level.FINEST, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
+                Channel _channel = channel;
+                if (_channel != null) {
+                    if (entry != null) {
+                        _channel.sendReplyMessage(message,
+                                Message.ACK(clientId)
+                                .setParameter("data", entry.getSerializedData())
+                                .setParameter("expiretime", entry.getExpiretime())
+                        );
+                    } else {
+                        _channel.sendReplyMessage(message,
+                                Message.ERROR(clientId, new Exception("entry " + key + " no more here"))
+                        );
                     }
-                } finally {
-                    localLocks.releaseReadLockForKey(key, locallock);
                 }
+
             }
             break;
         }
@@ -629,6 +617,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return fetch(key, null);
     }
 
+    private final PendingFetchesManager runningFetches = new PendingFetchesManager();
+
     /**
      * Returns an entry from the local cache, if not found asks the CacheServer
      * to find the entry on other clients.
@@ -641,51 +631,48 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #lock(java.lang.String)
      */
     public CacheEntry fetch(String key, KeyLock lock) throws InterruptedException {
-        ReentrantReadWriteLock locallock = localLocks.acquireWriteLockForKey(key);
+        long fetchId = runningFetches.registerFetchForKey(key);
+        Channel _channel = channel;
+        if (_channel == null) {
+            LOGGER.log(Level.SEVERE, "fetch failed {0}, not connected", key);
+            return null;
+        }
+        CacheEntry entry = cache.get(key);
+        this.clientFetches.incrementAndGet();
+        if (entry != null) {
+            entry.setLastGetTime(System.nanoTime());
+            this.clientHits.incrementAndGet();
+            return entry;
+        }
         try {
-            Channel _channel = channel;
-            if (_channel == null) {
-                LOGGER.log(Level.SEVERE, "fetch failed {0}, not connected", key);
-                return null;
+            Message request_message = Message.FETCH_ENTRY(clientId, key);
+            if (lock != null) {
+                if (!lock.getKey().equals(key)) {
+                    LOGGER.log(Level.SEVERE, "lock {0} is not for key {1}", new Object[]{lock, key});
+                    return null;
+                }
+                request_message.setParameter("lockId", lock.getLockId());
             }
-            CacheEntry entry = cache.get(key);
-            this.clientFetches.incrementAndGet();
-            if (entry != null) {
-                entry.setLastGetTime(System.nanoTime());
+            Message message = _channel.sendMessageWithReply(request_message, invalidateTimeout);
+            LOGGER.log(Level.FINEST, "fetch result " + key + ", answer is " + message);
+            if (internalClientListener != null) {
+                internalClientListener.onFetchResponse(key, message);
+            }
+            if (message.type == Message.TYPE_ACK && runningFetches.consumeAndValidateFetchForKey(key, fetchId)) {
+                byte[] data = (byte[]) message.parameters.get("data");
+                long expiretime = (long) message.parameters.get("expiretime");
+                entry = new CacheEntry(key, System.nanoTime(), data, expiretime);
+                storeEntry(entry);
+                this.clientMissedGetsToSuccessfulFetches.incrementAndGet();
                 this.clientHits.incrementAndGet();
                 return entry;
             }
-            try {
-                Message request_message = Message.FETCH_ENTRY(clientId, key);
-                if (lock != null) {
-                    if (!lock.getKey().equals(key)) {
-                        LOGGER.log(Level.SEVERE, "lock {0} is not for key {1}", new Object[]{lock, key});
-                        return null;
-                    }
-                    request_message.setParameter("lockId", lock.getLockId());
-                }
-                Message message = _channel.sendMessageWithReply(request_message, invalidateTimeout);
-                LOGGER.log(Level.FINEST, "fetch result " + key + ", answer is " + message);
-                if (internalClientListener != null) {
-                    internalClientListener.onFetchResponse(key, message);
-                }
-                if (message.type == Message.TYPE_ACK) {
-                    byte[] data = (byte[]) message.parameters.get("data");
-                    long expiretime = (long) message.parameters.get("expiretime");
-                    entry = new CacheEntry(key, System.nanoTime(), data, expiretime);
-                    storeEntry(entry);
-                    this.clientMissedGetsToSuccessfulFetches.incrementAndGet();
-                    this.clientHits.incrementAndGet();
-                    return entry;
-                }
-            } catch (TimeoutException err) {
-                LOGGER.log(Level.SEVERE, "fetch failed " + key + ": " + err);
-            }
-            this.clientMissedGetsToMissedFetches.incrementAndGet();
-            return null;
-        } finally {
-            localLocks.releaseWriteLockForKey(key, locallock);
+        } catch (TimeoutException err) {
+            LOGGER.log(Level.SEVERE, "fetch failed " + key + ": " + err);
         }
+        runningFetches.consumeAndValidateFetchForKey(key, fetchId);
+        this.clientMissedGetsToMissedFetches.incrementAndGet();
+        return null;
 
     }
 
@@ -782,39 +769,35 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 return;
             }
         }
-        ReentrantReadWriteLock locallock = localLocks.acquireWriteLockForKey(key);
-        try {
-            // subito rimuoviamo dal locale
-            CacheEntry removed = cache.remove(key);
-            if (removed != null) {
-                actualMemory.addAndGet(-removed.getSerializedData().length);
-            }
 
-            while (!stopped) {
-                Channel _channel = channel;
-                if (_channel == null) {
-                    LOGGER.log(Level.SEVERE, "invalidate " + key + ", not connected");
-                    Thread.sleep(1000);
-                    // if we are disconnected no lock can be valid
-                    lock = null;
-                } else {
-                    try {
-                        Message request = Message.INVALIDATE(clientId, key);
-                        if (lock != null) {
-                            request.setParameter("lockId", lock.getLockId());
-                        }
-                        Message response = _channel.sendMessageWithReply(request, invalidateTimeout);
-                        LOGGER.log(Level.FINEST, "invalidate " + key + ", -> " + response);
-                        this.clientInvalidations.incrementAndGet();
-                        return;
-                    } catch (TimeoutException error) {
-                        LOGGER.log(Level.SEVERE, "invalidate " + key + ", timeout " + error);
-                        Thread.sleep(1000);
+        // subito rimuoviamo dal locale
+        CacheEntry removed = cache.remove(key);
+        if (removed != null) {
+            actualMemory.addAndGet(-removed.getSerializedData().length);
+        }
+
+        while (!stopped) {
+            Channel _channel = channel;
+            if (_channel == null) {
+                LOGGER.log(Level.SEVERE, "invalidate " + key + ", not connected");
+                Thread.sleep(1000);
+                // if we are disconnected no lock can be valid
+                lock = null;
+            } else {
+                try {
+                    Message request = Message.INVALIDATE(clientId, key);
+                    if (lock != null) {
+                        request.setParameter("lockId", lock.getLockId());
                     }
+                    Message response = _channel.sendMessageWithReply(request, invalidateTimeout);
+                    LOGGER.log(Level.FINEST, "invalidate " + key + ", -> " + response);
+                    this.clientInvalidations.incrementAndGet();
+                    return;
+                } catch (TimeoutException error) {
+                    LOGGER.log(Level.SEVERE, "invalidate " + key + ", timeout " + error);
+                    Thread.sleep(1000);
                 }
             }
-        } finally {
-            localLocks.releaseWriteLockForKey(key, locallock);
         }
 
     }
@@ -882,7 +865,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         if (lock != null && !lock.getKey().equals(key)) {
             throw new CacheException("lock " + lock + " is not for key " + key);
         }
-        ReentrantReadWriteLock locallock = localLocks.acquireWriteLockForKey(key);
+
         try {
             CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime);
             CacheEntry prev = cache.put(key, entry);
@@ -911,8 +894,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return true;
         } catch (TimeoutException timedOut) {
             throw new CacheException("error while putting for key " + key + ":" + timedOut, timedOut);
-        } finally {
-            localLocks.releaseWriteLockForKey(key, locallock);
         }
 
     }
