@@ -31,6 +31,16 @@ public final class CacheEntry {
     private final String key;
     private final byte[] serializedData;
     private final long expiretime;
+    private Object reference;
+
+    public CacheEntry(String key, long lastGetTimeNanos, byte[] serializedData, long expiretime, Object reference) {
+        this.key = key;
+        this.lastGetTime = lastGetTimeNanos;
+        this.putTime = lastGetTimeNanos;
+        this.serializedData = serializedData;
+        this.expiretime = expiretime;
+        this.reference = reference;
+    }
 
     public CacheEntry(String key, long lastGetTimeNanos, byte[] serializedData, long expiretime) {
         this.key = key;
@@ -38,6 +48,13 @@ public final class CacheEntry {
         this.putTime = lastGetTimeNanos;
         this.serializedData = serializedData;
         this.expiretime = expiretime;
+    }
+
+    synchronized Object resolveReference(EntrySerializer serializer) throws CacheException {
+        if (reference == null) {
+            reference = serializer.deserializeObject(key, serializedData);
+        }
+        return reference;
     }
 
     public String getKey() {

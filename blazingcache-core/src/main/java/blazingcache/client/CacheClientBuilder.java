@@ -19,6 +19,7 @@
  */
 package blazingcache.client;
 
+import blazingcache.client.impl.JDKEntrySerializer;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.jvm.JVMServerLocator;
@@ -50,6 +51,7 @@ public class CacheClientBuilder {
     private int port = 1025;
     private boolean ssl = false;
     private boolean jmx = false;
+    private EntrySerializer entrySerializer = new JDKEntrySerializer();
 
     public static enum Mode {
         SINGLESERVER,
@@ -76,16 +78,31 @@ public class CacheClientBuilder {
         this.clientId = clientId;
         return this;
     }
-    
+
     /**
-     * Assign a priority to be used when a client is to be choosen for serving a remote fetch. Setting fetchPriority to 0 will prevent this client from being asked to serve fetch requests from other clients
+     * Assign a priority to be used when a client is to be choosen for serving a
+     * remote fetch. Setting fetchPriority to 0 will prevent this client from
+     * being asked to serve fetch requests from other clients
+     *
      * @param fetchPriority
-     * @return 
+     * @return
      */
     public CacheClientBuilder fetchPriority(int fetchPriority) {
         this.fetchPriority = fetchPriority;
         return this;
     }
+    
+    /**
+     * Assign an EntrySerializer to the CacheClient
+     * @param entrySerializer
+     * @return 
+     */
+    public CacheClientBuilder entrySerializer(EntrySerializer entrySerializer) {
+        this.entrySerializer = entrySerializer;
+        return this;
+    }
+    
+    
 
     /**
      * Zookeeper Path for discovery.
