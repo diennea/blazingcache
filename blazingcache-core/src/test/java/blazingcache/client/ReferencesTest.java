@@ -27,6 +27,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Assert;
+import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 
 /**
@@ -36,8 +37,8 @@ import org.junit.Test;
  */
 public class ReferencesTest {
 
-    private static AtomicInteger countObjectWrites = new AtomicInteger();
-    private static AtomicInteger countObjectReads = new AtomicInteger();
+    private static final AtomicInteger countObjectWrites = new AtomicInteger();
+    private static final AtomicInteger countObjectReads = new AtomicInteger();
 
     @Test
     public void basicTest() throws Exception {
@@ -59,19 +60,37 @@ public class ReferencesTest {
 
                 client1.putObject(key, myObject1, -1);
 
+                assertEquals(1, countObjectWrites.get());
+                assertEquals(0, countObjectReads.get());
+
                 MyBean reference_to_object1 = client1.getObject(key);
                 Assert.assertSame(reference_to_object1, myObject1);
+
+                assertEquals(1, countObjectWrites.get());
+                assertEquals(0, countObjectReads.get());
 
                 MyBean other_reference_to_object1 = client1.getObject(key);
                 Assert.assertSame(other_reference_to_object1, myObject1);
 
+                assertEquals(1, countObjectWrites.get());
+                assertEquals(0, countObjectReads.get());
+
                 client2.putObject(key, myObject1, -1);
+                
+                assertEquals(2, countObjectWrites.get());
+                assertEquals(0, countObjectReads.get());
 
                 MyBean reference_to_object1_changed = client1.fetchObject(key);
                 Assert.assertNotSame(reference_to_object1_changed, myObject1);
+                
+                assertEquals(2, countObjectWrites.get());
+                assertEquals(1, countObjectReads.get());
 
                 MyBean reference_to_object1_changed_2 = client1.fetchObject(key);
                 Assert.assertSame(reference_to_object1_changed, reference_to_object1_changed_2);
+                
+                assertEquals(2, countObjectWrites.get());
+                assertEquals(1, countObjectReads.get());                                
 
             }
 
