@@ -20,6 +20,7 @@
 package blazingcache.client;
 
 import blazingcache.client.impl.InternalClientListener;
+import blazingcache.client.impl.JDKEntrySerializer;
 import blazingcache.client.impl.PendingFetchesManager;
 import blazingcache.client.management.BlazingCacheClientStatisticsMXBean;
 import blazingcache.client.management.BlazingCacheClientStatusMXBean;
@@ -66,6 +67,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final String sharedSecret;
     private final CacheClientStatisticsMXBean statisticsMXBean;
     private final CacheClientStatusMXBean statusMXBean;
+    private EntrySerializer entrySerializer = new JDKEntrySerializer();
 
     private volatile boolean stopped = false;
     private Channel channel;
@@ -119,6 +121,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public void setFetchPriority(int fetchPriority) {
         this.fetchPriority = fetchPriority;
+    }
+
+    public EntrySerializer getEntrySerializer() {
+        return entrySerializer;
+    }
+
+    public void setEntrySerializer(EntrySerializer entrySerializer) {
+        this.entrySerializer = entrySerializer;
     }
 
     private final AtomicLong actualMemory = new AtomicLong();
@@ -606,12 +616,17 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Returns an entry from the local cache, if not found asks to the
-     * CacheServer to find the entry on other clients.
+     * CacheServer to find the entry on other clients. If you need to get the
+     * local 'reference' to the object you can use the {@link #fetchObject(java.lang.String)
+     * } function
      *
      * @param key
      * @return
      * @throws InterruptedException
      * @see #get(java.lang.String)
+     * @see #fetch(java.lang.String, blazingcache.client.KeyLock)
+     * @see #getObject(blazingcache.client.CacheEntry)
+     * @see #fetchObject(java.lang.String)
      */
     public CacheEntry fetch(String key) throws InterruptedException {
         return fetch(key, null);
@@ -621,14 +636,18 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Returns an entry from the local cache, if not found asks the CacheServer
-     * to find the entry on other clients.
+     * to find the entry on other clients. If you need to get the local
+     * 'reference' to the object you can use the {@link #fetchObject(java.lang.String, blazingcache.client.KeyLock) )
+     * } function
      *
      * @param key
-     * @param lock previouly acquired lock
+     * @param lock previouly acquired lock with {@link #lock(java.lang.String) }
      * @return
      * @throws InterruptedException
      * @see #get(java.lang.String)
      * @see #lock(java.lang.String)
+     * @see #getObject(blazingcache.client.CacheEntry)
+     * @see #fetchObject(java.lang.String)
      */
     public CacheEntry fetch(String key, KeyLock lock) throws InterruptedException {
         long fetchId = runningFetches.registerFetchForKey(key);
@@ -729,11 +748,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Returns an entry from the local cache. No network operations will be
-     * executed
+     * executed. If you need to get the local 'reference' to the object you can
+     * use the {@link #getObject(blazingcache.client.CacheEntry) } function
      *
      * @param key
      * @return
      * @see #fetch(java.lang.String)
+     * @see #getObject(blazingcache.client.CacheEntry)
      */
     public CacheEntry get(String key) {
         if (channel == null) {
@@ -856,7 +877,65 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return put(key, data, expireTime, null);
     }
 
+    /**
+     * Put an entry on the local cache. This method will also notify of the
+     * change to all other clients which hold the same entry locally.
+     *
+     * @param key
+     * @param data
+     * @param expireTime This is the UNIX timestamp at which the entry should be
+     * invalidated automatically. Use 0 in order to create an immortal entry
+     * @param lock This is a lock previously acquired using the {@link #lock(java.lang.String)
+     * } function
+     * @return
+     * @throws InterruptedException
+     * @throws CacheException
+     * @see #touchEntry(java.lang.String, long)
+     * @see #lock(java.lang.String)
+     */
     public boolean put(String key, byte[] data, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
+        return put(key, data, null, expireTime, lock);
+    }
+
+    /**
+     * Same as {@link #put(java.lang.String, byte[], long) } but the provided
+     * Object will be serialized using the {@link EntrySerializer}
+     *
+     * @param key
+     * @param object
+     * @param expireTime
+     * @return
+     * @throws InterruptedException
+     * @throws CacheException
+     * @see #getObject(blazingcache.client.CacheEntry)
+     * @see EntrySerializer
+     */
+    public boolean putObject(String key, Object object, long expireTime) throws InterruptedException, CacheException {
+        byte[] data = entrySerializer.serializeObject(key, object);
+        return put(key, data, object, expireTime, null);
+    }
+
+    /**
+     * Same as {@link #put(java.lang.String, byte[], long, blazingcache.client.KeyLock)
+     * } but the provided Object will be serialized using the
+     * {@link EntrySerializer}
+     *
+     * @param key
+     * @param object
+     * @param expireTime
+     * @param lock
+     * @return
+     * @throws InterruptedException
+     * @throws CacheException
+     * @see #getObject(blazingcache.client.CacheEntry)
+     * @see EntrySerializer
+     */
+    public boolean putObject(String key, Object object, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
+        byte[] data = entrySerializer.serializeObject(key, object);
+        return put(key, data, object, expireTime, lock);
+    }
+
+    private boolean put(String key, byte[] data, Object reference, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
         Channel _chanel = channel;
         if (_chanel == null) {
             LOGGER.log(Level.SEVERE, "cache put failed " + key + ", not connected");
@@ -867,7 +946,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
 
         try {
-            CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime);
+            CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime, reference);
             CacheEntry prev = cache.put(key, entry);
             if (prev != null) {
                 actualMemory.addAndGet(-prev.getSerializedData().length);
@@ -1047,6 +1126,62 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public CacheClientStatisticsMXBean getStatistics() {
         return statisticsMXBean;
+    }
+
+    /**
+     * Same as {@link #get(java.lang.String) }, but returns a deserialized
+     * version of the Object stored on the entry. The deserialized Object will
+     * be retained togheter with the Entry and client code MUST not change its
+     * fields/status
+     *
+     * @param key
+     * @return
+     * @throws CacheException
+     * @see #get(java.lang.String)
+     */
+    public <T> T getObject(String key) throws CacheException {
+        return resolveObject(get(key));
+    }
+
+    /**
+     * Same as {@link #fetch(java.lang.String) }, but returns a deserialized
+     * version of the Object stored on the entry. The deserialized Object will
+     * be retained togheter with the Entry and client code MUST not change its
+     * fields/status
+     *
+     * @param key
+     * @return
+     * @throws CacheException
+     * @throws InterruptedException
+     * @see #fetch(java.lang.String)
+     */
+    public <T> T fetchObject(String key) throws CacheException, InterruptedException {
+        return resolveObject(fetch(key));
+    }
+
+    /**
+     * Same as {@link #fetch(java.lang.String, blazingcache.client.KeyLock) },
+     * but returns a deserialized version of the Object stored on the entry. The
+     * deserialized Object will be retained togheter with the Entry and client
+     * code MUST not change its fields/status
+     *
+     * @param <T>
+     * @param key
+     * @param lock
+     * @return
+     * @throws CacheException
+     * @throws InterruptedException
+     * @see #fetch(java.lang.String)
+     */
+    public <T> T fetchObject(String key, KeyLock lock) throws CacheException, InterruptedException {
+        return resolveObject(fetch(key, lock));
+    }
+
+    private <T> T resolveObject(CacheEntry entry) throws CacheException {
+        if (entry == null) {
+            return null;
+        }
+        return (T) entry.resolveReference(entrySerializer);
     }
 
 }
