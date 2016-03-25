@@ -75,7 +75,7 @@ public class CacheServer implements AutoCloseable {
     private long clientFetchTimeout = 2000;
 
     public static String VERSION() {
-        return "1.7.0-SNAPSHOT";
+        return "1.7.0-ALPHA1";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
