@@ -55,14 +55,15 @@ public class NettyChannel extends Channel {
     private final ExecutorService callbackexecutor;
     private final NettyConnector connector;
     private boolean ioErrors = false;
-    private final long id = idGenerator.incrementAndGet();
+    private final long id = idGenerator.incrementAndGet();    
 
     @Override
     public String toString() {
-        return "NettyChannel{id=" + id + ", socket=" + socket + " pending " + pendingReplyMessages.size() + " msgs}";
+        return "NettyChannel{name=" + name + ", id=" + id + ", socket=" + socket + " pending " + pendingReplyMessages.size() + " msgs}";
     }
 
-    public NettyChannel(SocketChannel socket, ExecutorService callbackexecutor, NettyConnector connector) {
+    public NettyChannel(String name, SocketChannel socket, ExecutorService callbackexecutor, NettyConnector connector) {
+        this.name = name;
         this.socket = socket;
         this.callbackexecutor = callbackexecutor;
         this.connector = connector;
@@ -263,6 +264,14 @@ public class NettyChannel extends Channel {
     public void channelIdle() {
         LOGGER.log(Level.FINEST, "{0} channelIdle", this);
         processPendingReplyMessagesDeadline();
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
 }

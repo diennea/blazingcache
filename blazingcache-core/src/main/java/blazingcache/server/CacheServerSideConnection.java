@@ -161,6 +161,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 }
                 this.fetchPriority = fetchPriority;
                 this.clientId = _clientId;
+                _channel.setName(clientId);
                 server.getAcceptor().connectionAccepted(this);
                 answerConnectionAccepted(message);
                 this.server.addConnectedClients(1);
