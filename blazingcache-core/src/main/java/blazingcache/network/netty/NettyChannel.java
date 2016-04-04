@@ -55,7 +55,7 @@ public class NettyChannel extends Channel {
     private final ExecutorService callbackexecutor;
     private final NettyConnector connector;
     private boolean ioErrors = false;
-    private final long id = idGenerator.incrementAndGet();    
+    private final long id = idGenerator.incrementAndGet();
 
     @Override
     public String toString() {
@@ -154,17 +154,19 @@ public class NettyChannel extends Channel {
         if (messagesWithNoReply.isEmpty()) {
             return;
         }
-        LOGGER.log(Level.SEVERE, this + " found " + messagesWithNoReply + " without reply");
+        LOGGER.log(Level.SEVERE, this + " found " + messagesWithNoReply + " without reply, channel will be closed");
+        ioErrors = true;
         for (String messageId : messagesWithNoReply) {
             Message original = pendingReplyMessagesSource.remove(messageId);
             ReplyCallback callback = pendingReplyMessages.remove(messageId);
             pendingReplyMessagesDeadline.remove(messageId);
             if (original != null && callback != null) {
                 submitCallback(() -> {
-                    callback.replyReceived(original, null, new IOException(this + " reply timeout expired"));
+                    callback.replyReceived(original, null, new IOException(this + " reply timeout expired, channel will be closed"));
                 });
             }
-        };
+        }
+        close();
     }
 
     @Override
