@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package blazingcache;
+package blazingcache.server;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -24,6 +24,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import blazingcache.ZKTestEnv;
 import blazingcache.client.CacheClient;
 import blazingcache.network.ServerHostData;
 import blazingcache.server.CacheServer;

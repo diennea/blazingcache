@@ -72,6 +72,7 @@ public class ZKClusterManager implements AutoCloseable {
                     onSessionExpired();
                     break;
                 case SyncConnected:
+                    LOGGER.log(Level.SEVERE, "ZK Session connected. " + zk + "session id: " + zk.getSessionId() + "; session password: " + arraytohexstring(zk.getSessionPasswd()));
                     firstConnectionLatch.countDown();
                     break;
             }
@@ -358,6 +359,15 @@ public class ZKClusterManager implements AutoCloseable {
             } catch (InterruptedException ignore) {
             }
         }
+    }
+
+    private String arraytohexstring(byte[] bytes) {
+        StringBuilder string = new StringBuilder();
+        for (byte b : bytes) {
+            String hexString = Integer.toHexString(0x00FF & b);
+            string.append(hexString.length() == 1 ? "0" + hexString : hexString);
+        }
+        return string.toString();
     }
 
 }

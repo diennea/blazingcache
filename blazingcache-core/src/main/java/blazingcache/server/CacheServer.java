@@ -579,7 +579,7 @@ public class CacheServer implements AutoCloseable {
      *
      * @return the ZooKeeper client exploited by this CacheServer is clustering mode is on, null otherwise
      */
-    public ZooKeeper getZooKeeper() {
+     ZooKeeper getZooKeeper() {
         if (this.clusterManager != null) {
             return this.clusterManager.getZooKeeper();
         } else {
