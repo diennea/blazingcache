@@ -149,9 +149,9 @@ public class CacheServer implements AutoCloseable {
 
     }
 
-    public void setupCluster(String zkAddress, int zkTimeout, boolean recoverExpiredSession, String basePath, ServerHostData localhostdata) throws Exception {
+    public void setupCluster(String zkAddress, int zkTimeout, String basePath, ServerHostData localhostdata) throws Exception {
         leader = false;
-        clusterManager = new ZKClusterManager(zkAddress, zkTimeout, recoverExpiredSession, basePath, new LeaderShipChangeListenerImpl(), ServerHostData.formatHostdata(localhostdata));
+        clusterManager = new ZKClusterManager(zkAddress, zkTimeout, basePath, new LeaderShipChangeListenerImpl(), ServerHostData.formatHostdata(localhostdata));
         clusterManager.start();
         clusterManager.requestLeadership();
     }

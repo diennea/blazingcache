@@ -83,7 +83,6 @@ public class ZKClusterManager implements AutoCloseable {
     private final String leaderpath;
     private final String discoverypath;
     private final int connectionTimeout;
-    private final boolean recoverExpiredSession;
     private final String zkAddress;
     private final int zkTimeout;
 
@@ -98,7 +97,7 @@ public class ZKClusterManager implements AutoCloseable {
      * @param localhostdata
      * @throws Exception
      */
-    public ZKClusterManager(String zkAddress, int zkTimeout, boolean recoverExpiredSession, String basePath,
+    public ZKClusterManager(String zkAddress, int zkTimeout, String basePath,
             LeaderShipChangeListener listener, byte[] localhostdata) throws Exception {
         this.zk = new ZooKeeper(zkAddress, zkTimeout, new SystemWatcher());
         this.zkAddress = zkAddress;
@@ -109,7 +108,6 @@ public class ZKClusterManager implements AutoCloseable {
         this.leaderpath = basePath + "/leader";
         this.discoverypath = basePath + "/discoverypath";
         this.connectionTimeout = zkTimeout;
-        this.recoverExpiredSession = recoverExpiredSession;
     }
 
     /**
@@ -297,17 +295,13 @@ public class ZKClusterManager implements AutoCloseable {
         // close expired session first
         this.stopZK();
 
-        if (this.recoverExpiredSession) {
-            LOGGER.log(Level.SEVERE, "ZK session expired. trying to recover session");
-            try {
-                this.restartZK();
-                this.registerZKNodes();
-                this.requestLeadership();
-            } catch (Exception ex) {
-                LOGGER.log(Level.SEVERE, "Cannot create a new zookeeper client on session recovery");
-            }
-        } else {
-            LOGGER.log(Level.SEVERE, "ZooKeeper session expired: won't be recovered");
+        LOGGER.log(Level.SEVERE, "ZK session expired. trying to recover session");
+        try {
+            this.restartZK();
+            this.registerZKNodes();
+            this.requestLeadership();
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, "Cannot create a new zookeeper client on session recovery");
         }
     }
 

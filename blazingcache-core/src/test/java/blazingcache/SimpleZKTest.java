@@ -44,7 +44,7 @@ public class SimpleZKTest {
         ServerHostData hostData = new ServerHostData("localhost", 1234, "ciao", false, null);
         try (ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
                 CacheServer cacheServer = new CacheServer("ciao", hostData)) {
-            cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.isRecoverExpiredSession(), zkEnv.getPath(), hostData);
+            cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData);
             cacheServer.start();
 
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
@@ -77,7 +77,7 @@ public class SimpleZKTest {
         ServerHostData hostData = new ServerHostData("localhost", 1234, "ciao", false, null);
         try (ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
                 CacheServer cacheServer = new CacheServer("ciao", hostData)) {
-            cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.isRecoverExpiredSession(), zkEnv.getPath(), hostData);
+            cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData);
             cacheServer.start();
 
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
@@ -142,7 +142,7 @@ public class SimpleZKTest {
                 CacheServer cacheServer = new CacheServer("ciao", leaderHostdata);
                 CacheServer cacheServerBk = new CacheServer("ciao", backupHostdata)) {
 
-            cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.isRecoverExpiredSession(),
+            cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(),
                     zkEnv.getPath(), leaderHostdata);
             cacheServer.start();
             waitForCondition(() -> {
@@ -150,7 +150,7 @@ public class SimpleZKTest {
             }, 100);
 
             //start backupcluster: we are sure this is in backup mode
-            cacheServerBk.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.isRecoverExpiredSession(),
+            cacheServerBk.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(),
                     zkEnv.getPath(), backupHostdata);
             cacheServerBk.start();
 
