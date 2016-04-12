@@ -19,10 +19,12 @@
  */
 package blazingcache.zookeeper;
 
+import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -35,7 +37,7 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 /**
- * Cluster Management
+ * Cluster Management.
  *
  * @author enrico.olivelli
  */
@@ -43,7 +45,7 @@ public class ZKClusterManager implements AutoCloseable {
 
     private static final Logger LOGGER = Logger.getLogger(ZKClusterManager.class.getName());
 
-    private final ZooKeeper zk;
+    private ZooKeeper zk;
     private final LeaderShipChangeListener listener;
 
     public ZooKeeper getZooKeeper() {
@@ -75,22 +77,45 @@ public class ZKClusterManager implements AutoCloseable {
             }
         }
     }
+
     private final String basePath;
     private final byte[] localhostdata;
     private final String leaderpath;
     private final String discoverypath;
     private final int connectionTimeout;
+    private final boolean recoverExpiredSession;
+    private final String zkAddress;
+    private final int zkTimeout;
 
-    public ZKClusterManager(String zkAddress, int zkTimeout, String basePath, LeaderShipChangeListener listener, byte[] localhostdata) throws Exception {
+    /**
+     * Creates a new ZooKeeper-based cluster manager.
+     *
+     * @param zkAddress
+     * @param zkTimeout
+     * @param recoverExpiredSession
+     * @param basePath
+     * @param listener
+     * @param localhostdata
+     * @throws Exception
+     */
+    public ZKClusterManager(String zkAddress, int zkTimeout, boolean recoverExpiredSession, String basePath,
+            LeaderShipChangeListener listener, byte[] localhostdata) throws Exception {
         this.zk = new ZooKeeper(zkAddress, zkTimeout, new SystemWatcher());
+        this.zkAddress = zkAddress;
+        this.zkTimeout = zkTimeout;
         this.basePath = basePath;
         this.listener = listener;
         this.localhostdata = localhostdata;
         this.leaderpath = basePath + "/leader";
         this.discoverypath = basePath + "/discoverypath";
         this.connectionTimeout = zkTimeout;
+        this.recoverExpiredSession = recoverExpiredSession;
     }
 
+    /**
+     *
+     * @throws Exception in case of issue on starting the cluster manager
+     */
     public void start() throws Exception {
         try {
             if (this.zk.exists(basePath, false) == null) {
@@ -117,18 +142,31 @@ public class ZKClusterManager implements AutoCloseable {
         }
     }
 
-    private static enum MasterStates {
+    /**
+     *
+     * @author enrico.olivelli
+     *
+     */
+    private enum MasterStates {
 
         ELECTED,
         NOTELECTED,
         RUNNING
     }
+
     private MasterStates state = MasterStates.NOTELECTED;
 
+    /**
+     *
+     * @return leader's state
+     */
     public MasterStates getState() {
         return state;
     }
 
+    /**
+     *
+     */
     AsyncCallback.DataCallback masterCheckBallback = new AsyncCallback.DataCallback() {
 
         @Override
@@ -144,19 +182,29 @@ public class ZKClusterManager implements AutoCloseable {
         }
     };
 
+    /**
+     *
+     */
     private void checkMaster() {
         zk.getData(leaderpath, false, masterCheckBallback, null);
     }
 
+    /**
+     *
+     */
     private final Watcher masterExistsWatcher = new Watcher() {
 
         @Override
-        public void process(WatchedEvent we) {
+        public void process(final WatchedEvent we) {
             if (we.getType() == EventType.NodeDeleted) {
                 requestLeadership();
             }
         }
     };
+
+    /**
+     *
+     */
     AsyncCallback.StatCallback masterExistsCallback = new AsyncCallback.StatCallback() {
 
         @Override
@@ -177,14 +225,25 @@ public class ZKClusterManager implements AutoCloseable {
         }
     };
 
+    /**
+     *
+     */
     private void masterExists() {
         zk.exists(leaderpath, masterExistsWatcher, masterExistsCallback, null);
     }
 
+    /**
+     *
+     */
     private void takeLeaderShip() {
         listener.leadershipAcquired();
     }
 
+    /**
+     *
+     * @return leader's data
+     * @throws Exception 
+     */
     public byte[] getActualMaster() throws Exception {
         try {
             return zk.getData(leaderpath, false, new Stat());
@@ -193,6 +252,9 @@ public class ZKClusterManager implements AutoCloseable {
         }
     }
 
+    /**
+     *
+     */
     private final AsyncCallback.StringCallback masterCreateCallback = new AsyncCallback.StringCallback() {
 
         @Override
@@ -220,14 +282,79 @@ public class ZKClusterManager implements AutoCloseable {
 
     };
 
+    /**
+     *
+     */
     private void onSessionExpired() {
         listener.leadershipLost();
+        handleExpiredSession();
     }
 
+    /**
+    * Handle session expiration.
+    */
+    private void handleExpiredSession() {
+        // close expired session first
+        this.stopZK();
+
+        if (this.recoverExpiredSession) {
+            LOGGER.log(Level.SEVERE, "ZK session expired. trying to recover session");
+            try {
+                this.restartZK();
+                this.registerZKNodes();
+                this.requestLeadership();
+            } catch (Exception ex) {
+                LOGGER.log(Level.SEVERE, "Cannot create a new zookeeper client on session recovery");
+            }
+        } else {
+            LOGGER.log(Level.SEVERE, "ZooKeeper session expired: won't be recovered");
+        }
+    }
+
+    /**
+     * register back brokers ephemeral nodes after session recovery.
+     *
+     * @throws Exception in case node creation ends up with issues
+     */
+    private void registerZKNodes() throws Exception {
+        final String completeDiscoveryPath = discoverypath + "/brokers";
+        String newPath = zk.create(completeDiscoveryPath, localhostdata, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        LOGGER.log(Level.SEVERE, "my own discoverypath path is " + newPath);
+    }
+
+   /**
+   *
+   * Actually creates the ZooKeeper session.
+   *
+   * @throws IOException in case of network issues to connect to ZooKeeper
+   * service
+   */
+  public final void restartZK() throws IOException {
+      LOGGER.log(Level.SEVERE, "Restarting ZooKeeper client after session expired");
+      this.zk = new ZooKeeper(this.zkAddress, this.zkTimeout, new SystemWatcher());
+  }
+
+    /**
+     * Utility method used to stop an existing ZooKeeper.
+     */
+    private void stopZK() {
+        try {
+            this.zk.close();
+        } catch (InterruptedException e) {
+            LOGGER.log(Level.SEVERE, "Impossible to stop ZooKeeper on expired session", e);
+        }
+  }
+
+    /**
+     * Let cache server compete for cluster leadership.
+     */
     public void requestLeadership() {
         zk.create(leaderpath, localhostdata, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, masterCreateCallback, null);
     }
 
+    /**
+     *
+     */
     @Override
     public void close() {
         listener.leadershipLost();

@@ -20,6 +20,7 @@
 package blazingcache.server;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +34,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.zookeeper.ZooKeeper;
+
 import blazingcache.management.JMXUtils;
 import blazingcache.network.Message;
 import blazingcache.network.ServerHostData;
@@ -41,8 +44,6 @@ import blazingcache.server.management.BlazingCacheServerStatusMXBean;
 import blazingcache.server.management.CacheServerStatusMXBean;
 import blazingcache.zookeeper.LeaderShipChangeListener;
 import blazingcache.zookeeper.ZKClusterManager;
-import java.util.ArrayList;
-import java.util.Comparator;
 
 /**
  * The CacheServer core.
@@ -75,7 +76,7 @@ public class CacheServer implements AutoCloseable {
     private long clientFetchTimeout = 2000;
 
     public static String VERSION() {
-        return "1.7.0-ALPHA3";
+        return "1.7.0-ALPHA4";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
@@ -136,6 +137,8 @@ public class CacheServer implements AutoCloseable {
         public void leadershipLost() {
             leader = false;
             CacheServer.this.stateChangeTimestamp = System.currentTimeMillis();
+            //close currently active client connections
+            acceptor.closeAllClientConnections();
         }
 
         @Override
@@ -146,9 +149,9 @@ public class CacheServer implements AutoCloseable {
 
     }
 
-    public void setupCluster(String zkAddress, int zkTimeout, String basePath, ServerHostData localhostdata) throws Exception {
+    public void setupCluster(String zkAddress, int zkTimeout, boolean recoverExpiredSession, String basePath, ServerHostData localhostdata) throws Exception {
         leader = false;
-        clusterManager = new ZKClusterManager(zkAddress, zkTimeout, basePath, new LeaderShipChangeListenerImpl(), ServerHostData.formatHostdata(localhostdata));
+        clusterManager = new ZKClusterManager(zkAddress, zkTimeout, recoverExpiredSession, basePath, new LeaderShipChangeListenerImpl(), ServerHostData.formatHostdata(localhostdata));
         clusterManager.start();
         clusterManager.requestLeadership();
     }
@@ -571,6 +574,20 @@ public class CacheServer implements AutoCloseable {
     }
 
     /**
+     * This method should be used only for debug purposes. Return ZooKeeper client if
+     * clustering mode (ZooKeeper-based) is on.
+     *
+     * @return the ZooKeeper client exploited by this CacheServer is clustering mode is on, null otherwise
+     */
+    public ZooKeeper getZooKeeper() {
+        if (this.clusterManager != null) {
+            return this.clusterManager.getZooKeeper();
+        } else {
+            return null;
+        }
+    }
+
+    /**
      * Access lowlevel information about pending network requests
      *
      * @return
@@ -578,5 +595,4 @@ public class CacheServer implements AutoCloseable {
     public BroadcastRequestStatusMonitor getNetworkRequestsStatusMonitor() {
         return networkRequestsStatusMonitor;
     }
-
 }

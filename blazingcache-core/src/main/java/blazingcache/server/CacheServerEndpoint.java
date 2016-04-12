@@ -67,6 +67,11 @@ public class CacheServerEndpoint implements ServerSideConnectionAcceptor<CacheSe
         return clientConnections.get(workerId);
     }
 
+    public void closeAllClientConnections() {
+        final List<CacheServerSideConnection> currentClientConnections = new ArrayList<>(this.getClientConnections().values());
+        currentClientConnections.forEach(connection -> connection.close());
+    }
+
     void connectionAccepted(CacheServerSideConnection con) {
         LOGGER.log(Level.SEVERE, "connectionAccepted {0}", con);
         clientConnections.put(con.getClientId(), con);

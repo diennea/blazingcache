@@ -10,9 +10,16 @@ public class ZKTestEnv implements AutoCloseable {
 
     Path path;
 
-    public ZKTestEnv(Path path) throws Exception {
+    final boolean recoverExpiredSession;
+
+    public ZKTestEnv(final Path path) throws Exception {
+        this(path, true);
+    }
+
+    public ZKTestEnv(final Path path, final boolean recoverExpiredSession) throws Exception {
         zkServer = new TestingServer(-1, path.toFile(), true);
         this.path = path;
+        this.recoverExpiredSession = recoverExpiredSession;
     }
 
     public String getAddress() {
@@ -35,6 +42,10 @@ public class ZKTestEnv implements AutoCloseable {
             }
         } catch (Throwable t) {
         }
+    }
+
+    public boolean isRecoverExpiredSession() {
+        return recoverExpiredSession;
     }
 
 }
