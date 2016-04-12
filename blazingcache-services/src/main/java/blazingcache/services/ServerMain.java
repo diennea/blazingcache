@@ -169,8 +169,7 @@ public class ServerMain implements AutoCloseable {
                 String zkAddress = configuration.getProperty("zk.address", "localhost:1281");
                 int zkSessionTimeout = Integer.parseInt(configuration.getProperty("zk.sessiontimeout", "40000"));
                 String zkPath = configuration.getProperty("zk.path", "/blazingcache");
-                boolean recoverExpiredSession = Boolean.parseBoolean(configuration.getProperty("zk.recoversession", "true"));
-                cacheServer.setupCluster(zkAddress, zkSessionTimeout, recoverExpiredSession, zkPath, data);
+                cacheServer.setupCluster(zkAddress, zkSessionTimeout, zkPath, data);
                 break;
             }
             default:

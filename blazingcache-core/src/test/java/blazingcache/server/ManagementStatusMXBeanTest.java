@@ -106,17 +106,15 @@ public final class ManagementStatusMXBeanTest {
             final ObjectName statusS1BeanName = new ObjectName(MessageFormat.format(STATUS_MBEAN_PATTERN, server1.getServerId()));
             final ObjectName statusS2BeanName = new ObjectName(MessageFormat.format(STATUS_MBEAN_PATTERN, server2.getServerId()));
 
-            
             server1.enableJmx(true);
             long state1ChangeTS = (Long) JMXUtils.getMBeanServer().getAttribute(statusS1BeanName, "StateChangeTimestamp");
             assertEquals(0, state1ChangeTS);
-            server1.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.isRecoverExpiredSession(), zkEnv.getPath(), hostData1);
+            server1.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData1);
 
-            
             server2.enableJmx(true);
             long state2ChangeTS = (Long) JMXUtils.getMBeanServer().getAttribute(statusS2BeanName, "StateChangeTimestamp");
             assertEquals(0, state2ChangeTS);
-            server2.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.isRecoverExpiredSession(), zkEnv.getPath(), hostData2);
+            server2.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData2);
 
             // start server1
             server1.start();
