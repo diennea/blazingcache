@@ -45,6 +45,7 @@ import java.util.logging.Logger;
  */
 public class NettyChannel extends Channel {
 
+    private static final boolean DISCONNECT_ON_PENDING_REPLY_TIMEOUT = Boolean.getBoolean("blazingcache.nettychannel.disconnectonpendingreplytimeout");
     volatile SocketChannel socket;
     private static final Logger LOGGER = Logger.getLogger(NettyChannel.class.getName());
     private static final AtomicLong idGenerator = new AtomicLong();
@@ -154,19 +155,25 @@ public class NettyChannel extends Channel {
         if (messagesWithNoReply.isEmpty()) {
             return;
         }
-        LOGGER.log(Level.SEVERE, this + " found " + messagesWithNoReply + " without reply, channel will be closed");
-        ioErrors = true;
+        if (DISCONNECT_ON_PENDING_REPLY_TIMEOUT) {
+            LOGGER.log(Level.SEVERE, this + " found " + messagesWithNoReply.size() + " without reply, channel will be closed");
+            ioErrors = true;
+        } else {
+            LOGGER.log(Level.SEVERE, this + " found " + messagesWithNoReply.size() + " without reply");
+        }
         for (String messageId : messagesWithNoReply) {
             Message original = pendingReplyMessagesSource.remove(messageId);
             ReplyCallback callback = pendingReplyMessages.remove(messageId);
             pendingReplyMessagesDeadline.remove(messageId);
             if (original != null && callback != null) {
                 submitCallback(() -> {
-                    callback.replyReceived(original, null, new IOException(this + " reply timeout expired, channel will be closed"));
+                    callback.replyReceived(original, null, new IOException(this + " reply timeout expired"));
                 });
             }
         }
-        close();
+        if (DISCONNECT_ON_PENDING_REPLY_TIMEOUT) {
+            close();
+        }
     }
 
     @Override
