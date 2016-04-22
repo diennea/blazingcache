@@ -40,7 +40,7 @@ import static org.junit.Assert.fail;
  *
  * @author enrico.olivelli
  */
-public class LostFetchMessageTest {
+public class LostFetchMessageAutoCloseClientTest {
 
     @Test
     public void basicTest() throws Exception {
@@ -111,8 +111,8 @@ public class LostFetchMessageTest {
                 Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get("lost-fetch");
                 assertEquals(Integer.valueOf(1), locksCountOnKey);
 
-                // shut down the bad client, the pending fetch will be canceled
-                client1.disconnect();
+                // do shut down the bad client here, the pending fetch will be canceled on reply timeout
+//                client1.disconnect();
 
                 // wait to exit the wait
                 assertTrue(latch.await(20, TimeUnit.SECONDS));

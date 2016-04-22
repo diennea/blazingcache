@@ -222,7 +222,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public boolean waitForConnection(int timeout) throws InterruptedException {
         long time = System.currentTimeMillis();
         while (System.currentTimeMillis() - time <= timeout) {
-            if (channel != null) {
+            Channel _channel = channel;
+            if (_channel != null && _channel.isValid()) {
                 return true;
             }
             Thread.sleep(100);
