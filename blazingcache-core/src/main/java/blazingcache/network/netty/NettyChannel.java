@@ -57,6 +57,7 @@ public class NettyChannel extends Channel {
     private final NettyConnector connector;
     private boolean ioErrors = false;
     private final long id = idGenerator.incrementAndGet();
+    private final boolean disconnectOnReplyTimeout;
 
     @Override
     public String toString() {
@@ -68,6 +69,7 @@ public class NettyChannel extends Channel {
         this.socket = socket;
         this.callbackexecutor = callbackexecutor;
         this.connector = connector;
+        this.disconnectOnReplyTimeout = (connector == null); // only server-side
     }
 
     public void messageReceived(Message message) {
@@ -155,7 +157,7 @@ public class NettyChannel extends Channel {
         if (messagesWithNoReply.isEmpty()) {
             return;
         }
-        if (DISCONNECT_ON_PENDING_REPLY_TIMEOUT) {
+        if (DISCONNECT_ON_PENDING_REPLY_TIMEOUT && disconnectOnReplyTimeout) {
             LOGGER.log(Level.SEVERE, this + " found " + messagesWithNoReply.size() + " without reply, channel will be closed");
             ioErrors = true;
         } else {
@@ -171,7 +173,7 @@ public class NettyChannel extends Channel {
                 });
             }
         }
-        if (DISCONNECT_ON_PENDING_REPLY_TIMEOUT) {
+        if (DISCONNECT_ON_PENDING_REPLY_TIMEOUT && disconnectOnReplyTimeout) {
             close();
         }
     }

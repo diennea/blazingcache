@@ -124,13 +124,13 @@ public class JVMChannel extends Channel {
         message.setMessageId(UUID.randomUUID().toString());
         Message _message = cloneMessage(message);
         if (executionserializer.isShutdown()) {
-            System.out.println("[JVM] channel shutdown, discarding reply message " + _message);
+            LOGGER.log(Level.SEVERE,"channel shutdown, discarding reply message " + _message);
             return;
         }
         executionserializer.submit(() -> {
 //        System.out.println("[JVM] sendReplyMessage inAnswerTo=" + inAnswerTo.getMessageId() + " newmessage=" + message);
             if (!active) {
-                System.out.println("[JVM] channel not active, discarding reply message " + _message);
+                LOGGER.log(Level.SEVERE,"channel not active, discarding reply message " + _message);
                 return;
             }
             _message.setReplyMessageId(inAnswerTo.messageId);
@@ -150,7 +150,7 @@ public class JVMChannel extends Channel {
         message.setMessageId(UUID.randomUUID().toString());
         Message _message = cloneMessage(message);
         if (executionserializer.isShutdown()) {
-            System.out.println("[JVM] channel shutdown, discarding sendMessageWithAsyncReply");
+            LOGGER.log(Level.SEVERE,"[JVM] channel shutdown, discarding sendMessageWithAsyncReply");
             return;
         }
         executionserializer.submit(() -> {

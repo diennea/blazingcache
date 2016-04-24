@@ -78,16 +78,23 @@ public class ReferencesTest {
                 client2.putObject(key, myObject1, -1);
                 
                 assertEquals(2, countObjectWrites.get());
-                assertEquals(0, countObjectReads.get());
-
+                assertEquals(0, countObjectReads.get());                
                 MyBean reference_to_object1_changed = client1.fetchObject(key);
+                System.out.println("qui "+reference_to_object1_changed);
                 Assert.assertNotSame(reference_to_object1_changed, myObject1);
                 
                 assertEquals(2, countObjectWrites.get());
                 assertEquals(1, countObjectReads.get());
 
+                System.out.println("qua");
                 MyBean reference_to_object1_changed_2 = client1.fetchObject(key);
                 Assert.assertSame(reference_to_object1_changed, reference_to_object1_changed_2);
+                
+                assertEquals(2, countObjectWrites.get());
+                assertEquals(1, countObjectReads.get());                                
+                
+                MyBean reference_to_object1_changed_3 = client1.fetchObject(key);
+                Assert.assertSame(reference_to_object1_changed, reference_to_object1_changed_3);
                 
                 assertEquals(2, countObjectWrites.get());
                 assertEquals(1, countObjectReads.get());                                

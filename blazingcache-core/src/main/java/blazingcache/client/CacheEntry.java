@@ -19,6 +19,8 @@
  */
 package blazingcache.client;
 
+import java.lang.ref.SoftReference;
+
 /**
  * Una entry nella cache
  *
@@ -31,15 +33,15 @@ public final class CacheEntry {
     private final String key;
     private final byte[] serializedData;
     private final long expiretime;
-    private Object reference;
+    private SoftReference<Object> reference;
 
-    public CacheEntry(String key, long lastGetTimeNanos, byte[] serializedData, long expiretime, Object reference) {
+    public CacheEntry(String key, long lastGetTimeNanos, byte[] serializedData, long expiretime, Object deserialized) {
         this.key = key;
         this.lastGetTime = lastGetTimeNanos;
         this.putTime = lastGetTimeNanos;
         this.serializedData = serializedData;
         this.expiretime = expiretime;
-        this.reference = reference;
+        this.reference = deserialized != null ? new SoftReference<>(deserialized) : null;
     }
 
     public CacheEntry(String key, long lastGetTimeNanos, byte[] serializedData, long expiretime) {
@@ -51,10 +53,12 @@ public final class CacheEntry {
     }
 
     synchronized Object resolveReference(EntrySerializer serializer) throws CacheException {
-        if (reference == null) {
-            reference = serializer.deserializeObject(key, serializedData);
+        Object resolved = reference != null ? reference.get() : null;
+        if (resolved == null) {
+            resolved = serializer.deserializeObject(key, serializedData);
+            reference = new SoftReference<>(resolved);
         }
-        return reference;
+        return resolved;
     }
 
     public String getKey() {
