@@ -26,7 +26,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.ObjectStreamClass;
 
 /**
  * Standard serializer which uses standard Java serialization
@@ -52,13 +51,7 @@ public class JDKEntrySerializer implements EntrySerializer {
     public Object deserializeObject(String key, byte[] value) throws CacheException {
         try {
             ByteArrayInputStream oo = new ByteArrayInputStream(value);
-            ObjectInputStream oo2 = new ObjectInputStream(oo) {
-                @Override
-                protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
-                    // always use the contextclassloader
-                    return Thread.currentThread().getContextClassLoader().loadClass(desc.getName());
-                }
-            };
+            ObjectInputStream oo2 = new ObjectInputStream(oo);
             return oo2.readUnshared();
         } catch (IOException | SecurityException | ClassNotFoundException err) {
             throw new CacheException(err);
