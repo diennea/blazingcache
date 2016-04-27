@@ -585,6 +585,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public void channelClosed() {
         LOGGER.log(Level.SEVERE, "channel closed, clearing nearcache");
         cache.clear();
+        runningFetches.clear();
         actualMemory.set(0);
     }
 
@@ -651,7 +652,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #fetchObject(java.lang.String)
      */
     public CacheEntry fetch(String key, KeyLock lock) throws InterruptedException {
-        long fetchId = runningFetches.registerFetchForKey(key);
         Channel _channel = channel;
         if (_channel == null) {
             LOGGER.log(Level.SEVERE, "fetch failed {0}, not connected", key);
@@ -664,6 +664,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             this.clientHits.incrementAndGet();
             return entry;
         }
+        long fetchId = runningFetches.registerFetchForKey(key);
+        boolean fetchConsumed = false;
         try {
             Message request_message = Message.FETCH_ENTRY(clientId, key);
             if (lock != null) {
@@ -678,7 +680,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (internalClientListener != null) {
                 internalClientListener.onFetchResponse(key, message);
             }
-            if (message.type == Message.TYPE_ACK && runningFetches.consumeAndValidateFetchForKey(key, fetchId)) {
+            boolean fetchStillValid = runningFetches.consumeAndValidateFetchForKey(key, fetchId);
+            fetchConsumed = true;
+            if (message.type == Message.TYPE_ACK && fetchStillValid) {
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
                 entry = new CacheEntry(key, System.nanoTime(), data, expiretime);
@@ -689,11 +693,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
         } catch (TimeoutException err) {
             LOGGER.log(Level.SEVERE, "fetch failed " + key + ": " + err);
+        } finally {
+            if (!fetchConsumed) {
+                runningFetches.consumeAndValidateFetchForKey(key, fetchId);
+            }
         }
-        runningFetches.consumeAndValidateFetchForKey(key, fetchId);
         this.clientMissedGetsToMissedFetches.incrementAndGet();
         return null;
-
     }
 
     private void storeEntry(CacheEntry entry) {
