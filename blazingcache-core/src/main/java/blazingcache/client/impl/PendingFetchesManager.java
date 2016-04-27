@@ -72,4 +72,14 @@ public class PendingFetchesManager {
         }
 
     }
+
+    public void clear() {
+        lock.lock();
+        try {
+            pendingFetchesByKey.clear();
+        } finally {
+            lock.unlock();
+        }
+    }
+
 }
