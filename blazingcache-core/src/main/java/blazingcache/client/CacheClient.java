@@ -806,7 +806,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
         while (!stopped) {
             Channel _channel = channel;
-            if (_channel == null) {
+            if (_channel == null || !_channel.isValid()) {
                 LOGGER.log(Level.SEVERE, "invalidate " + key + ", not connected");
                 Thread.sleep(1000);
                 // if we are disconnected no lock can be valid
@@ -821,7 +821,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     LOGGER.log(Level.FINEST, "invalidate " + key + ", -> " + response);
                     this.clientInvalidations.incrementAndGet();
                     return;
-                } catch (TimeoutException error) {
+                } catch (InterruptedException error) {
+                    LOGGER.log(Level.SEVERE, "invalidate " + key + ", interrupted, " + error);
+                    throw error;
+                } catch (Exception error) {
                     LOGGER.log(Level.SEVERE, "invalidate " + key + ", timeout " + error);
                     Thread.sleep(1000);
                 }
