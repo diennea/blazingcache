@@ -627,7 +627,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @throws InterruptedException
      * @see #get(java.lang.String)
      * @see #fetch(java.lang.String, blazingcache.client.KeyLock)
-     * @see #getObject(blazingcache.client.CacheEntry)
+     * @see #getObject(java.lang.String)
      * @see #fetchObject(java.lang.String)
      */
     public CacheEntry fetch(String key) throws InterruptedException {
@@ -648,7 +648,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @throws InterruptedException
      * @see #get(java.lang.String)
      * @see #lock(java.lang.String)
-     * @see #getObject(blazingcache.client.CacheEntry)
+     * @see #getObject(java.lang.String)
      * @see #fetchObject(java.lang.String)
      */
     public CacheEntry fetch(String key, KeyLock lock) throws InterruptedException {
@@ -756,12 +756,12 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     /**
      * Returns an entry from the local cache. No network operations will be
      * executed. If you need to get the local 'reference' to the object you can
-     * use the {@link #getObject(blazingcache.client.CacheEntry) } function
+     * use the {@link #getObject(java.lang.String) } function
      *
      * @param key
      * @return
      * @see #fetch(java.lang.String)
-     * @see #getObject(blazingcache.client.CacheEntry)
+     * @see #getObject(java.lang.String) 
      */
     public CacheEntry get(String key) {
         if (channel == null) {
@@ -917,7 +917,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @return
      * @throws InterruptedException
      * @throws CacheException
-     * @see #getObject(blazingcache.client.CacheEntry)
+     * @see #getObject(java.lang.String) 
      * @see EntrySerializer
      */
     public boolean putObject(String key, Object object, long expireTime) throws InterruptedException, CacheException {
@@ -937,7 +937,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @return
      * @throws InterruptedException
      * @throws CacheException
-     * @see #getObject(blazingcache.client.CacheEntry)
+     * @see #getObject(java.lang.String) 
      * @see EntrySerializer
      */
     public boolean putObject(String key, Object object, long expireTime, KeyLock lock) throws InterruptedException, CacheException {

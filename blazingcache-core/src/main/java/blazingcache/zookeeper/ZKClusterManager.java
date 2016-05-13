@@ -91,8 +91,7 @@ public class ZKClusterManager implements AutoCloseable {
      * Creates a new ZooKeeper-based cluster manager.
      *
      * @param zkAddress
-     * @param zkTimeout
-     * @param recoverExpiredSession
+     * @param zkTimeout     
      * @param basePath
      * @param listener
      * @param localhostdata
