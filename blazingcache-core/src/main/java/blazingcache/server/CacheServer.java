@@ -74,9 +74,10 @@ public class CacheServer implements AutoCloseable {
     private long stateChangeTimestamp;
     private long slowClientTimeout = 120000;
     private long clientFetchTimeout = 2000;
+    private final long lastStartupTimestamp = System.currentTimeMillis();
 
     public static String VERSION() {
-        return "1.8.0";
+        return "1.9.0-SNAPSHOT";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
@@ -517,6 +518,10 @@ public class CacheServer implements AutoCloseable {
         return this.stateChangeTimestamp;
     }
 
+    public long getLastStartupTimestamp() {
+        return lastStartupTimestamp;
+    }
+
     public int getGlobalCacheSize() {
         return this.cacheStatus.getTotalEntryCount();
     }
@@ -574,12 +579,13 @@ public class CacheServer implements AutoCloseable {
     }
 
     /**
-     * This method should be used only for debug purposes. Return ZooKeeper client if
-     * clustering mode (ZooKeeper-based) is on.
+     * This method should be used only for debug purposes. Return ZooKeeper
+     * client if clustering mode (ZooKeeper-based) is on.
      *
-     * @return the ZooKeeper client exploited by this CacheServer is clustering mode is on, null otherwise
+     * @return the ZooKeeper client exploited by this CacheServer is clustering
+     * mode is on, null otherwise
      */
-     ZooKeeper getZooKeeper() {
+    ZooKeeper getZooKeeper() {
         if (this.clusterManager != null) {
             return this.clusterManager.getZooKeeper();
         } else {
