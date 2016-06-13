@@ -66,6 +66,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     private final MutableConfiguration<K, V> configuration;
     private final CacheManager cacheManager;
     private volatile boolean closed;
+    private final boolean storeByReference;
 
     private final CacheLoader<K, V> cacheLoader;
     private final CacheWriter<K, V> cacheWriter;
@@ -90,6 +91,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         this.usefetch = usefetch;
         this.configurationMXBean = new BlazingCacheConfigurationMXBean<>(this);
         this.statisticsMXBean = new BlazingCacheStatisticsMXBean<>(this);
+        this.storeByReference = !configuration.isStoreByValue();
         if (configuration instanceof CompleteConfiguration) {
             this.configuration = new MutableConfiguration<>((CompleteConfiguration<K, V>) configuration);
             CompleteConfiguration<K, V> cc = (CompleteConfiguration<K, V>) configuration;
@@ -171,7 +173,13 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     }
 
     private V getNoFetch(String serializedKey) {
-
+        if (storeByReference) {
+            try {
+                return (V) client.getObject(serializedKey);
+            } catch (CacheException error) {
+                throw new javax.cache.CacheException(error);
+            }
+        }
         CacheEntry result = client.get(serializedKey);
         if (result != null) {
             return (V) valuesSerializer.deserialize(result.getSerializedData());
@@ -243,19 +251,34 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         checkClosed();
         String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
         try {
-            CacheEntry result;
-            if (usefetch) {
-                result = client.fetch(serializedKey, lock);
+            V resultObject = null;
+            boolean hit = false;
+            if (storeByReference) {
+                if (usefetch) {
+                    resultObject = client.fetchObject(serializedKey, lock);
+                } else {
+                    resultObject = client.getObject(serializedKey);
+                }
+                hit = resultObject != null;
             } else {
-                result = client.get(serializedKey);
+                CacheEntry result;
+                if (usefetch) {
+                    result = client.fetch(serializedKey, lock);
+                } else {
+                    result = client.get(serializedKey);
+                }
+                if (result != null) {
+                    hit = true;
+                    resultObject = (V) valuesSerializer.deserialize(result.getSerializedData());
+                }
             }
-            if (result != null) {
+            if (hit) {
                 boolean validAfterAccess = !checkExpiryAccess || handleEntryAccessed(serializedKey, lock);
                 if (!validAfterAccess) {
                     client.invalidate(serializedKey, lock);
                 }
                 cacheHits.incrementAndGet();
-                return (V) valuesSerializer.deserialize(result.getSerializedData());
+                return resultObject;
             }
             if (allowLoader && cacheLoader != null && isReadThrough) {
                 V loaded;
@@ -267,7 +290,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 if (loaded != null) {
                     long createdExpireTime = getCreatedExpireTime();
                     if (createdExpireTime != 0) {
-                        client.put(serializedKey, valuesSerializer.serialize(loaded), nowPlusDuration(createdExpireTime),lock);
+                        long expireTs = nowPlusDuration(createdExpireTime);
+                        _put(serializedKey, loaded, expireTs, lock);
                     }
                     fireEntryCreated(key, loaded);
                     cacheHits.incrementAndGet();
@@ -305,14 +329,31 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
                 String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
                 V r = null;
-                CacheEntry result;
-                if (usefetch) {
-                    result = client.fetch(serializedKey);
+                boolean hit = false;
+                V resultObject = null;
+                if (storeByReference) {
+                    if (usefetch) {
+                        resultObject = client.fetchObject(serializedKey);
+                    } else {
+                        resultObject = client.getObject(serializedKey);
+                    }
+                    if (resultObject != null) {
+                        hit = true;
+                    }
                 } else {
-                    result = client.get(serializedKey);
+                    CacheEntry result;
+                    if (usefetch) {
+                        result = client.fetch(serializedKey);
+                    } else {
+                        result = client.get(serializedKey);
+                    }
+                    if (result != null) {
+                        hit = true;
+                        resultObject = (V) valuesSerializer.deserialize(result.getSerializedData());
+                    }
                 }
-                if (result != null) {
-                    r = (V) valuesSerializer.deserialize(result.getSerializedData());
+                if (hit) {
+                    r = resultObject;
                 } else if (cacheLoader != null && isReadThrough) {
                     keysToLoad.add(key);
                 }
@@ -339,7 +380,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                         String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
                         long createdExpireTime = getCreatedExpireTime();
                         if (createdExpireTime != 0) {
-                            client.put(serializedKey, valuesSerializer.serialize(loaded), nowPlusDuration(createdExpireTime));
+                            long expireTs = nowPlusDuration(createdExpireTime);
+                            _put(serializedKey, loaded, expireTs, null);
                         }
 
                         fireEntryCreated(key, loaded);
@@ -371,6 +413,14 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
     private boolean _containsKey(String serializedKey) {
         return client.get(serializedKey) != null;
+    }
+
+    private void _put(String serializedKey, V value, long expireTs, KeyLock lock) throws InterruptedException, CacheException {
+        if (storeByReference) {
+            client.putObject(serializedKey, value, expireTs, lock);
+        } else {
+            client.put(serializedKey, valuesSerializer.serialize(value), expireTs, lock);
+        }
     }
 
     @Override
@@ -424,13 +474,15 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                                 if (actual == null) {
                                     long createdExpireTime = getCreatedExpireTime();
                                     if (createdExpireTime != 0) {
-                                        client.put(serializedKey, valuesSerializer.serialize(value), nowPlusDuration(createdExpireTime));
+                                        long expireTs = nowPlusDuration(createdExpireTime);
+                                        _put(serializedKey, value, expireTs, null);
                                         fireEntryCreated(key, value);
                                     }
                                 } else {
                                     long updatedExpireTime = getUpdatedExpireTime();
                                     if (updatedExpireTime != 0) {
-                                        client.put(serializedKey, valuesSerializer.serialize(value), nowPlusDuration(updatedExpireTime));
+                                        long expireTs = nowPlusDuration(nowPlusDuration(updatedExpireTime));
+                                        _put(serializedKey, value, expireTs, null);
                                         fireEntryUpdated(key, actual, value);
                                     } else {
                                         client.invalidate(serializedKey);
@@ -439,7 +491,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                             } else {
                                 long createdExpireTime = getCreatedExpireTime();
                                 if (createdExpireTime != 0) {
-                                    client.put(serializedKey, valuesSerializer.serialize(value), nowPlusDuration(createdExpireTime));
+                                    long expireTs = nowPlusDuration(createdExpireTime);
+                                    _put(serializedKey, value, expireTs, null);
                                 }
                             }
                         }
@@ -499,7 +552,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
             long updatedExpireTime = getUpdatedExpireTime();
             if (updatedExpireTime != 0) {
-                client.put(serializedKey, valuesSerializer.serialize(value), nowPlusDuration(updatedExpireTime), lock);
+                long expireTs = nowPlusDuration(updatedExpireTime);
+                _put(serializedKey, value, expireTs, lock);
             } else {
                 client.invalidate(serializedKey, lock);
             }
@@ -538,7 +592,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 cacheMisses.incrementAndGet();
                 long createdExpireTime = getCreatedExpireTime();
                 if (createdExpireTime != 0) {
-                    client.put(serializedKey, valuesSerializer.serialize(value), nowPlusDuration(createdExpireTime), lock);
+                    long expireTs = nowPlusDuration(createdExpireTime);
+                    _put(serializedKey, value, expireTs, lock);
                     cachePuts.incrementAndGet();
                     fireEntryCreated(key, value);
                 }
@@ -546,7 +601,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 cacheHits.incrementAndGet();
                 long updatedExpireTime = getUpdatedExpireTime();
                 if (updatedExpireTime != 0) {
-                    client.put(serializedKey, valuesSerializer.serialize(value), nowPlusDuration(updatedExpireTime), lock);
+                    long expireTs = nowPlusDuration(updatedExpireTime);
+                    _put(serializedKey, value, expireTs, lock);
                     cachePuts.incrementAndGet();
                     fireEntryUpdated(key, actual, value);
                 } else {
@@ -607,14 +663,16 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     if (previousForListener == null) {
                         long createdExpireTime = getCreatedExpireTime();
                         if (createdExpireTime != 0) {
-                            client.put(serializedKey, valuesSerializer.serialize(value), nowPlusDuration(createdExpireTime));
+                            long expireTs = nowPlusDuration(createdExpireTime);
+                            _put(serializedKey, value, expireTs, null);
                             fireEntryCreated(key, value);
                             cachePuts.incrementAndGet();
                         }
                     } else {
                         long updatedExpireTime = getUpdatedExpireTime();
                         if (updatedExpireTime != 0) {
-                            client.put(serializedKey, valuesSerializer.serialize(value), nowPlusDuration(updatedExpireTime));
+                            long expireTs = nowPlusDuration(updatedExpireTime);
+                            _put(serializedKey, value, expireTs, null);
                             fireEntryUpdated(key, previousForListener, value);
                             cachePuts.incrementAndGet();
                         } else {
@@ -625,7 +683,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     long createdExpireTime = getCreatedExpireTime();
                     if (createdExpireTime != 0) {
                         String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
-                        client.put(serializedKey, valuesSerializer.serialize(value), nowPlusDuration(createdExpireTime));
+                        long expireTs = nowPlusDuration(createdExpireTime);
+                        _put(serializedKey, value, expireTs, null);
                         cachePuts.incrementAndGet();
                     }
                 }

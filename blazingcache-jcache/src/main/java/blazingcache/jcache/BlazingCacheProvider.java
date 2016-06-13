@@ -195,6 +195,10 @@ public class BlazingCacheProvider implements CachingProvider {
 
     @Override
     public boolean isSupported(OptionalFeature optionalFeature) {
+        switch (optionalFeature) {
+            case STORE_BY_REFERENCE:
+                return true;
+        }
         return false;
     }
 
