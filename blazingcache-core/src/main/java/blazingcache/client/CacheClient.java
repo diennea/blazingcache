@@ -451,7 +451,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             CountDownLatch count = new CountDownLatch(evictable.size());
             for (final CacheEntry entry : evictable) {
                 final String key = entry.getKey();
-                LOGGER.log(Level.SEVERE, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{key, entry.getSerializedData().length, entry.getLastGetTime()});
+                LOGGER.log(Level.FINEST, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{key, entry.getSerializedData().length, entry.getLastGetTime()});
 
                 final CacheEntry removed = cache.remove(key);
                 if (removed != null) {
