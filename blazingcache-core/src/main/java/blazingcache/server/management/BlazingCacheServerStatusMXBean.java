@@ -34,9 +34,7 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
     /**
      * Builds a new MXBean to publish server status on JMX.
      *
-     * @param server
-     *            the {@link CacheServer} instance this
-     *            MXBean refers to
+     * @param server the {@link CacheServer} instance this MXBean refers to
      */
     public BlazingCacheServerStatusMXBean(final CacheServer server) {
         this.server = server;
@@ -45,6 +43,7 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
     /**
      * {@inheritDoc}
      */
+    @Override
     public long getCurrentTimestamp() {
         return this.server.getCurrentTimestamp();
     }
@@ -52,6 +51,7 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isLeader() {
         return this.server.isLeader();
     }
@@ -59,6 +59,7 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
     /**
      * {@inheritDoc}
      */
+    @Override
     public long getStateChangeTimestamp() {
         return this.server.getStateChangeTimestamp();
     }
@@ -66,6 +67,7 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getGlobalCacheSize() {
         return this.server.getGlobalCacheSize();
     }
@@ -73,6 +75,7 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getConnectedClients() {
         return this.server.getNumberOfConnectedClients();
     }
@@ -80,6 +83,7 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getLockedEntries() {
         return this.server.getNumberOfLockedKeys();
     }
@@ -87,8 +91,17 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
     /**
      * {@inheritDoc}
      */
+    @Override
     public long getPendingOperations() {
         return this.server.getPendingOperations();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public long getLastStartupTimestamp() {
+        return server.getLastStartupTimestamp();
     }
 
 }

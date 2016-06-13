@@ -82,5 +82,11 @@ public interface CacheServerStatusMXBean {
      * @return the number of pending operations
      */
     long getPendingOperations();
+    
+    /**
+     * Instant of time (unix epoch) when the server started
+     * @return 
+     */
+    long getLastStartupTimestamp();
 
 }

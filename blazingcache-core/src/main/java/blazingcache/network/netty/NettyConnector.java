@@ -34,6 +34,7 @@ import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -111,7 +112,6 @@ public class NettyConnector implements AutoCloseable {
         b.group(group)
                 .channel(NioSocketChannel.class)
                 .option(ChannelOption.TCP_NODELAY, true)
-                .option(ChannelOption.SO_TIMEOUT, socketTimeout)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeout)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
@@ -120,6 +120,9 @@ public class NettyConnector implements AutoCloseable {
                         channel.setMessagesReceiver(receiver);
                         if (ssl) {
                             ch.pipeline().addLast(sslCtx.newHandler(ch.alloc(), host, port));
+                        }
+                        if (socketTimeout > 0) {
+                            ch.pipeline().addLast("readTimeoutHandler", new ReadTimeoutHandler(socketTimeout));
                         }
                         ch.pipeline().addLast("lengthprepender", new LengthFieldPrepender(4));
                         ch.pipeline().addLast("lengthbaseddecoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));

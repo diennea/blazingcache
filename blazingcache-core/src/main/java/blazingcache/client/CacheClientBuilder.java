@@ -39,6 +39,7 @@ public class CacheClientBuilder {
     private String clientSecret = "blazingcache";
     private Mode mode = Mode.LOCAL;
     private long maxMemory = 0;
+    private long maxLocalEntryAge = 0;
     private int connectTimeout = 10000;
     private int socketTimeout = 0;
     private int fetchPriority = 10;
@@ -91,18 +92,17 @@ public class CacheClientBuilder {
         this.fetchPriority = fetchPriority;
         return this;
     }
-    
+
     /**
      * Assign an EntrySerializer to the CacheClient
+     *
      * @param entrySerializer
-     * @return 
+     * @return
      */
     public CacheClientBuilder entrySerializer(EntrySerializer entrySerializer) {
         this.entrySerializer = entrySerializer;
         return this;
     }
-    
-    
 
     /**
      * Zookeeper Path for discovery.
@@ -154,6 +154,20 @@ public class CacheClientBuilder {
      */
     public CacheClientBuilder maxMemory(long maxMemory) {
         this.maxMemory = maxMemory;
+        return this;
+    }
+
+    /**
+     * Maximum "local" age of any entry (in millis). Sometimes a client retains
+     * "immortal" entries which does not need anymore and continues to receive
+     * notifications. This options evicts automatically every entry which is too
+     * old.<br>
+     * This option also ensures that you are not going to keep data which could
+     * be stale if the client which updated real data (on database for instance)
+     * dies (halt/crash) before invalidating the cache
+     */
+    public CacheClientBuilder maxLocalEntryAge(long maxLocalEntryAge) {
+        this.maxLocalEntryAge = maxLocalEntryAge;
         return this;
     }
 
@@ -290,6 +304,7 @@ public class CacheClientBuilder {
         }
         final CacheClient res = new CacheClient(clientId, clientSecret, locator);
         res.setMaxMemory(maxMemory);
+        res.setMaxLocalEntryAge(maxLocalEntryAge);
         if (this.jmx) {
             res.enableJmx(true);
         }
