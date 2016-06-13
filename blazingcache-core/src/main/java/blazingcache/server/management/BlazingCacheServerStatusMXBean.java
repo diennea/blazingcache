@@ -99,6 +99,7 @@ public class BlazingCacheServerStatusMXBean implements CacheServerStatusMXBean {
     /**
      * {@inheritDoc}
      */
+    @Override
     public long getLastStartupTimestamp() {
         return server.getLastStartupTimestamp();
     }
