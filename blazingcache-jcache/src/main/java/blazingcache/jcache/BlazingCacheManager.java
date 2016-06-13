@@ -67,6 +67,7 @@ public class BlazingCacheManager implements CacheManager {
             String keySerializerClass = properties.getProperty("blazingcache.jcache.keyserializer", "blazingcache.jcache.StandardKeySerializer");
             String valuesSerializerClass = properties.getProperty("blazingcache.jcache.valuesserializer", "blazingcache.jcache.StandardValuesSerializer");
             long maxmemory = Long.parseLong(properties.getProperty("blazingcache.jcache.maxmemory", "0"));
+            long maxLocalEntryAge = Long.parseLong(properties.getProperty("blazingcache.jcache.localentryage", "0"));
             this.keysSerializer = (Serializer<Object, String>) Class.forName(keySerializerClass, true, classLoader).newInstance();
             this.valuesSerializer = (Serializer<Object, byte[]>) Class.forName(valuesSerializerClass, true, classLoader).newInstance();
             this.keysSerializer.configure(properties);
@@ -124,6 +125,7 @@ public class BlazingCacheManager implements CacheManager {
                 client.enableJmx(true);
             }
             client.setMaxMemory(maxmemory);
+            client.setMaxLocalEntryAge(maxLocalEntryAge);
             client.setFetchPriority(fetchPriority);
             client.start();
             client.waitForConnection(10000);

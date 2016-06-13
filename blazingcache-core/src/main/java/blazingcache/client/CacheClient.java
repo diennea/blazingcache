@@ -86,6 +86,25 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final AtomicLong clientMissedGetsToMissedFetches;
 
     /**
+     * Maximum "local" age of any entry (in millis). Sometimes a client retains
+     * "immortal" entries which does not need anymore and continues to receive
+     * notifications. This options evicts automatically every entry which is too
+     * old.<br>
+     * This option also ensures that you are not going to keep data which could
+     * be stale if the client which updated real data (on database for instance)
+     * dies (halt/crash) before invalidating the cache
+     */
+    private long maxLocalEntryAge = 0;
+
+    public long getMaxLocalEntryAge() {
+        return maxLocalEntryAge;
+    }
+
+    public void setMaxLocalEntryAge(long maxLocalEntryAge) {
+        this.maxLocalEntryAge = maxLocalEntryAge;
+    }
+
+    /**
      * Maximum amount of memory used for storing entry values. 0 or negative to
      * disable
      */
@@ -359,9 +378,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                         }
                         continue;
                     }
-                    if (maxMemory > 0) {
+                    if (maxMemory > 0 || maxLocalEntryAge > 0) {
                         try {
-                            ensureMaxMemoryLimit();
+                            performEviction();
                         } catch (InterruptedException exit) {
                             continue;
                         }
@@ -403,26 +422,36 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     }
 
-    private void ensureMaxMemoryLimit() throws InterruptedException {
-        long delta = maxMemory - actualMemory.longValue();
-        if (delta > 0) {
+    private void performEviction() throws InterruptedException {
+        long deltaMemory = maxMemory - actualMemory.longValue();
+        if (deltaMemory > 0 && maxLocalEntryAge <= 0) {
             return;
         }
-        long to_release = -delta;
-        LOGGER.log(Level.SEVERE, "trying to release {0} bytes", to_release);
+
+        long to_release = -deltaMemory;
+        long maxAgeTs = System.currentTimeMillis() - maxLocalEntryAge;
+        if (maxMemory > 0 && maxLocalEntryAge > 0) {
+            LOGGER.log(Level.SEVERE, "trying to release {0} bytes, and evicting local entries before {1}", new Object[]{to_release, new java.util.Date(maxAgeTs)});
+        } else if (maxMemory > 0) {
+            LOGGER.log(Level.SEVERE, "trying to release {0} bytes", new Object[]{to_release});
+        } else if (maxLocalEntryAge > 0) {
+            LOGGER.log(Level.SEVERE, "evicting local entries before {0}", new Object[]{new java.util.Date(maxAgeTs)});
+        }
+        long maxAgeTsNanos = maxAgeTs * 1000L * 1000;
         List<CacheEntry> evictable = new ArrayList<>();
         java.util.function.Consumer<CacheEntry> accumulator = new java.util.function.Consumer<CacheEntry>() {
             long releasedMemory = 0;
 
             @Override
             public void accept(CacheEntry t) {
-                if (releasedMemory < to_release) {
-                    LOGGER.log(Level.FINEST, "evaluating {0} {1} size {2}", new Object[]{t.getKey(), t.getLastGetTime(), t.getSerializedData().length});
+                if ((maxMemory > 0 && releasedMemory < to_release)
+                        || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {
                     evictable.add(t);
                     releasedMemory += t.getSerializedData().length;
                 }
             }
         };
+
         try {
             cache.values().stream().sorted(
                     new Comparator<CacheEntry>() {
@@ -441,6 +470,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.severe("dataChangedDuringSort: " + dataChangedDuringSort);
             return;
         }
+
         LOGGER.severe("found " + evictable.size() + " evictable entries");
 
         if (!evictable.isEmpty()) {
