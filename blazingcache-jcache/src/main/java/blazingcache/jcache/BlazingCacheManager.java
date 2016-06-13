@@ -43,6 +43,8 @@ import javax.cache.spi.CachingProvider;
  */
 public class BlazingCacheManager implements CacheManager {
 
+    final static boolean JSR107_TCK_101_COMPAT_MODE = Boolean.getBoolean("org.blazingcache.jsr107tck101compatmode");
+
     private final BlazingCacheProvider provider;
     private final URI uri;
     private final ClassLoader classLoader;
@@ -215,7 +217,9 @@ public class BlazingCacheManager implements CacheManager {
 
     @Override
     public Iterable<String> getCacheNames() {
-        //checkClosed(); TCK does not pass if we throw IllegalStateException
+        if (!JSR107_TCK_101_COMPAT_MODE) {
+            checkClosed();
+        }
         return Collections.unmodifiableCollection(new ArrayList<>(caches.keySet()));
     }
 
