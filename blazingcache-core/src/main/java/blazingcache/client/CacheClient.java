@@ -464,7 +464,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                             @Override
                             public void replyReceived(Message originalMessage, Message message, Throwable error) {
                                 if (error != null) {
-                                    LOGGER.log(Level.SEVERE, "error while unregistering entry " + key, error);
+                                    if (LOGGER.isLoggable(Level.FINEST)) {
+                                        LOGGER.log(Level.FINEST, "error while unregistering entry " + key + ": " + error, error);
+                                    } else {
+                                        LOGGER.log(Level.SEVERE, "error while unregistering entry " + key + ": " + error);
+                                    }
                                 }
                                 count.countDown();
                             }
@@ -761,7 +765,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @param key
      * @return
      * @see #fetch(java.lang.String)
-     * @see #getObject(java.lang.String) 
+     * @see #getObject(java.lang.String)
      */
     public CacheEntry get(String key) {
         if (channel == null) {
@@ -917,7 +921,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @return
      * @throws InterruptedException
      * @throws CacheException
-     * @see #getObject(java.lang.String) 
+     * @see #getObject(java.lang.String)
      * @see EntrySerializer
      */
     public boolean putObject(String key, Object object, long expireTime) throws InterruptedException, CacheException {
@@ -937,7 +941,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @return
      * @throws InterruptedException
      * @throws CacheException
-     * @see #getObject(java.lang.String) 
+     * @see #getObject(java.lang.String)
      * @see EntrySerializer
      */
     public boolean putObject(String key, Object object, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
