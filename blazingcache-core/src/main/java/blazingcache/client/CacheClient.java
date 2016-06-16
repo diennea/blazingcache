@@ -431,11 +431,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         long to_release = -deltaMemory;
         long maxAgeTs = System.currentTimeMillis() - maxLocalEntryAge;
         if (maxMemory > 0 && maxLocalEntryAge > 0) {
-            LOGGER.log(Level.SEVERE, "trying to release {0} bytes, and evicting local entries before {1}", new Object[]{to_release, new java.util.Date(maxAgeTs)});
+            LOGGER.log(Level.FINEST, "trying to release {0} bytes, and evicting local entries before {1}", new Object[]{to_release, new java.util.Date(maxAgeTs)});
         } else if (maxMemory > 0) {
-            LOGGER.log(Level.SEVERE, "trying to release {0} bytes", new Object[]{to_release});
+            LOGGER.log(Level.FINEST, "trying to release {0} bytes", new Object[]{to_release});
         } else if (maxLocalEntryAge > 0) {
-            LOGGER.log(Level.SEVERE, "evicting local entries before {0}", new Object[]{new java.util.Date(maxAgeTs)});
+            LOGGER.log(Level.FINEST, "evicting local entries before {0}", new Object[]{new java.util.Date(maxAgeTs)});
         }
         long maxAgeTsNanos = maxAgeTs * 1000L * 1000;
         List<CacheEntry> evictable = new ArrayList<>();
@@ -470,10 +470,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.severe("dataChangedDuringSort: " + dataChangedDuringSort);
             return;
         }
-
-        LOGGER.severe("found " + evictable.size() + " evictable entries");
-
+                
         if (!evictable.isEmpty()) {
+            LOGGER.log(Level.FINE, "found {0} evictable entries", evictable.size());
             //update the age of the oldest evicted key
             //the oldest one is the first entry in evictable
             this.oldestEvictedKeyAge.getAndSet(System.nanoTime() - evictable.get(0).getPutTime());
