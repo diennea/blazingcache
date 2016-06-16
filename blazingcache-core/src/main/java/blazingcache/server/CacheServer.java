@@ -77,7 +77,7 @@ public class CacheServer implements AutoCloseable {
     private final long lastStartupTimestamp = System.currentTimeMillis();
 
     public static String VERSION() {
-        return "1.9.0";
+        return "1.9.1";
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {
