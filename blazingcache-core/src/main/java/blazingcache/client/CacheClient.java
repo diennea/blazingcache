@@ -431,21 +431,21 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         long to_release = -deltaMemory;
         long maxAgeTs = System.currentTimeMillis() - maxLocalEntryAge;
         if (maxMemory > 0 && maxLocalEntryAge > 0) {
-            LOGGER.log(Level.FINEST, "trying to release {0} bytes, and evicting local entries before {1}", new Object[]{to_release, new java.util.Date(maxAgeTs)});
+            LOGGER.log(Level.FINER, "trying to release {0} bytes, and evicting local entries before {1}", new Object[]{to_release, new java.util.Date(maxAgeTs)});
         } else if (maxMemory > 0) {
-            LOGGER.log(Level.FINEST, "trying to release {0} bytes", new Object[]{to_release});
+            LOGGER.log(Level.FINER, "trying to release {0} bytes", new Object[]{to_release});
         } else if (maxLocalEntryAge > 0) {
-            LOGGER.log(Level.FINEST, "evicting local entries before {0}", new Object[]{new java.util.Date(maxAgeTs)});
+            LOGGER.log(Level.FINER, "evicting local entries before {0}", new Object[]{new java.util.Date(maxAgeTs)});
         }
-        long maxAgeTsNanos = maxAgeTs * 1000L * 1000;
+        long maxAgeTsNanos = System.nanoTime()- maxLocalEntryAge * 1000L * 1000;
         List<CacheEntry> evictable = new ArrayList<>();
         java.util.function.Consumer<CacheEntry> accumulator = new java.util.function.Consumer<CacheEntry>() {
             long releasedMemory = 0;
 
             @Override
-            public void accept(CacheEntry t) {
+            public void accept(CacheEntry t) {                
                 if ((maxMemory > 0 && releasedMemory < to_release)
-                        || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {
+                        || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {                    
                     evictable.add(t);
                     releasedMemory += t.getSerializedData().length;
                 }
@@ -472,7 +472,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
                 
         if (!evictable.isEmpty()) {
-            LOGGER.log(Level.FINE, "found {0} evictable entries", evictable.size());
+            LOGGER.log(Level.INFO, "found {0} evictable entries", evictable.size());
             //update the age of the oldest evicted key
             //the oldest one is the first entry in evictable
             this.oldestEvictedKeyAge.getAndSet(System.nanoTime() - evictable.get(0).getPutTime());
@@ -512,7 +512,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
             int countWait = 0;
             while (true) {
-                LOGGER.log(Level.SEVERE, "waiting for evict ack from server (#{0})", countWait);
+                LOGGER.log(Level.FINER, "waiting for evict ack from server (#{0})", countWait);
                 boolean done = count.await(1, TimeUnit.SECONDS);
                 if (done) {
                     break;
