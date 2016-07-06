@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.blazingcache</groupId>
     <artifactId>blazingcache</artifactId>
-    <version>1.9.1</version>
+    <version>1.9.2</version>
     <packaging>pom</packaging>
     <name>BlazingCache</name>
     <url>http://blazingcache.org</url>
@@ -56,7 +56,7 @@
         <libs.servletapi>3.1.0</libs.servletapi>
         <libs.junit>4.12</libs.junit>
         <libs.jackson.mapper>1.9.11</libs.jackson.mapper>
-        <libs.zookeeper>3.4.6</libs.zookeeper>
+        <libs.zookeeper>3.4.8</libs.zookeeper>
         <libs.curator>2.8.0</libs.curator>        
     </properties>  
     <profiles>
