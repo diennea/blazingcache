@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.blazingcache</groupId>
         <artifactId>blazingcache</artifactId>
-        <version>1.9.1</version>
+        <version>1.9.2</version>
     </parent>
     <artifactId>blazingcache-jcache</artifactId>    
     <groupId>org.blazingcache</groupId>

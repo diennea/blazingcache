@@ -72,6 +72,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private volatile boolean stopped = false;
     private Channel channel;
     private long connectionTimestamp;
+    private long lastPerformedEvictionTimestamp;
     private int fetchPriority = 10;
 
     private final AtomicLong oldestEvictedKeyAge;
@@ -424,12 +425,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     private void performEviction() throws InterruptedException {
         long deltaMemory = maxMemory - actualMemory.longValue();
-        if (deltaMemory > 0 && maxLocalEntryAge <= 0) {
+        final long now = System.currentTimeMillis();
+        final boolean performMaxEntryAgeEviction = checkPerformEvictionForMaxLocalEntryAge(now);
+        if (deltaMemory > 0 && !performMaxEntryAgeEviction) {
             return;
         }
-
+        this.lastPerformedEvictionTimestamp = now;
         long to_release = -deltaMemory;
-        long maxAgeTs = System.currentTimeMillis() - maxLocalEntryAge;
+        long maxAgeTs = now - maxLocalEntryAge;
         if (maxMemory > 0 && maxLocalEntryAge > 0) {
             LOGGER.log(Level.FINER, "trying to release {0} bytes, and evicting local entries before {1}", new Object[]{to_release, new java.util.Date(maxAgeTs)});
         } else if (maxMemory > 0) {
@@ -528,6 +531,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
+    private boolean checkPerformEvictionForMaxLocalEntryAge(final long now) {
+        return maxLocalEntryAge > 0
+                && now - lastPerformedEvictionTimestamp >= maxLocalEntryAge / 2;
+    }
     @Override
     public void messageReceived(Message message) {
         if (internalClientListener != null) {
