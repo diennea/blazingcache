@@ -317,6 +317,25 @@ public class CacheServer implements AutoCloseable {
         executeOnHandler("putEntry " + sourceClientId + "," + key, action);
     }
 
+    public void loadEntry(String key, byte[] data, long expiretime, String sourceClientId, String clientProvidedLockId, SimpleCallback<String> onFinish) {
+        Runnable action = () -> {
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId, clientProvidedLockId);
+            if (lockID == null) {
+                onFinish.onResult(null, new Exception("invalid clientProvidedLockId " + clientProvidedLockId));
+                return;
+            }
+            Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
+            if (sourceClientId != null) {
+                clientsForKey.remove(sourceClientId);
+            }
+            LOGGER.log(Level.FINEST, "putEntry from {0}, key={1}, clientsForKey:{2}", new Object[]{sourceClientId, key, clientsForKey});
+            cacheStatus.registerKeyForClient(key, sourceClientId, expiretime);
+            locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+            onFinish.onResult(key, null);
+        };
+        executeOnHandler("loadEntry " + sourceClientId + "," + key, action);
+    }
+
     public void invalidateKey(String key, String sourceClientId, String clientProvidedLockId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId, clientProvidedLockId);

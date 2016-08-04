@@ -278,6 +278,21 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 });
                 break;
             }
+            case Message.TYPE_LOAD_ENTRY: {
+                String key = (String) message.parameters.get("key");
+                byte[] data = (byte[]) message.parameters.get("data");
+                long expiretime = (long) message.parameters.get("expiretime");
+                String lockId = (String) message.parameters.get("lockId");
+                server.addPendingOperations(1);
+                server.loadEntry(key, data, expiretime, clientId, lockId, new SimpleCallback<String>() {
+                    @Override
+                    public void onResult(String result, Throwable error) {
+                        server.addPendingOperations(-1);
+                        _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
+                    }
+                });
+                break;
+            }
             case Message.TYPE_CLIENT_SHUTDOWN:
                 LOGGER.log(Level.SEVERE, "client " + clientId + " sent shutdown message");
                 this.server.addConnectedClients(-1);

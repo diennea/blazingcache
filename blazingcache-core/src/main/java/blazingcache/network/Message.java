@@ -56,6 +56,14 @@ public final class Message {
         return new Message(clientId, TYPE_PUT_ENTRY, data);
     }
 
+    public static Message LOAD_ENTRY(String clientId, String key, byte[] serializedData, long expiretime) {
+        HashMap<String, Object> data = new HashMap<>();
+        data.put("key", key);
+        data.put("data", serializedData);
+        data.put("expiretime", expiretime);
+        return new Message(clientId, TYPE_PUT_ENTRY, data);
+    }
+
     public static Message UNREGISTER_ENTRY(String clientId, String key) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
@@ -133,33 +141,36 @@ public final class Message {
     public static final int TYPE_TOUCH_ENTRY = 10;
     public static final int TYPE_LOCK_ENTRY = 11;
     public static final int TYPE_UNLOCK_ENTRY = 12;
+    public static final int TYPE_LOAD_ENTRY = 13;
 
     public static String typeToString(int type) {
         switch (type) {
             case TYPE_ACK:
-                return "TYPE_ACK";
+                return "ACK";
             case TYPE_ERROR:
-                return "TYPE_ERROR";
+                return "ERROR";
             case TYPE_CLIENT_CONNECTION_REQUEST:
-                return "TYPE_CLIENT_CONNECTION_REQUEST";
+                return "CLIENT_CONNECTION_REQUEST";
             case TYPE_CLIENT_SHUTDOWN:
-                return "TYPE_CLIENT_SHUTDOWN";
+                return "CLIENT_SHUTDOWN";
             case TYPE_INVALIDATE:
-                return "TYPE_INVALIDATE";
+                return "INVALIDATE";
             case TYPE_INVALIDATE_BY_PREFIX:
-                return "TYPE_INVALIDATE_BY_PREFIX";
+                return "INVALIDATE_BY_PREFIX";
             case TYPE_PUT_ENTRY:
                 return "PUT_ENTRY";
             case TYPE_UNREGISTER_ENTRY:
-                return "TYPE_UNREGISTER_ENTRY";
+                return "UNREGISTER_ENTRY";
             case TYPE_FETCH_ENTRY:
-                return "TYPE_FETCH_ENTRY";
+                return "FETCH_ENTRY";
             case TYPE_TOUCH_ENTRY:
-                return "TYPE_TOUCH_ENTRY";
+                return "TOUCH_ENTRY";
             case TYPE_LOCK_ENTRY:
-                return "TYPE_LOCK_ENTRY";
+                return "LOCK_ENTRY";
             case TYPE_UNLOCK_ENTRY:
-                return "TYPE_UNLOCK_ENTRY";
+                return "UNLOCK_ENTRY";
+            case TYPE_LOAD_ENTRY:
+                return "LOAD_ENTRY";
             default:
                 return "?" + type;
         }

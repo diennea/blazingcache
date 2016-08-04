@@ -77,6 +77,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     private final AtomicLong oldestEvictedKeyAge;
     private final AtomicLong clientPuts;
+    private final AtomicLong clientLoads;
     private final AtomicLong clientTouches;
     private final AtomicLong clientGets;
     private final AtomicLong clientFetches;
@@ -192,6 +193,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
         this.oldestEvictedKeyAge = new AtomicLong();
         this.clientPuts = new AtomicLong();
+        this.clientLoads = new AtomicLong();
         this.clientTouches = new AtomicLong();
         this.clientGets = new AtomicLong();
         this.clientFetches = new AtomicLong();
@@ -207,6 +209,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public void clearStatistics() {
         this.clientPuts.set(0);
+        this.clientLoads.set(0);
         this.clientTouches.set(0);
         this.clientGets.set(0);
         this.clientFetches.set(0);
@@ -440,15 +443,15 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         } else if (maxLocalEntryAge > 0) {
             LOGGER.log(Level.FINER, "evicting local entries before {0}", new Object[]{new java.util.Date(maxAgeTs)});
         }
-        long maxAgeTsNanos = System.nanoTime()- maxLocalEntryAge * 1000L * 1000;
+        long maxAgeTsNanos = System.nanoTime() - maxLocalEntryAge * 1000L * 1000;
         List<CacheEntry> evictable = new ArrayList<>();
         java.util.function.Consumer<CacheEntry> accumulator = new java.util.function.Consumer<CacheEntry>() {
             long releasedMemory = 0;
 
             @Override
-            public void accept(CacheEntry t) {                
+            public void accept(CacheEntry t) {
                 if ((maxMemory > 0 && releasedMemory < to_release)
-                        || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {                    
+                        || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {
                     evictable.add(t);
                     releasedMemory += t.getSerializedData().length;
                 }
@@ -473,7 +476,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.severe("dataChangedDuringSort: " + dataChangedDuringSort);
             return;
         }
-                
+
         if (!evictable.isEmpty()) {
             LOGGER.log(Level.INFO, "found {0} evictable entries", evictable.size());
             //update the age of the oldest evicted key
@@ -535,6 +538,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return maxLocalEntryAge > 0
                 && now - lastPerformedEvictionTimestamp >= maxLocalEntryAge / 2;
     }
+
     @Override
     public void messageReceived(Message message) {
         if (internalClientListener != null) {
@@ -928,8 +932,27 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Put an entry on the local cache. This method will also notify of the
-     * change to all other clients which hold the same entry locally.
+     * Loads an entry on the local cache. This method will NOT notify the
+     * change to all other clients holding the same entry locally, but a
+     * listener on the entry will be registered on the server in order to
+     * let this client receive notifications about the entry.
+     *
+     * @param key
+     * @param data
+     * @param expireTime This is the UNIX timestamp at which the entry should be
+     * invalidated automatically. Use 0 in order to create an immortal entry
+     * @return
+     * @throws InterruptedException
+     * @throws CacheException
+     * @see #touchEntry(java.lang.String, long)
+     */
+    public boolean load(String key, byte[] data, long expireTime) throws InterruptedException, CacheException {
+        return load(key, data, expireTime, null);
+    }
+
+    /**
+     * Put an entry on the local cache. This method will also notify the
+     * change to all other clients holding the same entry locally.
      *
      * @param key
      * @param data
@@ -948,8 +971,31 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
+     * Loads an entry on the local cache. This method will NOT notify the
+     * change to all other clients holding the same entry locally, but a
+     * listener on the entry will be registered on the server in order to
+     * let this client receive notifications about the entry.
+     *
+     * @param key
+     * @param data
+     * @param expireTime This is the UNIX timestamp at which the entry should be
+     * invalidated automatically. Use 0 in order to create an immortal entry
+     * @param lock This is a lock previously acquired using the {@link #lock(java.lang.String)
+     * } function
+     * @return
+     * @throws InterruptedException
+     * @throws CacheException
+     * @see #touchEntry(java.lang.String, long)
+     * @see #lock(java.lang.String)
+     * @see #put(java.lang.String, byte[], long, blazingcache.client.KeyLock)
+     */
+    public boolean load(String key, byte[] data, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
+        return put(key, data, null, expireTime, lock);
+    }
+
+    /**
      * Same as {@link #put(java.lang.String, byte[], long) } but the provided
-     * Object will be serialized using the {@link EntrySerializer}
+     * Object will be serialized using {@link EntrySerializer}.
      *
      * @param key
      * @param object
@@ -966,9 +1012,26 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
+     * Same as {@link #load(java.lang.String, byte[], long) } but the provided
+     * Object will be serialized using {@link EntrySerializer}.
+     *
+     * @param key
+     * @param object
+     * @param expireTime
+     * @return
+     * @throws InterruptedException
+     * @throws CacheException
+     * @see #getObject(java.lang.String)
+     * @see EntrySerializer
+     */
+    public boolean loadObject(String key, Object object, long expireTime) throws InterruptedException, CacheException {
+        byte[] data = entrySerializer.serializeObject(key, object);
+        return load(key, data, object, expireTime, null);
+    }
+
+    /**
      * Same as {@link #put(java.lang.String, byte[], long, blazingcache.client.KeyLock)
-     * } but the provided Object will be serialized using the
-     * {@link EntrySerializer}
+     * } but the provided Object will be serialized using {@link EntrySerializer}.
      *
      * @param key
      * @param object
@@ -983,6 +1046,66 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public boolean putObject(String key, Object object, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
         byte[] data = entrySerializer.serializeObject(key, object);
         return put(key, data, object, expireTime, lock);
+    }
+
+    /**
+     * Same as {@link #load(java.lang.String, byte[], long, blazingcache.client.KeyLock)
+     * } but the provided Object will be serialized using {@link EntrySerializer}.
+     *
+     * @param key
+     * @param object
+     * @param expireTime
+     * @param lock
+     * @return
+     * @throws InterruptedException
+     * @throws CacheException
+     * @see #getObject(java.lang.String)
+     * @see EntrySerializer
+     */
+    public boolean loadObject(String key, Object object, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
+        byte[] data = entrySerializer.serializeObject(key, object);
+        return load(key, data, object, expireTime, lock);
+    }
+
+    private boolean load(String key, byte[] data, Object reference, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
+        Channel _chanel = channel;
+        if (_chanel == null) {
+            LOGGER.log(Level.SEVERE, "cache load failed " + key + ", not connected");
+            return false;
+        }
+        if (lock != null && !lock.getKey().equals(key)) {
+            throw new CacheException("lock " + lock + " is not for key " + key);
+        }
+
+        try {
+            CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime, reference);
+            CacheEntry prev = cache.put(key, entry);
+            if (prev != null) {
+                actualMemory.addAndGet(-prev.getSerializedData().length);
+            }
+            actualMemory.addAndGet(data.length);
+            Message request = Message.LOAD_ENTRY(clientId, key, data, expireTime);
+            if (lock != null) {
+                request.setParameter("lockId", lock.getLockId());
+            }
+            Message response = _chanel.sendMessageWithReply(request, invalidateTimeout);
+            if (response.type != Message.TYPE_ACK) {
+                throw new CacheException("error while loading key " + key + " (" + response + ")");
+            }
+            // race condition: if two clients perform a put on the same entry maybe after the network trip we get another value, different from the expected one.
+            // it is better to invalidate the entry for all
+            CacheEntry afterNetwork = cache.get(key);
+            if (afterNetwork != null) {
+                if (!Arrays.equals(afterNetwork.getSerializedData(), data)) {
+                    LOGGER.log(Level.SEVERE, "detected conflict on load of " + key + ", invalidating entry");
+                    invalidate(key);
+                }
+            }
+            this.clientLoads.incrementAndGet();
+            return true;
+        } catch (TimeoutException timedOut) {
+            throw new CacheException("error while putting for key " + key + ":" + timedOut, timedOut);
+        }
     }
 
     private boolean put(String key, byte[] data, Object reference, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
@@ -1101,6 +1224,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public long getClientPuts() {
         return this.clientPuts.get();
+    }
+
+    /**
+     *
+     * @return number of loads executed since client boot
+     */
+    public long getClientLoads() {
+        return this.clientLoads.get();
     }
 
     /**
