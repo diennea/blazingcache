@@ -932,10 +932,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Loads an entry on the local cache. This method will NOT notify of the
-     * change to all other clients which hold the same entry locally but a
+     * Loads an entry on the local cache. This method will NOT notify the
+     * change to all other clients holding the same entry locally, but a
      * listener on the entry will be registered on the server in order to
-     * receive notifications about the entry
+     * let this client receive notifications about the entry.
      *
      * @param key
      * @param data
@@ -951,8 +951,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Put an entry on the local cache. This method will also notify of the
-     * change to all other clients which hold the same entry locally.
+     * Put an entry on the local cache. This method will also notify the
+     * change to all other clients holding the same entry locally.
      *
      * @param key
      * @param data
@@ -971,10 +971,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Loads an entry on the local cache. This method will NOT notify of the
-     * change to all other clients which hold the same entry locally but a
+     * Loads an entry on the local cache. This method will NOT notify the
+     * change to all other clients holding the same entry locally, but a
      * listener on the entry will be registered on the server in order to
-     * receive notifications about the entry
+     * let this client receive notifications about the entry.
      *
      * @param key
      * @param data
@@ -995,7 +995,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Same as {@link #put(java.lang.String, byte[], long) } but the provided
-     * Object will be serialized using the {@link EntrySerializer}
+     * Object will be serialized using {@link EntrySerializer}.
      *
      * @param key
      * @param object
@@ -1013,7 +1013,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Same as {@link #load(java.lang.String, byte[], long) } but the provided
-     * Object will be serialized using the {@link EntrySerializer}
+     * Object will be serialized using {@link EntrySerializer}.
      *
      * @param key
      * @param object
@@ -1031,8 +1031,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Same as {@link #put(java.lang.String, byte[], long, blazingcache.client.KeyLock)
-     * } but the provided Object will be serialized using the
-     * {@link EntrySerializer}
+     * } but the provided Object will be serialized using {@link EntrySerializer}.
      *
      * @param key
      * @param object
@@ -1051,8 +1050,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Same as {@link #load(java.lang.String, byte[], long, blazingcache.client.KeyLock)
-     * } but the provided Object will be serialized using the
-     * {@link EntrySerializer}
+     * } but the provided Object will be serialized using {@link EntrySerializer}.
      *
      * @param key
      * @param object
