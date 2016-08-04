@@ -47,6 +47,13 @@ public interface CacheClientStatisticsMXBean {
      * @return the no. of puts
      */
     long getClientPuts();
+    
+     /**
+     * The number of loads performed by the client since last reboot.
+     *
+     * @return the no. of loads
+     */
+    long getClientLoads();
 
     /**
      * The number of touches performed by the client since last reboot.

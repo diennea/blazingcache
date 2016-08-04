@@ -54,6 +54,13 @@ public class BlazingCacheClientStatisticsMXBean implements CacheClientStatistics
     public long getClientPuts() {
         return this.client.getClientPuts();
     }
+    
+     /**
+     * {@inheritDoc}
+     */
+    public long getClientLoads() {
+        return this.client.getClientLoads();
+    }
 
     /**
      * {@inheritDoc}
