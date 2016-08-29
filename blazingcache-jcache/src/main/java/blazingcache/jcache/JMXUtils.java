@@ -52,7 +52,7 @@ public class JMXUtils {
     }
 
     private static String safeName(String s) {
-        return s.replaceAll(",|:|=|\n\r#", ".");
+        return s.replaceAll("[?,:=\\W]", ".");
     }
 
     public static MBeanServer getMBeanServer() {
@@ -63,8 +63,8 @@ public class JMXUtils {
         if (platformMBeanServer == null) {
             throw new CacheException("PlatformMBeanServer not available", mBeanServerLookupError);
         }
-        String cacheManagerName = safeName(cache.getCacheManager().getURI().toString());
-        String cacheName = safeName(cache.getName());
+        String cacheManagerName = safeName(cache.getCacheManager().getURI().toString());        
+        String cacheName = safeName(cache.getName());        
 
         try {
             ObjectName name = new ObjectName("javax.cache:type=CacheStatistics,CacheManager=" + cacheManagerName + ",Cache=" + cacheName);            

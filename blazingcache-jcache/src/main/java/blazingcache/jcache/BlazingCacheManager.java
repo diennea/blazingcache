@@ -24,12 +24,15 @@ import blazingcache.server.CacheServer;
 import blazingcache.zookeeper.ZKCacheServerLocator;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.cache.Cache;
 import javax.cache.CacheException;
 import javax.cache.CacheManager;
@@ -58,25 +61,29 @@ public class BlazingCacheManager implements CacheManager {
     private final Serializer<Object, byte[]> valuesSerializer;
     private final Map<String, BlazingCacheCache> caches = new HashMap<>();
 
-    BlazingCacheManager(BlazingCacheProvider provider, URI uri, ClassLoader classLoader, Properties properties) {
+    BlazingCacheManager(BlazingCacheProvider provider, URI uri, ClassLoader classLoader, Properties configproperties) {
         try {
             this.provider = provider;
             this.uri = uri;
-            this.usefetch = Boolean.parseBoolean(properties.getProperty("blazingcache.usefetch", "true"));
-            this.fetchPriority = Integer.parseInt(properties.getProperty("blazingcache.fetchpriority", "10"));
+
+            Properties properties_and_params = new Properties();
+            parseUriQueryStringParameters(uri, properties_and_params);
+            properties_and_params.putAll(configproperties);
+            this.usefetch = Boolean.parseBoolean(properties_and_params.getProperty("blazingcache.usefetch", "true"));
+            this.fetchPriority = Integer.parseInt(properties_and_params.getProperty("blazingcache.fetchpriority", "10"));
             this.classLoader = classLoader;
-            this.properties = properties;
-            String keySerializerClass = properties.getProperty("blazingcache.jcache.keyserializer", "blazingcache.jcache.StandardKeySerializer");
-            String valuesSerializerClass = properties.getProperty("blazingcache.jcache.valuesserializer", "blazingcache.jcache.StandardValuesSerializer");
-            long maxmemory = Long.parseLong(properties.getProperty("blazingcache.jcache.maxmemory", "0"));
-            long maxLocalEntryAge = Long.parseLong(properties.getProperty("blazingcache.jcache.localentryage", "0"));
+            this.properties = properties_and_params;
+            String keySerializerClass = properties_and_params.getProperty("blazingcache.jcache.keyserializer", "blazingcache.jcache.StandardKeySerializer");
+            String valuesSerializerClass = properties_and_params.getProperty("blazingcache.jcache.valuesserializer", "blazingcache.jcache.StandardValuesSerializer");
+            long maxmemory = Long.parseLong(properties_and_params.getProperty("blazingcache.jcache.maxmemory", "0"));
+            long maxLocalEntryAge = Long.parseLong(properties_and_params.getProperty("blazingcache.jcache.localentryage", "0"));
             this.keysSerializer = (Serializer<Object, String>) Class.forName(keySerializerClass, true, classLoader).newInstance();
             this.valuesSerializer = (Serializer<Object, byte[]>) Class.forName(valuesSerializerClass, true, classLoader).newInstance();
-            this.keysSerializer.configure(properties);
-            this.valuesSerializer.configure(properties);
-            String clientId = properties.getProperty("blazingcache.clientId", "client");
-            String secret = properties.getProperty("blazingcache.secret", "blazingcache");
-            final boolean jmx = Boolean.parseBoolean(properties.getProperty("blazingcache.jmx", "false"));
+            this.keysSerializer.configure(properties_and_params);
+            this.valuesSerializer.configure(properties_and_params);
+            String clientId = properties_and_params.getProperty("blazingcache.clientId", "client");
+            String secret = properties_and_params.getProperty("blazingcache.secret", "blazingcache");
+            final boolean jmx = Boolean.parseBoolean(properties_and_params.getProperty("blazingcache.jmx", "false"));
             if (clientId.isEmpty()) {
                 try {
                     clientId = InetAddress.getLocalHost().getCanonicalHostName();
@@ -85,14 +92,14 @@ public class BlazingCacheManager implements CacheManager {
                 }
             }
             ServerLocator locator;
-            String mode = properties.getProperty("blazingcache.mode", "local");
-            int sockettimeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.sockettimeout", "0"));
-            int connecttimeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.connecttimeout", "10000"));
+            String mode = properties_and_params.getProperty("blazingcache.mode", "local");
+            int sockettimeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.sockettimeout", "0"));
+            int connecttimeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.connecttimeout", "10000"));
             switch (mode) {
                 case "clustered":
-                    String connect = properties.getProperty("blazingcache.zookeeper.connectstring", "localhost:1281");
-                    int timeout = Integer.parseInt(properties.getProperty("blazingcache.zookeeper.sessiontimeout", "40000"));
-                    String path = properties.getProperty("blazingcache.zookeeper.path", "/blazingcache");
+                    String connect = properties_and_params.getProperty("blazingcache.zookeeper.connectstring", "localhost:1281");
+                    int timeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.sessiontimeout", "40000"));
+                    String path = properties_and_params.getProperty("blazingcache.zookeeper.path", "/blazingcache");
                     locator = new ZKCacheServerLocator(connect, timeout, path);
                     ((ZKCacheServerLocator) locator).setSocketTimeout(sockettimeout);
                     ((ZKCacheServerLocator) locator).setConnectTimeout(connecttimeout);
@@ -100,9 +107,9 @@ public class BlazingCacheManager implements CacheManager {
                     this.embeddedServer = null;
                     break;
                 case "static":
-                    String host = properties.getProperty("blazingcache.server.host", "localhost");
-                    int port = Integer.parseInt(properties.getProperty("blazingcache.server.port", "1025"));
-                    boolean ssl = Boolean.parseBoolean(properties.getProperty("blazingcache.server.ssl", "false"));
+                    String host = properties_and_params.getProperty("blazingcache.server.host", "localhost");
+                    int port = Integer.parseInt(properties_and_params.getProperty("blazingcache.server.port", "1025"));
+                    boolean ssl = Boolean.parseBoolean(properties_and_params.getProperty("blazingcache.server.ssl", "false"));
                     locator = new NettyCacheServerLocator(host, port, ssl);
                     ((NettyCacheServerLocator) locator).setSocketTimeout(sockettimeout);
                     ((NettyCacheServerLocator) locator).setConnectTimeout(connecttimeout);
@@ -305,5 +312,33 @@ public class BlazingCacheManager implements CacheManager {
     public CacheClient getClient() {
         return client;
     }
+
+    private void parseUriQueryStringParameters(URI uri, Properties properties_and_params) {
+        if (uri == null) {
+            return;
+        }
+        try {
+            String url = uri.toString();
+            int questionMark = url.indexOf('?');
+            if (questionMark < url.length()) {
+                String qs = url.substring(questionMark + 1);
+                String[] params = qs.split("&");
+                for (String param : params) {
+                    int pos = param.indexOf('=');
+                    if (pos > 0) {
+                        String key = param.substring(0, pos);
+                        if (!key.startsWith("blazingcache.")) {
+                            key = "blazingcache." + key;
+                        }
+                        String value = URLDecoder.decode(param.substring(pos + 1), "utf-8");
+                        properties_and_params.put(key, value);
+                    }
+                }
+            }
+        } catch (Exception err) {
+            LOG.log(Level.SEVERE, "Error parsing URI: " + uri, err);
+        }
+    }
+    private static final Logger LOG = Logger.getLogger(BlazingCacheManager.class.getName());
 
 }
