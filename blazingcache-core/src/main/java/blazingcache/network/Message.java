@@ -79,6 +79,31 @@ public final class Message {
         return new Message(clientId, TYPE_ERROR, params);
     }
 
+    public static Message SASL_TOKEN_MESSAGE_REQUEST(String saslMech, byte[] firstToken) {
+        HashMap<String, Object> data = new HashMap<>();
+        String ts = System.currentTimeMillis() + "";
+        data.put("ts", ts);
+        data.put("mech", saslMech);
+        data.put("token", firstToken);
+        return new Message(null, TYPE_SASL_TOKEN_MESSAGE_REQUEST, data);
+    }
+
+    public static Message SASL_TOKEN_SERVER_RESPONSE(byte[] saslTokenChallenge) {
+        HashMap<String, Object> data = new HashMap<>();
+        String ts = System.currentTimeMillis() + "";
+        data.put("ts", ts);
+        data.put("token", saslTokenChallenge);
+        return new Message(null, TYPE_SASL_TOKEN_SERVER_RESPONSE, data);
+    }
+
+    public static Message SASL_TOKEN_MESSAGE_TOKEN(byte[] token) {
+        HashMap<String, Object> data = new HashMap<>();
+        String ts = System.currentTimeMillis() + "";
+        data.put("ts", ts);
+        data.put("token", token);
+        return new Message(null, TYPE_SASL_TOKEN_MESSAGE_TOKEN, data);
+    }
+
     public static Message CLIENT_CONNECTION_REQUEST(String clientId, String secret, int fetchPriority) {
         HashMap<String, Object> data = new HashMap<>();
         String ts = System.currentTimeMillis() + "";
@@ -143,6 +168,10 @@ public final class Message {
     public static final int TYPE_UNLOCK_ENTRY = 12;
     public static final int TYPE_LOAD_ENTRY = 13;
 
+    public static final int TYPE_SASL_TOKEN_MESSAGE_REQUEST = 100;
+    public static final int TYPE_SASL_TOKEN_SERVER_RESPONSE = 101;
+    public static final int TYPE_SASL_TOKEN_MESSAGE_TOKEN = 102;
+
     public static String typeToString(int type) {
         switch (type) {
             case TYPE_ACK:
@@ -171,6 +200,12 @@ public final class Message {
                 return "UNLOCK_ENTRY";
             case TYPE_LOAD_ENTRY:
                 return "LOAD_ENTRY";
+            case TYPE_SASL_TOKEN_MESSAGE_REQUEST:
+                return "SASL_TOKEN_MESSAGE_REQUEST";
+            case TYPE_SASL_TOKEN_SERVER_RESPONSE:
+                return "SASL_TOKEN_SERVER_RESPONSE";
+            case TYPE_SASL_TOKEN_MESSAGE_TOKEN:
+                return "SASL_TOKEN_MESSAGE_TOKEN";
             default:
                 return "?" + type;
         }

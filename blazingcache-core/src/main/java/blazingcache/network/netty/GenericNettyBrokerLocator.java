@@ -29,6 +29,9 @@ import blazingcache.network.Message;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeoutException;
 import blazingcache.network.ServerHostData;
+import blazingcache.security.sasl.ClientAuthenticationUtils;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Network connection, based on Netty
@@ -59,7 +62,7 @@ public abstract class GenericNettyBrokerLocator implements ServerLocator {
     }
 
     @Override
-    public Channel connect(ChannelEventListener messageReceiver, ConnectionRequestInfo workerInfo) throws InterruptedException, ServerNotAvailableException, ServerRejectedConnectionException {
+    public Channel connect(ChannelEventListener messageReceiver, ConnectionRequestInfo clientInfo) throws InterruptedException, ServerNotAvailableException, ServerRejectedConnectionException {
         boolean ok = false;
         NettyConnector connector = new NettyConnector(messageReceiver);
         try {
@@ -69,18 +72,25 @@ public abstract class GenericNettyBrokerLocator implements ServerLocator {
             }
             InetSocketAddress addre = broker.getSocketAddress();
             connector.setPort(addre.getPort());
-            connector.setHost(addre.getAddress().getHostAddress());
+            String host = addre.getHostName();
+            if (host == null) {
+                host = addre.getAddress().getHostAddress();
+            }
+
+            LOG.log(Level.SEVERE, "connect to server " + broker);
+            connector.setHost(host);
             connector.setConnectTimeout(connectTimeout);
             connector.setSocketTimeout(socketTimeout);
             connector.setSsl(broker.isSsl());
             NettyChannel channel;
             try {
                 channel = connector.connect();
+                ClientAuthenticationUtils.performAuthentication(channel, host, clientInfo.getSharedSecret());
             } catch (final Exception e) {
                 throw new ServerNotAvailableException(e);
             }
 
-            Message acceptMessage = Message.CLIENT_CONNECTION_REQUEST(workerInfo.getClientId(), workerInfo.getSharedSecret(), workerInfo.getFetchPriority());
+            Message acceptMessage = Message.CLIENT_CONNECTION_REQUEST(clientInfo.getClientId(), clientInfo.getSharedSecret(), clientInfo.getFetchPriority());
             try {
                 Message connectionResponse = channel.sendMessageWithReply(acceptMessage, 10000);
                 if (connectionResponse.type == Message.TYPE_ACK) {
@@ -98,4 +108,5 @@ public abstract class GenericNettyBrokerLocator implements ServerLocator {
             }
         }
     }
+    private static final Logger LOG = Logger.getLogger(GenericNettyBrokerLocator.class.getName());
 }

@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.blazingcache</groupId>
     <artifactId>blazingcache</artifactId>
-    <version>1.10.1-ALPHA</version>
+    <version>1.11.0-ALPHA</version>
     <packaging>pom</packaging>
     <name>BlazingCache</name>
     <url>http://blazingcache.org</url>
@@ -87,7 +87,7 @@
                             <argLine>-Xmx1024m -Djava.net.preferIpv4Stack=true</argLine>
                             <forkCount>1</forkCount>
                             <reuseForks>false</reuseForks>
-                            <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                            <!--<redirectTestOutputToFile>true</redirectTestOutputToFile>-->
                         </configuration>
                     </plugin>
                     <plugin>

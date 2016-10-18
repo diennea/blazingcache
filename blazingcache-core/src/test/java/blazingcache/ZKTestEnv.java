@@ -2,16 +2,15 @@ package blazingcache;
 
 import java.nio.file.Path;
 
-import org.apache.curator.test.TestingServer;
-
 public class ZKTestEnv implements AutoCloseable {
 
-    TestingServer zkServer;
+    TestingZookeeperServerEmbedded zkServer;
 
     Path path;
 
     public ZKTestEnv(final Path path) throws Exception {
-        zkServer = new TestingServer(-1, path.toFile(), true);
+        zkServer = new TestingZookeeperServerEmbedded(1281, path.toFile());
+        zkServer.start();
         this.path = path;
     }
 

@@ -28,7 +28,7 @@ import blazingcache.network.HashUtils;
 import blazingcache.network.Message;
 import blazingcache.network.ReplyCallback;
 import blazingcache.network.ServerSideConnection;
-import java.util.concurrent.atomic.AtomicBoolean;
+import blazingcache.security.sasl.SaslNettyServer;
 
 /**
  * Connection to a node from the server side
@@ -45,6 +45,10 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
     private Channel channel;
     private CacheServer server;
     private long lastReceivedMessageTs;
+    private volatile SaslNettyServer saslNettyServer;
+    private volatile boolean authenticated;
+    private volatile String username;
+    private boolean requireAuthentication;
     private final long MAX_TS_DELTA = Long.getLong("blazingcache.server.maxclienttsdelta", 1000L * 60 * 60);
 
     private static final AtomicLong sessionId = new AtomicLong();
@@ -102,10 +106,63 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             LOGGER.log(Level.SEVERE, "receivedMessage {0}, but channel is closed", message);
             return;
         }
-        LOGGER.log(Level.FINER, "receivedMessageFromWorker {0}", message);
+        LOGGER.log(Level.FINER, "receivedMessageFromClient {0}", message);
         switch (message.type) {
+            case Message.TYPE_SASL_TOKEN_MESSAGE_REQUEST: {
+                try {
+                    byte[] token = (byte[]) message.parameters.get("token");
+                    if (token == null) {
+                        token = new byte[0];
+                    }
+                    String mech = (String) message.parameters.get("mech");
+                    if (saslNettyServer == null) {
+                        saslNettyServer = new SaslNettyServer(server.getSharedSecret(), mech);
+                    }
+                    byte[] responseToken = saslNettyServer.response(token);
+                    Message tokenChallenge = Message.SASL_TOKEN_SERVER_RESPONSE(responseToken);
+                    _channel.sendReplyMessage(message, tokenChallenge);
+                } catch (Exception err) {
+                    Message error = Message.ERROR(null, err);
+                    _channel.sendReplyMessage(message, error);
+                }
+                break;
+            }
+            case Message.TYPE_SASL_TOKEN_MESSAGE_TOKEN: {
+                try {
+                    if (saslNettyServer == null) {
+                        Message error = Message.ERROR(null, new Exception("Authentication failed (SASL protocol error)"));
+                        _channel.sendReplyMessage(message, error);
+                        return;
+                    }
+                    byte[] token = (byte[]) message.parameters.get("token");
+                    byte[] responseToken = saslNettyServer.response(token);
+                    Message tokenChallenge = Message.SASL_TOKEN_SERVER_RESPONSE(responseToken);
+                    if (saslNettyServer.isComplete()) {
+                        username = saslNettyServer.getUserName();
+                        authenticated = true;
+                        LOGGER.severe("client " + channel + " completed SASL authentication as " + username);
+                        saslNettyServer = null;
+                    }
+                    _channel.sendReplyMessage(message, tokenChallenge);
+                } catch (Exception err) {
+                    if (err instanceof javax.security.sasl.SaslException) {
+                        LOGGER.log(Level.SEVERE, "SASL error " + err, err);
+                        Message error = Message.ERROR(null, new Exception("Authentication failed (SASL error)"));
+                        _channel.sendReplyMessage(message, error);
+                    } else {
+                        Message error = Message.ERROR(null, err);
+                        _channel.sendReplyMessage(message, error);
+                    }
+                }
+                break;
+            }
             case Message.TYPE_CLIENT_CONNECTION_REQUEST: {
                 LOGGER.log(Level.INFO, "connection request from {0}", message.clientId);
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 String challenge = (String) message.parameters.get("challenge");
                 String ts = (String) message.parameters.get("ts");
                 int fetchPriority = 10;
@@ -169,6 +226,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             }
 
             case Message.TYPE_LOCK_ENTRY: {
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 String key = (String) message.parameters.get("key");
                 server.addPendingOperations(1);
                 server.lockKey(key, clientId, new SimpleCallback<String>() {
@@ -181,6 +243,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 break;
             }
             case Message.TYPE_UNLOCK_ENTRY: {
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 String key = (String) message.parameters.get("key");
                 String lockId = (String) message.parameters.get("lockId");
                 server.addPendingOperations(1);
@@ -195,6 +262,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             }
 
             case Message.TYPE_INVALIDATE: {
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 String key = (String) message.parameters.get("key");
                 String lockId = (String) message.parameters.get("lockId");
                 server.addPendingOperations(1);
@@ -209,6 +281,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
             }
             case Message.TYPE_UNREGISTER_ENTRY: {
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 String key = (String) message.parameters.get("key");
                 server.addPendingOperations(1);
                 server.unregisterEntry(key, clientId, new SimpleCallback<String>() {
@@ -222,6 +299,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
             }
             case Message.TYPE_FETCH_ENTRY: {
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 String key = (String) message.parameters.get("key");
                 String lockId = (String) message.parameters.get("lockId");
                 server.addPendingOperations(1);
@@ -242,6 +324,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             }
 
             case Message.TYPE_TOUCH_ENTRY: {
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 String key = (String) message.parameters.get("key");
                 long expiretime = (long) message.parameters.get("expiretime");
                 server.addPendingOperations(1);
@@ -251,6 +338,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
             }
             case Message.TYPE_INVALIDATE_BY_PREFIX: {
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 String prefix = (String) message.parameters.get("prefix");
                 server.addPendingOperations(1);
                 server.invalidateByPrefix(prefix, clientId, new SimpleCallback<String>() {
@@ -264,6 +356,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
             }
             case Message.TYPE_PUT_ENTRY: {
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 String key = (String) message.parameters.get("key");
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
@@ -279,6 +376,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 break;
             }
             case Message.TYPE_LOAD_ENTRY: {
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 String key = (String) message.parameters.get("key");
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
@@ -294,6 +396,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 break;
             }
             case Message.TYPE_CLIENT_SHUTDOWN:
+                if (!authenticated && requireAuthentication) {
+                    Message error = Message.ERROR(null, new Exception("not authenticated"));
+                    _channel.sendReplyMessage(message, error);
+                    return;
+                }
                 LOGGER.log(Level.SEVERE, "client " + clientId + " sent shutdown message");
                 this.server.addConnectedClients(-1);
                 /// ignore

@@ -91,14 +91,14 @@ public class ZKClusterManager implements AutoCloseable {
      * Creates a new ZooKeeper-based cluster manager.
      *
      * @param zkAddress
-     * @param zkTimeout     
+     * @param zkTimeout
      * @param basePath
      * @param listener
      * @param localhostdata
      * @throws Exception
      */
     public ZKClusterManager(String zkAddress, int zkTimeout, String basePath,
-            LeaderShipChangeListener listener, byte[] localhostdata) throws Exception {
+        LeaderShipChangeListener listener, byte[] localhostdata) throws Exception {
         this.zk = new ZooKeeper(zkAddress, zkTimeout, new SystemWatcher());
         this.zkAddress = zkAddress;
         this.zkTimeout = zkTimeout;
@@ -121,7 +121,7 @@ public class ZKClusterManager implements AutoCloseable {
                 try {
                     this.zk.create(basePath, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 } catch (KeeperException anyError) {
-                    throw new Exception("Could not init Zookeeper space at path " + basePath, anyError);
+                    throw new Exception("Could not init Zookeeper space at path " + basePath + ":" + anyError, anyError);
                 }
             }
             if (this.zk.exists(discoverypath, false) == null) {
@@ -136,7 +136,7 @@ public class ZKClusterManager implements AutoCloseable {
             LOGGER.log(Level.SEVERE, "my own discoverypath path is " + newPath);
 
         } catch (KeeperException error) {
-            throw new Exception("Could not init Zookeeper space at path " + basePath, error);
+            throw new Exception("Could not init Zookeeper space at path " + basePath + ":" + error, error);
         }
     }
 
@@ -240,7 +240,7 @@ public class ZKClusterManager implements AutoCloseable {
     /**
      *
      * @return leader's data
-     * @throws Exception 
+     * @throws Exception
      */
     public byte[] getActualMaster() throws Exception {
         try {
@@ -289,8 +289,8 @@ public class ZKClusterManager implements AutoCloseable {
     }
 
     /**
-    * Handle session expiration.
-    */
+     * Handle session expiration.
+     */
     private void handleExpiredSession() {
         // close expired session first
         this.stopZK();
@@ -316,17 +316,16 @@ public class ZKClusterManager implements AutoCloseable {
         LOGGER.log(Level.SEVERE, "my own discoverypath path is " + newPath);
     }
 
-   /**
-   *
-   * Actually creates the ZooKeeper session.
-   *
-   * @throws IOException in case of network issues to connect to ZooKeeper
-   * service
-   */
-  public final void restartZK() throws IOException {
-      LOGGER.log(Level.SEVERE, "Restarting ZooKeeper client after session expired");
-      this.zk = new ZooKeeper(this.zkAddress, this.zkTimeout, new SystemWatcher());
-  }
+    /**
+     *
+     * Actually creates the ZooKeeper session.
+     *
+     * @throws IOException in case of network issues to connect to ZooKeeper service
+     */
+    public final void restartZK() throws IOException {
+        LOGGER.log(Level.SEVERE, "Restarting ZooKeeper client after session expired");
+        this.zk = new ZooKeeper(this.zkAddress, this.zkTimeout, new SystemWatcher());
+    }
 
     /**
      * Utility method used to stop an existing ZooKeeper.
@@ -337,7 +336,7 @@ public class ZKClusterManager implements AutoCloseable {
         } catch (InterruptedException e) {
             LOGGER.log(Level.SEVERE, "Impossible to stop ZooKeeper on expired session", e);
         }
-  }
+    }
 
     /**
      * Let cache server compete for cluster leadership.

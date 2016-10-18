@@ -19,14 +19,10 @@
  */
 package blazingcache.client;
 
-import blazingcache.client.impl.InternalClientListener;
-import blazingcache.network.Channel;
-import blazingcache.network.Message;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
