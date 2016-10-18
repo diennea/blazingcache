@@ -20,6 +20,7 @@
 package blazingcache.zookeeper;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -34,6 +35,7 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
 /**
@@ -86,6 +88,7 @@ public class ZKClusterManager implements AutoCloseable {
     private final int connectionTimeout;
     private final String zkAddress;
     private final int zkTimeout;
+    private final List<ACL> acls;
 
     /**
      * Creates a new ZooKeeper-based cluster manager.
@@ -98,7 +101,7 @@ public class ZKClusterManager implements AutoCloseable {
      * @throws Exception
      */
     public ZKClusterManager(String zkAddress, int zkTimeout, String basePath,
-        LeaderShipChangeListener listener, byte[] localhostdata) throws Exception {
+        LeaderShipChangeListener listener, byte[] localhostdata, boolean writeacls) throws Exception {
         this.zk = new ZooKeeper(zkAddress, zkTimeout, new SystemWatcher());
         this.zkAddress = zkAddress;
         this.zkTimeout = zkTimeout;
@@ -108,6 +111,7 @@ public class ZKClusterManager implements AutoCloseable {
         this.leaderpath = basePath + "/leader";
         this.discoverypath = basePath + "/discoverypath";
         this.connectionTimeout = zkTimeout;
+        this.acls = writeacls ? ZooDefs.Ids.CREATOR_ALL_ACL : ZooDefs.Ids.OPEN_ACL_UNSAFE;
     }
 
     /**
@@ -119,7 +123,7 @@ public class ZKClusterManager implements AutoCloseable {
             if (this.zk.exists(basePath, false) == null) {
                 LOGGER.log(Level.SEVERE, "creating base path " + basePath);
                 try {
-                    this.zk.create(basePath, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    this.zk.create(basePath, new byte[0], acls, CreateMode.PERSISTENT);
                 } catch (KeeperException anyError) {
                     throw new Exception("Could not init Zookeeper space at path " + basePath + ":" + anyError, anyError);
                 }
@@ -127,12 +131,12 @@ public class ZKClusterManager implements AutoCloseable {
             if (this.zk.exists(discoverypath, false) == null) {
                 LOGGER.log(Level.SEVERE, "creating discoverypath path " + discoverypath);
                 try {
-                    this.zk.create(discoverypath, new byte[0], ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    this.zk.create(discoverypath, new byte[0], acls, CreateMode.PERSISTENT);
                 } catch (KeeperException anyError) {
                     throw new Exception("Could not init Zookeeper space at path " + discoverypath, anyError);
                 }
             }
-            String newPath = zk.create(discoverypath + "/brokers", localhostdata, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+            String newPath = zk.create(discoverypath + "/brokers", localhostdata, acls, CreateMode.EPHEMERAL_SEQUENTIAL);
             LOGGER.log(Level.SEVERE, "my own discoverypath path is " + newPath);
 
         } catch (KeeperException error) {
@@ -312,7 +316,7 @@ public class ZKClusterManager implements AutoCloseable {
      */
     private void registerZKNodes() throws Exception {
         final String completeDiscoveryPath = discoverypath + "/brokers";
-        String newPath = zk.create(completeDiscoveryPath, localhostdata, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        String newPath = zk.create(completeDiscoveryPath, localhostdata, acls, CreateMode.EPHEMERAL_SEQUENTIAL);
         LOGGER.log(Level.SEVERE, "my own discoverypath path is " + newPath);
     }
 
@@ -342,7 +346,7 @@ public class ZKClusterManager implements AutoCloseable {
      * Let cache server compete for cluster leadership.
      */
     public void requestLeadership() {
-        zk.create(leaderpath, localhostdata, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, masterCreateCallback, null);
+        zk.create(leaderpath, localhostdata, acls, CreateMode.EPHEMERAL, masterCreateCallback, null);
     }
 
     /**

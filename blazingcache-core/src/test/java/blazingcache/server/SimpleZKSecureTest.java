@@ -29,13 +29,26 @@ import blazingcache.client.CacheClient;
 import blazingcache.network.ServerHostData;
 import blazingcache.server.CacheServer;
 import blazingcache.zookeeper.ZKCacheServerLocator;
+import java.io.File;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 
 /**
  *
  * @author enrico.olivelli
  */
-public class SimpleZKTest {
+public class SimpleZKSecureTest {
 
+    @BeforeClass
+    public static void setUpJaas() {
+        System.setProperty("java.security.auth.login.config", new File("src/test/resources/test_jaas.conf").getAbsolutePath());
+    }
+
+    @AfterClass
+    public static void clearUpJaas() {
+        System.clearProperty("java.security.auth.login.config");
+    }
+    
     @Rule
     public TemporaryFolder folderZk = new TemporaryFolder();
 
@@ -45,7 +58,7 @@ public class SimpleZKTest {
         ServerHostData hostData = new ServerHostData("localhost", 1234, "ciao", false, null);
         try (ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
                 CacheServer cacheServer = new CacheServer("ciao", hostData)) {
-            cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData, false);
+            cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData, true);
             cacheServer.start();
 
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
@@ -78,7 +91,7 @@ public class SimpleZKTest {
         ServerHostData hostData = new ServerHostData("localhost", 1234, "ciao", false, null);
         try (ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
                 CacheServer cacheServer = new CacheServer("ciao", hostData)) {
-            cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData, false);
+            cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData, true);
             cacheServer.start();
 
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
@@ -144,7 +157,7 @@ public class SimpleZKTest {
                 CacheServer cacheServerBk = new CacheServer("ciao", backupHostdata)) {
 
             cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(),
-                    zkEnv.getPath(), leaderHostdata, false);
+                    zkEnv.getPath(), leaderHostdata, true);
             cacheServer.start();
             waitForCondition(() -> {
                 return cacheServer.isLeader();
@@ -152,7 +165,7 @@ public class SimpleZKTest {
 
             //start backupcluster: we are sure this is in backup mode
             cacheServerBk.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(),
-                    zkEnv.getPath(), backupHostdata, false);
+                    zkEnv.getPath(), backupHostdata, true);
             cacheServerBk.start();
 
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));

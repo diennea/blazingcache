@@ -76,7 +76,7 @@ public final class ManagementStatusMXBeanTest {
     @Test(expected = InstanceNotFoundException.class)
     public void statusMBeanDisabled() throws Exception {
         try (final CacheServer server1 = new CacheServer(SECRET_TEXT,
-                new ServerHostData(SERVER_HOST, SERVER_PORT + 1, "managementStatusTest", false, null));) {
+            new ServerHostData(SERVER_HOST, SERVER_PORT + 1, "managementStatusTest", false, null));) {
             server1.start();
             final ObjectName statusBeanName = new ObjectName(MessageFormat.format(STATUS_MBEAN_PATTERN, server1.getServerId()));
             JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CurrentTimestamp");
@@ -84,11 +84,9 @@ public final class ManagementStatusMXBeanTest {
     }
 
     /**
-     * Checks that jmx status bean is registered when jmx enabled on
-     * ClientCache.
+     * Checks that jmx status bean is registered when jmx enabled on ClientCache.
      * <p>
-     * Performs also a few tests to make sure status values provided by the
-     * mbean are consistent.
+     * Performs also a few tests to make sure status values provided by the mbean are consistent.
      *
      * @throws Exception
      */
@@ -97,24 +95,24 @@ public final class ManagementStatusMXBeanTest {
         final ServerHostData hostData1 = new ServerHostData(SERVER_HOST, SERVER_PORT, "managementStatusTest", false, null);
         final ServerHostData hostData2 = new ServerHostData(SERVER_HOST, SERVER_PORT + 1, "managementStatusTest", false, null);
         try (final ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
-                final CacheServer server1 = new CacheServer(SECRET_TEXT, hostData1);
-                final CacheServer server2 = new CacheServer(SECRET_TEXT, hostData2);
-                final CacheClient client1 = new CacheClient("testClient", SECRET_TEXT,
-                        new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
-                final CacheClient client2 = new CacheClient("testClient", SECRET_TEXT,
-                        new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));) {
+            final CacheServer server1 = new CacheServer(SECRET_TEXT, hostData1);
+            final CacheServer server2 = new CacheServer(SECRET_TEXT, hostData2);
+            final CacheClient client1 = new CacheClient("testClient", SECRET_TEXT,
+                new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
+            final CacheClient client2 = new CacheClient("testClient", SECRET_TEXT,
+                new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));) {
             final ObjectName statusS1BeanName = new ObjectName(MessageFormat.format(STATUS_MBEAN_PATTERN, server1.getServerId()));
             final ObjectName statusS2BeanName = new ObjectName(MessageFormat.format(STATUS_MBEAN_PATTERN, server2.getServerId()));
 
             server1.enableJmx(true);
             long state1ChangeTS = (Long) JMXUtils.getMBeanServer().getAttribute(statusS1BeanName, "StateChangeTimestamp");
             assertEquals(0, state1ChangeTS);
-            server1.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData1);
+            server1.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData1, false);
 
             server2.enableJmx(true);
             long state2ChangeTS = (Long) JMXUtils.getMBeanServer().getAttribute(statusS2BeanName, "StateChangeTimestamp");
             assertEquals(0, state2ChangeTS);
-            server2.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData2);
+            server2.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData2, false);
 
             // start server1
             server1.start();

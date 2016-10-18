@@ -150,9 +150,10 @@ public class CacheServer implements AutoCloseable {
 
     }
 
-    public void setupCluster(String zkAddress, int zkTimeout, String basePath, ServerHostData localhostdata) throws Exception {
+    public void setupCluster(
+        String zkAddress, int zkTimeout, String basePath, ServerHostData localhostdata, boolean writeacls) throws Exception {
         leader = false;
-        clusterManager = new ZKClusterManager(zkAddress, zkTimeout, basePath, new LeaderShipChangeListenerImpl(), ServerHostData.formatHostdata(localhostdata));
+        clusterManager = new ZKClusterManager(zkAddress, zkTimeout, basePath, new LeaderShipChangeListenerImpl(), ServerHostData.formatHostdata(localhostdata), writeacls);
         clusterManager.start();
         clusterManager.requestLeadership();
     }
@@ -582,8 +583,7 @@ public class CacheServer implements AutoCloseable {
     }
 
     /**
-     * Register the status mbean related to this server if the input param is
-     * true.
+     * Register the status mbean related to this server if the input param is true.
      * <p>
      * If the param is false, the status mbean would not be enabled.
      *
@@ -598,11 +598,10 @@ public class CacheServer implements AutoCloseable {
     }
 
     /**
-     * This method should be used only for debug purposes. Return ZooKeeper
-     * client if clustering mode (ZooKeeper-based) is on.
+     * This method should be used only for debug purposes. Return ZooKeeper client if clustering mode (ZooKeeper-based)
+     * is on.
      *
-     * @return the ZooKeeper client exploited by this CacheServer is clustering
-     * mode is on, null otherwise
+     * @return the ZooKeeper client exploited by this CacheServer is clustering mode is on, null otherwise
      */
     ZooKeeper getZooKeeper() {
         if (this.clusterManager != null) {

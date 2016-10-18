@@ -168,8 +168,9 @@ public class ServerMain implements AutoCloseable {
             case "clustered": {
                 String zkAddress = configuration.getProperty("zk.address", "localhost:1281");
                 int zkSessionTimeout = Integer.parseInt(configuration.getProperty("zk.sessiontimeout", "40000"));
+                boolean zkSecure = Boolean.parseBoolean(configuration.getProperty("zk.secure", "false"));
                 String zkPath = configuration.getProperty("zk.path", "/blazingcache");
-                cacheServer.setupCluster(zkAddress, zkSessionTimeout, zkPath, data);
+                cacheServer.setupCluster(zkAddress, zkSessionTimeout, zkPath, data, zkSecure);
                 break;
             }
             default:
