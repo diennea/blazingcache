@@ -484,7 +484,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
     @Override
     public String toString() {
-        return "CacheServerSideConnection{" + "clientId=" + clientId + " , connectionId=" + connectionId + ", channel=" + channel + ", lastReceivedMessageTs=" + lastReceivedMessageTs + '}';
+        return "CacheServerSideConnection{" + "clientId=" + clientId + " , connectionId=" + connectionId + ", channel=" + channel + ", lastReceivedMessageTs=" + lastReceivedMessageTs + ",user=" + username + '}';
     }
 
     void sendKeyInvalidationMessage(String sourceClientId, String key, BroadcastRequestStatus invalidation) {
