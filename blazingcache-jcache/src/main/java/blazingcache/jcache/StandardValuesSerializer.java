@@ -15,41 +15,40 @@
  */
 package blazingcache.jcache;
 
+import blazingcache.client.impl.JDKEntrySerializer;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.cache.CacheException;
 
 /**
- * Standard keys serializer
+ * Standard values serializer
  *
  * @author enrico.olivelli
  */
 public class StandardValuesSerializer implements Serializer<Object, byte[]> {
 
+    private final static JDKEntrySerializer STANDARD = new JDKEntrySerializer();
+
     @Override
     public byte[] serialize(Object value) {
         try {
-            ByteArrayOutputStream oo = new ByteArrayOutputStream();
-            ObjectOutputStream o = new ObjectOutputStream(oo);
-            o.writeUnshared(value);
-            o.flush();
-            return oo.toByteArray();
-        } catch (IOException err) {
-            throw new CacheException(err);
+            return STANDARD.serializeObject(null, value);
+        } catch (blazingcache.client.CacheException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
     @Override
     public Object deserialize(byte[] cachedValue) {
         try {
-            ByteArrayInputStream oo = new ByteArrayInputStream(cachedValue);
-            ObjectInputStream o = new ObjectInputStream(oo);            
-            return o.readUnshared();
-        } catch (IOException | ClassNotFoundException err) {
-            throw new CacheException(err);
+            return STANDARD.deserializeObject(null, cachedValue);
+        } catch (blazingcache.client.CacheException ex) {
+            throw new RuntimeException(ex);
         }
     }
 

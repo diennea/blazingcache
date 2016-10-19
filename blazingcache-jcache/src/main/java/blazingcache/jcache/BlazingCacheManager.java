@@ -144,6 +144,17 @@ public class BlazingCacheManager implements CacheManager {
             if (jmx) {
                 client.enableJmx(true);
             }
+            client.setEntrySerializer(new EntrySerializer() {
+                @Override
+                public byte[] serializeObject(String key, Object object) throws blazingcache.client.CacheException {
+                    return valuesSerializer.serialize(object);
+                }
+
+                @Override
+                public Object deserializeObject(String key, byte[] value) throws blazingcache.client.CacheException {
+                    return valuesSerializer.deserialize(value);
+                }
+            });
             client.setMaxMemory(maxmemory);
             client.setMaxLocalEntryAge(maxLocalEntryAge);
             client.setFetchPriority(fetchPriority);

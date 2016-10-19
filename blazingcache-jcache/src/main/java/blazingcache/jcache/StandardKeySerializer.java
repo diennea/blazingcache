@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Base64;
-import java.util.UUID;
 import javax.cache.CacheException;
 import org.jboss.netty.util.internal.ConcurrentWeakKeyHashMap;
 
