@@ -39,17 +39,18 @@ public class CacheServerEndpoint implements ServerSideConnectionAcceptor<CacheSe
     private final Map<String, CacheServerSideConnection> clientConnections = new ConcurrentHashMap<>();
     private final Map<Long, CacheServerSideConnection> connections = new ConcurrentHashMap<>();
 
-    private final CacheServer broker;
+    private final CacheServer server;
 
     public CacheServerEndpoint(CacheServer broker) {
-        this.broker = broker;
+        this.server = broker;
     }
 
     @Override
     public CacheServerSideConnection createConnection(Channel channel) {
         CacheServerSideConnection connection = new CacheServerSideConnection();
-        connection.setBroker(broker);
+        connection.setBroker(server);
         connection.setChannel(channel);
+        connection.setRequireAuthentication(server.isRequireAuthentication());
         channel.setMessagesReceiver(connection);
         connections.put(connection.getConnectionId(), connection);
         return connection;

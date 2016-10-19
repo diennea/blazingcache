@@ -75,9 +75,18 @@ public class CacheServer implements AutoCloseable {
     private long slowClientTimeout = 120000;
     private long clientFetchTimeout = 2000;
     private final long lastStartupTimestamp = System.currentTimeMillis();
+    private boolean requireAuthentication = true;
 
     public static String VERSION() {
-        return "1.9.1";
+        return "1.11.0-ALPHA";
+    }
+
+    public boolean isRequireAuthentication() {
+        return requireAuthentication;
+    }
+
+    public void setRequireAuthentication(boolean requireAuthentication) {
+        this.requireAuthentication = requireAuthentication;
     }
 
     public CacheServer(String sharedSecret, ServerHostData serverHostData) {

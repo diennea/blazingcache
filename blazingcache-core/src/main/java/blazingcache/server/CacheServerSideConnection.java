@@ -65,6 +65,14 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         this.server = broker;
     }
 
+    public boolean isRequireAuthentication() {
+        return requireAuthentication;
+    }
+
+    public void setRequireAuthentication(boolean requireAuthentication) {
+        this.requireAuthentication = requireAuthentication;
+    }
+
     public void setClientId(String clientId) {
         this.clientId = clientId;
     }
