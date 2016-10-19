@@ -71,7 +71,7 @@ public class BlazingCacheManager implements CacheManager {
             Properties properties_and_params = new Properties();
             parseUriQueryStringParameters(uri, properties_and_params);
             properties_and_params.putAll(configproperties);
-            String configfile = properties_and_params.getProperty("configfile", "/blazingcache.properties");
+            String configfile = properties_and_params.getProperty("configfile", "blazingcache.properties");
             if (!configfile.isEmpty()) {
                 loadConfigFile(configfile, "configure", classLoader, properties_and_params);
                 try {
