@@ -16,12 +16,14 @@
 package blazingcache.jcache;
 
 import blazingcache.client.CacheClient;
-import static blazingcache.jcache.BlazingCacheCache.JSR107_TCK_101_COMPAT_MODE;
+import blazingcache.client.EntrySerializer;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
 import blazingcache.zookeeper.ZKCacheServerLocator;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -69,6 +71,15 @@ public class BlazingCacheManager implements CacheManager {
             Properties properties_and_params = new Properties();
             parseUriQueryStringParameters(uri, properties_and_params);
             properties_and_params.putAll(configproperties);
+            String configfile = properties_and_params.getProperty("configfile", "/blazingcache.properties");
+            if (!configfile.isEmpty()) {
+                loadConfigFile(configfile, "configure", classLoader, properties_and_params);
+                try {
+                    loadConfigFile(configfile, "context", Thread.currentThread().getContextClassLoader(), properties_and_params);
+                } catch (SecurityException cannotAccess) {
+                    LOG.log(Level.CONFIG, "Cannot access context classloader:" + cannotAccess);
+                }
+            }
             this.usefetch = Boolean.parseBoolean(properties_and_params.getProperty("blazingcache.usefetch", "true"));
             this.fetchPriority = Integer.parseInt(properties_and_params.getProperty("blazingcache.fetchpriority", "10"));
             this.classLoader = classLoader;
@@ -198,7 +209,7 @@ public class BlazingCacheManager implements CacheManager {
         }
         Configuration configuration = res.getConfiguration(Configuration.class);
         if ((!keyType.equals(configuration.getKeyType()))
-                || !valueType.equals(configuration.getValueType())) {
+            || !valueType.equals(configuration.getValueType())) {
             throw new ClassCastException();
         }
         return res;
@@ -216,7 +227,7 @@ public class BlazingCacheManager implements CacheManager {
         }
         Configuration configuration = res.getConfiguration(Configuration.class);
         if ((configuration.getKeyType() != null && !configuration.getKeyType().equals(Object.class))
-                || (configuration.getValueType() != null && !configuration.getValueType().equals(Object.class))) {
+            || (configuration.getValueType() != null && !configuration.getValueType().equals(Object.class))) {
             throw new IllegalArgumentException();
         }
         return res;
@@ -340,5 +351,22 @@ public class BlazingCacheManager implements CacheManager {
         }
     }
     private static final Logger LOG = Logger.getLogger(BlazingCacheManager.class.getName());
+
+    private void loadConfigFile(String configfile, String classLoaderName, ClassLoader classLoader, Properties properties_and_params) {
+
+        InputStream in = classLoader.getResourceAsStream(configfile);
+        if (in != null) {
+            LOG.log(Level.CONFIG, "Loading configuration from resource " + configfile + " from " + classLoaderName + " classloader");
+            try (InputStream read = in) {
+                Properties p = new Properties();
+                p.load(read);
+                properties_and_params.putAll(p);
+            } catch (IOException err) {
+                LOG.log(Level.SEVERE, "Error while configuration from resource " + configfile + " from " + classLoaderName + " classloader: " + err, err);
+            }
+        } else {
+            LOG.log(Level.CONFIG, "Cannot find resource " + configfile + " from " + classLoaderName + " classloader");
+        }
+    }
 
 }
