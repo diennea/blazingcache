@@ -29,4 +29,9 @@ public class ServerRejectedConnectionException extends Exception {
     public ServerRejectedConnectionException(String message) {
         super(message);
     }
+
+    public ServerRejectedConnectionException(String message, Throwable cause) {
+        super(message, cause);
+    }
+    
 }

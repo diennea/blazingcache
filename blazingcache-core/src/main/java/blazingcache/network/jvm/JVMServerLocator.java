@@ -26,9 +26,12 @@ import blazingcache.network.Message;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.ServerNotAvailableException;
 import blazingcache.network.ServerRejectedConnectionException;
+import blazingcache.security.sasl.ClientAuthenticationUtils;
 import blazingcache.server.CacheServer;
 
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Connects to the broker inside the same JVM (for tests)
@@ -48,7 +51,7 @@ public class JVMServerLocator implements ServerLocator {
     }
 
     @Override
-    public Channel connect(ChannelEventListener worker, ConnectionRequestInfo workerInfo) throws InterruptedException, ServerRejectedConnectionException, ServerNotAvailableException {
+    public Channel connect(ChannelEventListener worker, ConnectionRequestInfo clientInfo) throws InterruptedException, ServerRejectedConnectionException, ServerNotAvailableException {
         if (cacheServer == null || !cacheServer.isLeader()) {
             throw new ServerNotAvailableException(new Exception("embedded server is not running"));
         }
@@ -58,7 +61,15 @@ public class JVMServerLocator implements ServerLocator {
         cacheServer.getAcceptor().createConnection(brokerSide);
         brokerSide.setOtherSide(workerSide);
         workerSide.setOtherSide(brokerSide);
-        Message acceptMessage = Message.CLIENT_CONNECTION_REQUEST(workerInfo.getClientId(), workerInfo.getSharedSecret(), workerInfo.getFetchPriority());
+
+        try {
+            ClientAuthenticationUtils.performAuthentication(workerSide, "localhost", clientInfo.getSharedSecret());
+        } catch (Exception err) {
+            LOG.log(Level.SEVERE, "Auth failed:" + err, err);
+            throw new ServerRejectedConnectionException("jvm auth failed", err);
+        }
+
+        Message acceptMessage = Message.CLIENT_CONNECTION_REQUEST(clientInfo.getClientId(), clientInfo.getSharedSecret(), clientInfo.getFetchPriority());
         try {
             Message connectionResponse = workerSide.sendMessageWithReply(acceptMessage, 10000);
             if (connectionResponse.type == Message.TYPE_ACK) {
@@ -71,6 +82,7 @@ public class JVMServerLocator implements ServerLocator {
         }
 
     }
+    private static final Logger LOG = Logger.getLogger(JVMServerLocator.class.getName());
 
     @Override
     public void brokerDisconnected() {
