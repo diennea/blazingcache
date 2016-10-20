@@ -990,7 +990,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #put(java.lang.String, byte[], long, blazingcache.client.KeyLock)
      */
     public boolean load(String key, byte[] data, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
-        return put(key, data, null, expireTime, lock);
+        return load(key, data, null, expireTime, lock);
     }
 
     /**
