@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.blazingcache</groupId>
         <artifactId>blazingcache</artifactId>
-        <version>1.11.0-ALPHA</version>
+        <version>1.11.0-ALPHA2</version>
     </parent>
     <artifactId>blazingcache-services</artifactId>    
     <packaging>jar</packaging>

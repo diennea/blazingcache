@@ -95,21 +95,15 @@ public class SaslNettyServer {
 
                     final String servicePrincipalName, serviceHostname;
                     if (indexOf > 0) {
-                        // e.g. servicePrincipalName := "zookeeper"
                         servicePrincipalName = servicePrincipalNameAndHostname.substring(0, indexOf);
-                        // e.g. serviceHostname := "myhost.foo.com"
                         serviceHostname = serviceHostnameAndKerbDomain.substring(0, indexOfAt);
                     } else {
                         servicePrincipalName = servicePrincipalNameAndHostname.substring(0, indexOfAt);
                         serviceHostname = null;
                     }
 
-                    final String _mech = "GSSAPI";   // TODO: should depend on zoo.cfg specified mechs, but if subject is non-null, it can be assumed to be GSSAPI.
-
-                    LOG.severe("serviceHostname is '" + serviceHostname + "'");
-                    LOG.severe("servicePrincipalName is '" + servicePrincipalName + "'");
-                    LOG.severe("SASL mechanism(mech) is '" + _mech + "'");
-                    LOG.severe("Subject is '" + subject + "'");
+                    final String _mech = "GSSAPI";
+                    LOG.severe("serviceHostname is '" + serviceHostname + "', servicePrincipalName is '" + servicePrincipalName + "', SASL mechanism(mech) is '" + _mech + "', Subject is '" + subject + "'");
 
                     try {
                         return Subject.doAs(subject, new PrivilegedExceptionAction<SaslServer>() {
@@ -151,7 +145,7 @@ public class SaslNettyServer {
         String section = "BlazingCacheServer";
         AppConfigurationEntry[] entries = Configuration.getConfiguration().getAppConfigurationEntry(section);
         if (entries == null) {
-            LOG.log(Level.SEVERE,"JAAS not configured or no "+section+" present in JAAS Configuration file");
+            LOG.log(Level.SEVERE, "JAAS not configured or no " + section + " present in JAAS Configuration file");
             return null;
         }
         LoginContext loginContext = new LoginContext(section, new ClientCallbackHandler(null));

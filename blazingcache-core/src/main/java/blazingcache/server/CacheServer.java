@@ -78,7 +78,7 @@ public class CacheServer implements AutoCloseable {
     private boolean requireAuthentication = true;
 
     public static String VERSION() {
-        return "1.11.0-ALPHA";
+        return "1.11.0-ALPHA2";
     }
 
     public boolean isRequireAuthentication() {
