@@ -69,6 +69,8 @@
                 <module>./blazingcache-core</module>
                 <module>./blazingcache-jcache</module>
                 <module>./blazingcache-services</module>
+                <module>./blazingcache-website</module>
+                <module>./blazingcache-site-skin</module>
             </modules>   
             <distributionManagement>        
                 <repository>                            
