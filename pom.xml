@@ -44,6 +44,11 @@
             <name>Matteo Casadei</name>
             <organization>Diennea</organization>
         </developer>
+        <developer>
+            <id>nicoloboschi</id>
+            <name>Nicolò Boschi</name>
+            <organization>Diennea</organization>
+        </developer>
     </developers>
     <issueManagement>
         <url>https://dev.blazingcache.org/jira</url>		
@@ -209,6 +214,13 @@
                     </plugin>
                 </plugins>              
             </build>
+        </profile>
+        <profile>
+            <id>website</id>            
+            <modules>
+                <module>./blazingcache-site-skin</module>
+                <module>./blazingcache-website</module>                         
+            </modules>
         </profile>
     </profiles>
 </project>
