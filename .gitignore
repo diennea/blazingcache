@@ -1,6 +1,8 @@
 /blazingcache-core/target/
 /blazingcache-jcache/target/
 /blazingcache-services/target/
+/blazingcache-website/target/
+/blazingcache-site-skin/target/
 /target/
 **/.checkstyle
 **/.classpath

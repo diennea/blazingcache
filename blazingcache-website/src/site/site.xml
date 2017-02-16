@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project>
+    <custom>
+        <pageTitle>Blazing Cache - Diennea</pageTitle>
+        <navigationBar>
+            <items>
+                <item>
+                    <text>Guide</text>
+                    <href>https://blazingcache.readme.io/</href>
+                </item>
+                <item>
+                    <text>Community</text>
+                    <href>http://lists.blazingcache.org/mailman/listinfo</href>
+                </item>
+                <item>
+                    <text>Bugs</text>
+                    <href>https://dev.blazingcache.org/jira/</href>
+                </item>
+                <item>
+                    <text>GitHub</text>
+                    <href>https://github.com/diennea/blazingcache</href>
+                </item>
+                <item>
+                    <text>Download</text>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
+                </item>
+            </items>
+        </navigationBar>
+        
+        <hero>
+            <title>Blazing Cache</title>
+            <subtitle>A fast distributed cache</subtitle>
+            <brand>Diennea engineering</brand>
+        </hero>
+        
+        <changelog>
+            <projectNameForChangelog>BlazingCache</projectNameForChangelog>
+            <releases>
+                <release>
+                    <version>1.11.0</version>
+                    <date>November 2016</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10104</href>
+                    <text>BlazingCache 1.11.0 introduces SASL/Kerberos authentication</text>
+                </release>
+                <release>
+                    <version>1.10.0</version>
+                    <date>September 2016</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10101</href>
+                    <text>BlazingCache 1.10.0 introduces CacheClient.load() feature</text>
+                </release>
+                <release>
+                    <version>1.9.0</version>
+                    <date>June 2016</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10009</href>
+                    <text>BlazingCache 1.9.0 introduces JCache JSR107 support for StoreByReference optional feature</text>
+                </release>
+                <release>
+                    <version>1.8.0</version>
+                    <date>May 2016</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10007</href>
+                    <text>BlazingCache 1.8.0 is a GA release</text>
+                </release>
+                <release>
+                    <version>1.7.0</version>
+                    <date>April 2016</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10006</href>
+                    <text>BlazingCache 1.7.0 introduces fetchObject, getObject and putObject methods</text>
+                </release>
+                <release>
+                    <version>1.6.0</version>
+                    <date>26 March 2016</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10005</href>
+                    <text>BlazingCache 1.6.0 introduces fetch/put/invalidate serialization</text>
+                </release>s
+                <release>
+                    <version>1.5.0</version>
+                    <date>1 March 2016</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10004</href>
+                    <text>BlazingCache 1.5.0 introduces detailed performance counters</text>
+                </release>
+                <release>
+                    <version>1.4.0</version>
+                    <date>26 January 2016</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10003</href>
+                    <text>BlazingCache 1.4.0 introduces distributed locks</text>
+                </release>
+                <release>
+                    <version>1.3.0</version>
+                    <date>21 January 2016</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10001</href>
+                    <text>BlazingCache 1.3.0 introduces JSR107 API, first public release</text>
+                </release>
+            </releases>
+        </changelog>
+    </custom>
+    
+    <skin>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>blazingcache-website-skin</artifactId>
+        <version>${project.version}</version>
+    </skin>
+</project>
