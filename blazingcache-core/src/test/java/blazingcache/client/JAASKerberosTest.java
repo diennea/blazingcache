@@ -75,7 +75,7 @@ public class JAASKerberosTest {
         String principalClientNoRealm = "blazingcacheclient/" + localhostName;
         String principalClient = principalClientNoRealm + "@" + kdc.getRealm();
 
-        System.out.println("adding principal: " + principalServerNoRealm);
+        System.out.println("adding principal: " + principalServerNoRealm+" -> "+byName);
         System.out.println("adding principal: " + principalClientNoRealm+" -> "+byName);
 
         File keytabClient = new File(kerberosWorkDir.getRoot(), "blazingcacheclient.keytab");
