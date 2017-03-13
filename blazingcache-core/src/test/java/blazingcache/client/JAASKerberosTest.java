@@ -24,6 +24,7 @@ import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
 import java.io.File;
 import java.io.FileWriter;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.logging.ConsoleHandler;
@@ -64,13 +65,18 @@ public class JAASKerberosTest {
         kdc.start();
 
         String localhostName = "localhost.localdomain";
+        InetAddress byName = InetAddress.getByName(localhostName);
+        System.err.println("debug InetAddress of "+localhostName+" is "+byName);
+        System.err.println("InetAddress of "+localhostName+" is "+byName.getHostAddress());
+        System.err.println("InetAddress of "+localhostName+" is "+byName.getCanonicalHostName());
+        System.err.println("InetAddress of "+localhostName+" is "+byName.getHostName());
         String principalServerNoRealm = "blazingcache/" + localhostName;
         String principalServer = "blazingcache/" + localhostName + "@" + kdc.getRealm();
         String principalClientNoRealm = "blazingcacheclient/" + localhostName;
         String principalClient = principalClientNoRealm + "@" + kdc.getRealm();
 
-        System.out.println("adding principal: " + principalServerNoRealm);
-        System.out.println("adding principal: " + principalClientNoRealm);
+        System.out.println("adding principal: " + principalServerNoRealm+" -> "+byName);
+        System.out.println("adding principal: " + principalClientNoRealm+" -> "+byName);
 
         File keytabClient = new File(kerberosWorkDir.getRoot(), "blazingcacheclient.keytab");
         kdc.createPrincipal(keytabClient, principalClientNoRealm);
