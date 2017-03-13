@@ -205,11 +205,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 }
                 String _clientId = message.clientId;
                 if (_clientId == null) {
-                    answerConnectionNotAcceptedAndClose(message, new Exception("invalid clientid " + _clientId));
+                    answerConnectionNotAcceptedAndClose(message, new Exception("invalid null clientid"));
                     return;
                 }
                 if (!server.isLeader()) {
-                    answerConnectionNotAcceptedAndClose(message, new Exception("this broker is not yet writable"));
+                    answerConnectionNotAcceptedAndClose(message, new Exception("this server is not yet leader"));
                     return;
                 }
                 LOGGER.log(Level.SEVERE, "registering connection " + connectionId + ", clientId:" + _clientId);
@@ -496,16 +496,18 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             return;
         }
         long _start = System.currentTimeMillis();
-        _channel.sendMessageWithAsyncReply(Message.INVALIDATE(sourceClientId, key), server.getSlowClientTimeout(), new ReplyCallback() {
+        _channel.sendMessageWithAsyncReply(Message.INVALIDATE(sourceClientId, key), server.getSlowClientTimeout(),
+            new ReplyCallback() {
 
             @Override
             public void replyReceived(Message originalMessage, Message message, Throwable error) {
                 if (error != null) {
                     long _delta = System.currentTimeMillis() - _start;
-                    LOGGER.log(Level.SEVERE, clientId + " not answered in time (elapsed " + _delta + " ms) to invalidation " + key + ": " + message + ", " + error);
-                    error.printStackTrace();
+                    LOGGER.log(Level.SEVERE, "{0} not answered in time (elapsed {1} ms) to invalidation {2}: {3}, {4}",
+                        new Object[]{clientId, _delta, key, message, error});
+                    LOGGER.log(Level.SEVERE, "error for "+clientId, error);
                 } else {
-                    LOGGER.log(Level.FINEST, clientId + " answered to invalidation " + key + ": " + message + ", " + error);
+                    LOGGER.log(Level.FINEST, "{0} answered to invalidation {1}: {2}", new Object[]{clientId, key, message});
                 }
                 // in ogni caso il client ha finito
                 invalidation.clientDone(clientId);
@@ -521,16 +523,18 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             return;
         }
         long _start = System.currentTimeMillis();
-        _channel.sendMessageWithAsyncReply(Message.PUT_ENTRY(sourceClientId, key, serializedData, expireTime), server.getSlowClientTimeout(), new ReplyCallback() {
+        _channel.sendMessageWithAsyncReply(Message.PUT_ENTRY(sourceClientId, key, serializedData, expireTime),
+            server.getSlowClientTimeout(), new ReplyCallback() {
 
             @Override
             public void replyReceived(Message originalMessage, Message message, Throwable error) {
                 if (error != null) {
                     long _delta = System.currentTimeMillis() - _start;
-                    LOGGER.log(Level.SEVERE, clientId + " not answered in time (elapsed " + _delta + " ms) to put " + key + ": " + message + ", " + error);
-                    error.printStackTrace();
+                    LOGGER.log(Level.SEVERE, "{0} not answered in time (elapsed {1} ms) to put {2}: {3}, {4}",
+                        new Object[]{clientId, _delta, key, message, error});
+                    LOGGER.log(Level.SEVERE, "error for "+clientId, error);
                 } else {
-                    LOGGER.log(Level.FINEST, clientId + " answered to put " + key + ": " + message + ", " + error);
+                    LOGGER.log(Level.FINEST, "{0} answered to put {1}: {2}", new Object[]{clientId, key, message});
                 }
                 // in ogni caso il client ha finito
                 invalidation.clientDone(clientId);

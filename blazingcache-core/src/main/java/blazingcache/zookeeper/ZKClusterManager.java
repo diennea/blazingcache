@@ -19,6 +19,7 @@
  */
 package blazingcache.zookeeper;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -61,7 +62,10 @@ public class ZKClusterManager implements AutoCloseable {
     CountDownLatch firstConnectionLatch = new CountDownLatch(1);
 
     void waitForConnection() throws InterruptedException {
-        firstConnectionLatch.await(this.connectionTimeout, TimeUnit.MILLISECONDS);
+        boolean ok = firstConnectionLatch.await(this.connectionTimeout, TimeUnit.MILLISECONDS);
+        if (!ok) {
+            LOGGER.log(Level.INFO, "Connection to ZK cannot be established within " + connectionTimeout + " ms");
+        }
     }
 
     private class SystemWatcher implements Watcher {
@@ -77,6 +81,13 @@ public class ZKClusterManager implements AutoCloseable {
                     LOGGER.log(Level.SEVERE, "ZK Session connected. " + zk + "session id: " + zk.getSessionId() + "; session password: " + arraytohexstring(zk.getSessionPasswd()));
                     firstConnectionLatch.countDown();
                     break;
+                case SaslAuthenticated:
+                    LOGGER.log(Level.SEVERE, "ZK Session SaslAuthenticated. " + zk + "session id: " + zk.getSessionId() + "; session password: " + arraytohexstring(zk.getSessionPasswd()));
+                    break;
+                default:
+                    // noop
+                    break;
+
             }
         }
     }
@@ -100,6 +111,7 @@ public class ZKClusterManager implements AutoCloseable {
      * @param localhostdata
      * @throws Exception
      */
+    @SuppressFBWarnings("EI_EXPOSE_REP2")
     public ZKClusterManager(String zkAddress, int zkTimeout, String basePath,
         LeaderShipChangeListener listener, byte[] localhostdata, boolean writeacls) throws Exception {
         this.zk = new ZooKeeper(zkAddress, zkTimeout, new SystemWatcher());
@@ -179,6 +191,9 @@ public class ZKClusterManager implements AutoCloseable {
                     break;
                 case NONODE:
                     requestLeadership();
+                    break;
+                default:
+                    // no-op
                     break;
             }
         }

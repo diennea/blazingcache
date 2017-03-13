@@ -15,7 +15,6 @@
  */
 package blazingcache.jcache;
 
-import blazingcache.client.CacheEntry;
 import java.util.Objects;
 import javax.cache.Cache;
 

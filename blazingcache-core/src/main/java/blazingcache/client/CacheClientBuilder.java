@@ -69,8 +69,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * The the ID of the client, it MUST be unique, it represent the peer on the
-     * network.
+     * The the ID of the client, it MUST be unique, it represent the peer on the network.
      *
      * @param clientId
      * @return
@@ -81,9 +80,8 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Assign a priority to be used when a client is to be choosen for serving a
-     * remote fetch. Setting fetchPriority to 0 will prevent this client from
-     * being asked to serve fetch requests from other clients
+     * Assign a priority to be used when a client is to be choosen for serving a remote fetch. Setting fetchPriority to
+     * 0 will prevent this client from being asked to serve fetch requests from other clients
      *
      * @param fetchPriority
      * @return
@@ -146,8 +144,7 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Limit on the memory retained by the cache, the value is expressed in
-     * bytes.
+     * Limit on the memory retained by the cache, the value is expressed in bytes.
      *
      * @param maxMemory
      * @return
@@ -158,13 +155,11 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Maximum "local" age of any entry (in millis). Sometimes a client retains
-     * "immortal" entries which does not need anymore and continues to receive
-     * notifications. This options evicts automatically every entry which is too
+     * Maximum "local" age of any entry (in millis). Sometimes a client retains "immortal" entries which does not need
+     * anymore and continues to receive notifications. This options evicts automatically every entry which is too
      * old.<br>
-     * This option also ensures that you are not going to keep data which could
-     * be stale if the client which updated real data (on database for instance)
-     * dies (halt/crash) before invalidating the cache
+     * This option also ensures that you are not going to keep data which could be stale if the client which updated
+     * real data (on database for instance) dies (halt/crash) before invalidating the cache
      */
     public CacheClientBuilder maxLocalEntryAge(long maxLocalEntryAge) {
         this.maxLocalEntryAge = maxLocalEntryAge;
@@ -207,8 +202,7 @@ public class CacheClientBuilder {
     /**
      * JMX flag to enable publishing of JMX status and statistics.
      *
-     * @param jmx true in order to enable publication of status and statistics
-     * mbeans on JMX
+     * @param jmx true in order to enable publication of status and statistics mbeans on JMX
      * @return the instance of {
      * @see CacheClientBuilder}
      */
@@ -263,9 +257,8 @@ public class CacheClientBuilder {
     }
 
     /**
-     * Builds up the client. in LOCAL mode eventually a local embedded
-     * CacheServer will be started too. The returned Client MUST be started in
-     * order to work.
+     * Builds up the client. in LOCAL mode eventually a local embedded CacheServer will be started too. The returned
+     * Client MUST be started in order to work.
      *
      * @return the new instance of {
      * @see CacheClient}
@@ -305,6 +298,8 @@ public class CacheClientBuilder {
         final CacheClient res = new CacheClient(clientId, clientSecret, locator);
         res.setMaxMemory(maxMemory);
         res.setMaxLocalEntryAge(maxLocalEntryAge);
+        res.setEntrySerializer(entrySerializer);
+        res.setFetchPriority(fetchPriority);
         if (this.jmx) {
             res.enableJmx(true);
         }

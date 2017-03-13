@@ -29,7 +29,7 @@ public class BlazingCacheClientStatisticsMXBean implements CacheClientStatistics
     /**
      * the cache client the provided statistics refers to.
      */
-    private final CacheClient client;
+    private final transient CacheClient client;
 
     /**
      * Construct a new MXBean to publish client statistics on JMX.
@@ -54,8 +54,8 @@ public class BlazingCacheClientStatisticsMXBean implements CacheClientStatistics
     public long getClientPuts() {
         return this.client.getClientPuts();
     }
-    
-     /**
+
+    /**
      * {@inheritDoc}
      */
     public long getClientLoads() {

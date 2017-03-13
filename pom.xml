@@ -52,7 +52,7 @@
     </developers>
     <issueManagement>
         <url>https://dev.blazingcache.org/jira</url>		
-    </issueManagement>
+    </issueManagement>    
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -63,7 +63,16 @@
         <libs.jackson.mapper>1.9.11</libs.jackson.mapper>
         <libs.zookeeper>3.4.8</libs.zookeeper>
         <libs.curator>2.8.0</libs.curator>        
+        <libs.findbugsannotations>3.0.0</libs.findbugsannotations>        
     </properties>  
+    <dependencies>
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>annotations</artifactId>
+            <version>${libs.findbugsannotations}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
     <profiles>
         <profile>
             <id>default</id>
@@ -85,7 +94,12 @@
                 </repository>        
             </distributionManagement>     
             <build>               
-                <plugins>                        
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>findbugs-maven-plugin</artifactId>
+                        <version>3.0.4</version>
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>

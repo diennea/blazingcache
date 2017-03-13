@@ -22,7 +22,11 @@ package blazingcache.services;
 import blazingcache.network.ServerHostData;
 import blazingcache.server.CacheServer;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
@@ -88,13 +92,13 @@ public class ServerMain implements AutoCloseable {
             File configFile;
             if (args.length > 0) {
                 configFile = new File(args[0]);
-                try (FileReader reader = new FileReader(configFile)) {
+                try (Reader reader = new InputStreamReader(new FileInputStream(configFile), StandardCharsets.UTF_8)) {
                     configuration.load(reader);
                 }
             } else {
                 configFile = new File("conf/server.properties");
                 if (configFile.isFile()) {
-                    try (FileReader reader = new FileReader(configFile)) {
+                    try (Reader reader = new InputStreamReader(new FileInputStream(configFile), StandardCharsets.UTF_8)) {
                         configuration.load(reader);
                     }
                 } else {

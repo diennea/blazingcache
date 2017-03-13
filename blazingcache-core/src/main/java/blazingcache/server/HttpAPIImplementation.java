@@ -34,8 +34,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.codehaus.jackson.map.ObjectMapper;
 
 /**
- * Implementation of the HTTP API, both for embedded and for standalone
- * installation
+ * Implementation of the HTTP API, both for embedded and for standalone installation
  *
  * @author enrico.olivelli
  */
@@ -133,6 +132,9 @@ public class HttpAPIImplementation {
                     resultMap.put("status", "not_started");
                 }
                 break;
+            default:
+                resultMap.put("error", "undefined view " + view);
+                return;
         }
 
         ObjectMapper mapper = new ObjectMapper();

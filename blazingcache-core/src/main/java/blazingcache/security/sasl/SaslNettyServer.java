@@ -54,6 +54,8 @@ public class SaslNettyServer {
     private static final Logger LOG = Logger
         .getLogger(SaslNettyServer.class.getName());
 
+    private static final String SERVER_JAAS_SECTION = "BlazingCacheServer";
+
     private SaslServer saslServer;
     private final String sharedSecret;
 
@@ -142,13 +144,13 @@ public class SaslNettyServer {
     }
 
     private Subject loginServer() throws SaslException, PrivilegedActionException, LoginException {
-        String section = "BlazingCacheServer";
-        AppConfigurationEntry[] entries = Configuration.getConfiguration().getAppConfigurationEntry(section);
+
+        AppConfigurationEntry[] entries = Configuration.getConfiguration().getAppConfigurationEntry(SERVER_JAAS_SECTION);
         if (entries == null) {
-            LOG.log(Level.SEVERE, "JAAS not configured or no " + section + " present in JAAS Configuration file");
+            LOG.log(Level.SEVERE, "JAAS not configured or no " + SERVER_JAAS_SECTION + " present in JAAS Configuration file");
             return null;
         }
-        LoginContext loginContext = new LoginContext(section, new ClientCallbackHandler(null));
+        LoginContext loginContext = new LoginContext(SERVER_JAAS_SECTION, new ClientCallbackHandler(null));
         loginContext.login();
         return loginContext.getSubject();
 
@@ -288,17 +290,16 @@ public class SaslNettyServer {
     private static class SaslServerCallbackHandler implements CallbackHandler {
 
         private static final String USER_PREFIX = "user_";
-        final String serverSection = "BlazingCacheServer";
 
         private String userName;
         private final Map<String, String> credentials = new HashMap<String, String>();
 
         public SaslServerCallbackHandler(Configuration configuration) throws IOException {
 
-            AppConfigurationEntry configurationEntries[] = configuration.getAppConfigurationEntry(serverSection);
+            AppConfigurationEntry configurationEntries[] = configuration.getAppConfigurationEntry(SERVER_JAAS_SECTION);
 
             if (configurationEntries == null) {
-                String errorMessage = "Could not find a '" + serverSection + "' entry in this configuration: Server cannot start.";
+                String errorMessage = "Could not find a '" + SERVER_JAAS_SECTION + "' entry in this configuration: Server cannot start.";
 
                 throw new IOException(errorMessage);
             }

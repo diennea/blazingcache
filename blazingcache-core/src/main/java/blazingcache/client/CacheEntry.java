@@ -19,6 +19,7 @@
  */
 package blazingcache.client;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.lang.ref.SoftReference;
 
 /**
@@ -26,6 +27,7 @@ import java.lang.ref.SoftReference;
  *
  * @author enrico.olivelli
  */
+@SuppressFBWarnings({"EI_EXPOSE_REP2", "EI_EXPOSE_REP"})
 public final class CacheEntry {
 
     private long lastGetTime;
@@ -87,7 +89,7 @@ public final class CacheEntry {
 
     @Override
     public String toString() {
-        return "CacheEntry{" + "key=" + key + ", lastGetTime=" + lastGetTime + ", serializedData=" + serializedData + ", expiretime=" + expiretime + '}';
+        return "CacheEntry{" + "key=" + key + ", lastGetTime=" + lastGetTime + ", expiretime=" + expiretime + '}';
     }
 
 }

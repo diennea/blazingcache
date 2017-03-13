@@ -88,13 +88,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final AtomicLong clientMissedGetsToMissedFetches;
 
     /**
-     * Maximum "local" age of any entry (in millis). Sometimes a client retains
-     * "immortal" entries which does not need anymore and continues to receive
-     * notifications. This options evicts automatically every entry which is too
+     * Maximum "local" age of any entry (in millis). Sometimes a client retains "immortal" entries which does not need
+     * anymore and continues to receive notifications. This options evicts automatically every entry which is too
      * old.<br>
-     * This option also ensures that you are not going to keep data which could
-     * be stale if the client which updated real data (on database for instance)
-     * dies (halt/crash) before invalidating the cache
+     * This option also ensures that you are not going to keep data which could be stale if the client which updated
+     * real data (on database for instance) dies (halt/crash) before invalidating the cache
      */
     private long maxLocalEntryAge = 0;
 
@@ -107,22 +105,19 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Maximum amount of memory used for storing entry values. 0 or negative to
-     * disable
+     * Maximum amount of memory used for storing entry values. 0 or negative to disable
      */
     private long maxMemory = 0;
 
     /**
-     * Maximum amount of memory used for storing entry values. 0 or negative to
-     * disable.
+     * Maximum amount of memory used for storing entry values. 0 or negative to disable.
      */
     public long getMaxMemory() {
         return maxMemory;
     }
 
     /**
-     * Maximum amount of memory used for storing entry values. 0 or negative to
-     * disable
+     * Maximum amount of memory used for storing entry values. 0 or negative to disable
      */
     public void setMaxMemory(long maxMemory) {
         this.maxMemory = maxMemory;
@@ -134,9 +129,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Assign a priority to be used when a client is to be choosen for serving a
-     * remote fetch. Setting fetchPriority to 0 will prevent this client from
-     * being asked to serve fetch requests from other clients
+     * Assign a priority to be used when a client is to be choosen for serving a remote fetch. Setting fetchPriority to
+     * 0 will prevent this client from being asked to serve fetch requests from other clients
      *
      * @param fetchPriority
      */
@@ -225,8 +219,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Start the client. You MUST start the client before using it, otherwise
-     * the client will always operated in disconnected mode
+     * Start the client. You MUST start the client before using it, otherwise the client will always operated in
+     * disconnected mode
      *
      * @see #isConnected()
      * @see #waitForConnection(int)
@@ -287,11 +281,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns the timestamp in ms of the last successful connection to the
-     * server.
+     * Returns the timestamp in ms of the last successful connection to the server.
      * <p>
-     * In case of the client being currently disconnected, the value returned
-     * will be 0.
+     * In case of the client being currently disconnected, the value returned will be 0.
      *
      * @return the timestamp of the last successful connection to the server
      */
@@ -336,8 +328,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Disconnects the client. This operation autmatically evicts all the
-     * entries from the local cache
+     * Disconnects the client. This operation autmatically evicts all the entries from the local cache
      */
     public void disconnect() {
         try {
@@ -451,7 +442,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             @Override
             public void accept(CacheEntry t) {
                 if ((maxMemory > 0 && releasedMemory < to_release)
-                        || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {
+                    || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {
                     evictable.add(t);
                     releasedMemory += t.getSerializedData().length;
                 }
@@ -460,7 +451,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
         try {
             cache.values().stream().sorted(
-                    new Comparator<CacheEntry>() {
+                new Comparator<CacheEntry>() {
 
                 @Override
                 public int compare(CacheEntry o1, CacheEntry o2) {
@@ -536,7 +527,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     private boolean checkPerformEvictionForMaxLocalEntryAge(final long now) {
         return maxLocalEntryAge > 0
-                && now - lastPerformedEvictionTimestamp >= maxLocalEntryAge / 2;
+            && now - lastPerformedEvictionTimestamp >= maxLocalEntryAge / 2;
     }
 
     @Override
@@ -609,19 +600,22 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 if (_channel != null) {
                     if (entry != null) {
                         _channel.sendReplyMessage(message,
-                                Message.ACK(clientId)
+                            Message.ACK(clientId)
                                 .setParameter("data", entry.getSerializedData())
                                 .setParameter("expiretime", entry.getExpiretime())
                         );
                     } else {
                         _channel.sendReplyMessage(message,
-                                Message.ERROR(clientId, new Exception("entry " + key + " no more here"))
+                            Message.ERROR(clientId, new Exception("entry " + key + " no more here"))
                         );
                     }
                 }
 
             }
             break;
+            default:
+                LOGGER.log(Level.SEVERE, "{0} dropping message {1} from {2} -> {3}", new Object[]{clientId, message.type, message.clientId});
+                break;
         }
     }
 
@@ -661,9 +655,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns an entry from the local cache, if not found asks to the
-     * CacheServer to find the entry on other clients. If you need to get the
-     * local 'reference' to the object you can use the {@link #fetchObject(java.lang.String)
+     * Returns an entry from the local cache, if not found asks to the CacheServer to find the entry on other clients.
+     * If you need to get the local 'reference' to the object you can use the {@link #fetchObject(java.lang.String)
      * } function
      *
      * @param key
@@ -681,9 +674,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final PendingFetchesManager runningFetches = new PendingFetchesManager();
 
     /**
-     * Returns an entry from the local cache, if not found asks the CacheServer
-     * to find the entry on other clients. If you need to get the local
-     * 'reference' to the object you can use the {@link #fetchObject(java.lang.String, blazingcache.client.KeyLock) )
+     * Returns an entry from the local cache, if not found asks the CacheServer to find the entry on other clients. If
+     * you need to get the local 'reference' to the object you can use the {@link #fetchObject(java.lang.String, blazingcache.client.KeyLock) )
      * } function
      *
      * @param key
@@ -755,8 +747,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Modifies the expireTime for a given entry. Expiration works at
-     * CacheServer side.
+     * Modifies the expireTime for a given entry. Expiration works at CacheServer side.
      *
      * @param key
      * @param expiretime
@@ -766,8 +757,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Modifies the expireTime for a given entry. Expiration works at
-     * CacheServer side.
+     * Modifies the expireTime for a given entry. Expiration works at CacheServer side.
      *
      * @param key
      * @param expiretime
@@ -798,9 +788,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Returns an entry from the local cache. No network operations will be
-     * executed. If you need to get the local 'reference' to the object you can
-     * use the {@link #getObject(java.lang.String) } function
+     * Returns an entry from the local cache. No network operations will be executed. If you need to get the local
+     * 'reference' to the object you can use the {@link #getObject(java.lang.String) } function
      *
      * @param key
      * @return
@@ -825,8 +814,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private static final int invalidateTimeout = 240000;
 
     /**
-     * Invalidates an entry from the local cache and blocks until any other
-     * client which holds the same entry has invalidated the entry locally.
+     * Invalidates an entry from the local cache and blocks until any other client which holds the same entry has
+     * invalidated the entry locally.
      *
      * @param key
      * @throws InterruptedException
@@ -878,8 +867,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Same as {@link #invalidate(java.lang.String) } but it applies to every
-     * entry whose key 'startsWith' the given prefix.
+     * Same as {@link #invalidate(java.lang.String) } but it applies to every entry whose key 'startsWith' the given
+     * prefix.
      *
      * @param prefix
      * @throws InterruptedException
@@ -915,13 +904,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Put an entry on the local cache. This method will also notify of the
-     * change to all other clients which hold the same entry locally.
+     * Put an entry on the local cache. This method will also notify of the change to all other clients which hold the
+     * same entry locally.
      *
      * @param key
      * @param data
-     * @param expireTime This is the UNIX timestamp at which the entry should be
-     * invalidated automatically. Use 0 in order to create an immortal entry
+     * @param expireTime This is the UNIX timestamp at which the entry should be invalidated automatically. Use 0 in
+     * order to create an immortal entry
      * @return
      * @throws InterruptedException
      * @throws CacheException
@@ -932,15 +921,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Loads an entry on the local cache. This method will NOT notify the
-     * change to all other clients holding the same entry locally, but a
-     * listener on the entry will be registered on the server in order to
-     * let this client receive notifications about the entry.
+     * Loads an entry on the local cache. This method will NOT notify the change to all other clients holding the same
+     * entry locally, but a listener on the entry will be registered on the server in order to let this client receive
+     * notifications about the entry.
      *
      * @param key
      * @param data
-     * @param expireTime This is the UNIX timestamp at which the entry should be
-     * invalidated automatically. Use 0 in order to create an immortal entry
+     * @param expireTime This is the UNIX timestamp at which the entry should be invalidated automatically. Use 0 in
+     * order to create an immortal entry
      * @return
      * @throws InterruptedException
      * @throws CacheException
@@ -951,13 +939,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Put an entry on the local cache. This method will also notify the
-     * change to all other clients holding the same entry locally.
+     * Put an entry on the local cache. This method will also notify the change to all other clients holding the same
+     * entry locally.
      *
      * @param key
      * @param data
-     * @param expireTime This is the UNIX timestamp at which the entry should be
-     * invalidated automatically. Use 0 in order to create an immortal entry
+     * @param expireTime This is the UNIX timestamp at which the entry should be invalidated automatically. Use 0 in
+     * order to create an immortal entry
      * @param lock This is a lock previously acquired using the {@link #lock(java.lang.String)
      * } function
      * @return
@@ -971,15 +959,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Loads an entry on the local cache. This method will NOT notify the
-     * change to all other clients holding the same entry locally, but a
-     * listener on the entry will be registered on the server in order to
-     * let this client receive notifications about the entry.
+     * Loads an entry on the local cache. This method will NOT notify the change to all other clients holding the same
+     * entry locally, but a listener on the entry will be registered on the server in order to let this client receive
+     * notifications about the entry.
      *
      * @param key
      * @param data
-     * @param expireTime This is the UNIX timestamp at which the entry should be
-     * invalidated automatically. Use 0 in order to create an immortal entry
+     * @param expireTime This is the UNIX timestamp at which the entry should be invalidated automatically. Use 0 in
+     * order to create an immortal entry
      * @param lock This is a lock previously acquired using the {@link #lock(java.lang.String)
      * } function
      * @return
@@ -994,8 +981,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Same as {@link #put(java.lang.String, byte[], long) } but the provided
-     * Object will be serialized using {@link EntrySerializer}.
+     * Same as {@link #put(java.lang.String, byte[], long) } but the provided Object will be serialized using
+     * {@link EntrySerializer}.
      *
      * @param key
      * @param object
@@ -1012,8 +999,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Same as {@link #load(java.lang.String, byte[], long) } but the provided
-     * Object will be serialized using {@link EntrySerializer}.
+     * Same as {@link #load(java.lang.String, byte[], long) } but the provided Object will be serialized using
+     * {@link EntrySerializer}.
      *
      * @param key
      * @param object
@@ -1201,8 +1188,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Register the statistics mbean related to this client if the input param
-     * is set to true.
+     * Register the statistics mbean related to this client if the input param is set to true.
      * <p>
      * If the param is false, the statistics mbean would not be enabled.
      *
@@ -1292,16 +1278,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      *
-     * @return number of missed gets that ended with an unsuccessful remote read
-     * as well.
+     * @return number of missed gets that ended with an unsuccessful remote read as well.
      */
     public long getClientMissedGetsToMissedFetches() {
         return this.clientMissedGetsToMissedFetches.get();
     }
 
     /**
-     * Return actual statistics. Statistics are always computed even if not
-     * enabled
+     * Return actual statistics. Statistics are always computed even if not enabled
      *
      * @return actual statistics
      */
@@ -1310,9 +1294,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Same as {@link #get(java.lang.String) }, but returns a deserialized
-     * version of the Object stored on the entry. The deserialized Object will
-     * be retained togheter with the Entry and client code MUST not change its
+     * Same as {@link #get(java.lang.String) }, but returns a deserialized version of the Object stored on the entry.
+     * The deserialized Object will be retained togheter with the Entry and client code MUST not change its
      * fields/status
      *
      * @param key
@@ -1325,9 +1308,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Same as {@link #fetch(java.lang.String) }, but returns a deserialized
-     * version of the Object stored on the entry. The deserialized Object will
-     * be retained togheter with the Entry and client code MUST not change its
+     * Same as {@link #fetch(java.lang.String) }, but returns a deserialized version of the Object stored on the entry.
+     * The deserialized Object will be retained togheter with the Entry and client code MUST not change its
      * fields/status
      *
      * @param key
@@ -1341,10 +1323,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     /**
-     * Same as {@link #fetch(java.lang.String, blazingcache.client.KeyLock) },
-     * but returns a deserialized version of the Object stored on the entry. The
-     * deserialized Object will be retained togheter with the Entry and client
-     * code MUST not change its fields/status
+     * Same as {@link #fetch(java.lang.String, blazingcache.client.KeyLock) }, but returns a deserialized version of the
+     * Object stored on the entry. The deserialized Object will be retained togheter with the Entry and client code MUST
+     * not change its fields/status
      *
      * @param <T>
      * @param key

@@ -93,15 +93,20 @@ public class ZKCacheServerLocator extends GenericNettyBrokerLocator {
 
                         @Override
                         public void process(WatchedEvent event) {
-                            if (event.getState() == Event.KeeperState.SyncConnected || event.getState() == Event.KeeperState.ConnectedReadOnly) {
+                            if (event.getState() == Event.KeeperState.SyncConnected
+                                || event.getState() == Event.KeeperState.ConnectedReadOnly) {
                                 connection.countDown();
                             }
                             LOGGER.severe("process ZK event " + event.getState() + " " + event.getType() + " " + event.getPath());
                         }
                     });
                     try {
-                        connection.await(connectTimeout, TimeUnit.MILLISECONDS);
-                        LOGGER.finest("ZK client is " + client);
+                        boolean ok = connection.await(connectTimeout, TimeUnit.MILLISECONDS);
+                        if (!ok) {
+                            LOGGER.log(Level.INFO, "ZK at " + zkAddress + " not connected within {0} ms", connectTimeout);
+                        } else {
+                            LOGGER.finest("ZK client is " + client);
+                        }
                         // se la connessione non sarà stabilita in tempo o c'è qualche problem troveremo un ConnectionLoss ad esempio                                        
                         data = client.getData(leaderPath, false, null);
                     } finally {

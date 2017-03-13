@@ -18,6 +18,7 @@ package blazingcache.jcache;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.WeakHashMap;
 import javax.cache.CacheException;
@@ -100,8 +101,8 @@ public class BlazingCacheProvider implements CachingProvider {
             return new URI(this.getClass().getName());
         } catch (URISyntaxException e) {
             throw new CacheException(
-                    "Failed to create the default URI for the javax.cache Reference Implementation",
-                    e);
+                "Failed to create the default URI for the javax.cache Reference Implementation",
+                e);
         }
     }
 
@@ -120,10 +121,11 @@ public class BlazingCacheProvider implements CachingProvider {
     @Override
     public synchronized void close() {
         WeakHashMap<ClassLoader, HashMap<URI, BlazingCacheManager>> managersByClassLoader = this.cacheManagersByClassLoader;
-        this.cacheManagersByClassLoader = new WeakHashMap<ClassLoader, HashMap<URI, BlazingCacheManager>>();
+        this.cacheManagersByClassLoader = new WeakHashMap<>();
 
-        for (ClassLoader classLoader : managersByClassLoader.keySet()) {
-            for (CacheManager cacheManager : managersByClassLoader.get(classLoader).values()) {
+        for (Map.Entry<ClassLoader, HashMap<URI, BlazingCacheManager>> entry : managersByClassLoader.entrySet()) {
+            HashMap<URI, BlazingCacheManager> managers = entry.getValue();
+            for (CacheManager cacheManager : managers.values()) {
                 cacheManager.close();
             }
         }
@@ -168,12 +170,10 @@ public class BlazingCacheProvider implements CachingProvider {
     }
 
     /**
-     * Releases the CacheManager with the specified URI and ClassLoader from
-     * this CachingProvider. This does not close the CacheManager. It simply
-     * releases it from being tracked by the CachingProvider.
+     * Releases the CacheManager with the specified URI and ClassLoader from this CachingProvider. This does not close
+     * the CacheManager. It simply releases it from being tracked by the CachingProvider.
      * <p>
-     * This method does nothing if a CacheManager matching the specified
-     * parameters is not being tracked.
+     * This method does nothing if a CacheManager matching the specified parameters is not being tracked.
      * </p>
      *
      * @param uri the URI of the CacheManager

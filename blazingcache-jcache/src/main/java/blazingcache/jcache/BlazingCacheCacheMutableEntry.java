@@ -90,4 +90,14 @@ public class BlazingCacheCacheMutableEntry<K, V> extends BlazingCacheEntry<K, V>
         updated = false;
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        return super.equals(obj);
+    }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode();
+    }
+
 }

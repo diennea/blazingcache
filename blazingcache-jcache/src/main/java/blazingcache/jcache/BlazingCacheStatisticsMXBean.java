@@ -15,7 +15,6 @@
  */
 package blazingcache.jcache;
 
-import blazingcache.jcache.BlazingCacheCache;
 import java.io.Serializable;
 import javax.cache.management.CacheStatisticsMXBean;
 
@@ -26,7 +25,8 @@ import javax.cache.management.CacheStatisticsMXBean;
  */
 public class BlazingCacheStatisticsMXBean<K, V> implements CacheStatisticsMXBean, Serializable {
 
-    private final BlazingCacheCache<K, V> cache;
+    private static final long serialVersionUID = 1200L;
+    private final transient BlazingCacheCache<K, V> cache;
 
     public BlazingCacheStatisticsMXBean(BlazingCacheCache<K, V> cache) {
         this.cache = cache;
