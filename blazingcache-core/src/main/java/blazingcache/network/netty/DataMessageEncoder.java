@@ -37,7 +37,7 @@ public class DataMessageEncoder extends ChannelOutboundHandlerAdapter {
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
         Message m = (Message) msg;
         ByteBuf encoded = ctx.alloc().buffer();
-        DodoMessageUtils.encodeMessage(encoded, m);
+        MessageUtils.encodeMessage(encoded, m);
         ctx.writeAndFlush(encoded, promise);
     }
 

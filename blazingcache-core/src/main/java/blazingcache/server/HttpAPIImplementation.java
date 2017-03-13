@@ -19,6 +19,7 @@
  */
 package blazingcache.server;
 
+import blazingcache.utils.RawString;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -104,7 +105,9 @@ public class HttpAPIImplementation {
                 break;
             case "keys":
                 if (broker != null) {
-                    List<String> copy = new ArrayList<>(broker.getCacheStatus().getKeys());
+                    List<String> copy = new ArrayList<>(broker.getCacheStatus().getKeys()).stream()
+                        .map(s->s.toString())
+                        .collect(Collectors.toList());
                     copy.sort(String.CASE_INSENSITIVE_ORDER);
                     resultMap.put("keys", copy);
                 } else {
@@ -124,7 +127,7 @@ public class HttpAPIImplementation {
                 break;
             case "key":
                 if (broker != null) {
-                    String key = req.getParameter("key") + "";
+                    RawString key = RawString.of(req.getParameter("key") + "");
                     CacheStatus status = broker.getCacheStatus();
                     resultMap.put("key", key);
                     resultMap.put("clients", status.getClientsForKey(key));

@@ -47,7 +47,7 @@ public class CacheStatus {
     private final Map<String, Set<RawString>> keysForClient = new HashMap<>();
     private final Map<RawString, Long> entryExpireTime = new HashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
-    private final Map<String, Map<String, List<LockID>>> remoteLocks = new HashMap<>();
+    private final Map<String, Map<RawString, List<LockID>>> remoteLocks = new HashMap<>();
     private final ReentrantLock remoteLocksLock = new ReentrantLock(true);
 
     @Override
@@ -87,7 +87,7 @@ public class CacheStatus {
         }
     }
 
-    public Set<String> getClientsForKey(String key) {
+    public Set<String> getClientsForKey(RawString key) {
         lock.readLock().lock();
         try {
             Set<String> clients = clientsForKey.get(key);
@@ -133,7 +133,7 @@ public class CacheStatus {
         }
     }
 
-    public void removeKeyForClient(String key, String client) {
+    public void removeKeyForClient(RawString key, String client) {
         LOGGER.log(Level.FINEST, "removeKeyForClient key={0} client={1}", new Object[]{key, client});
         lock.writeLock().lock();
         try {
@@ -165,7 +165,7 @@ public class CacheStatus {
         try {
 
             Set<RawString> keys = keysForClient.get(client);
-            Set<String> selectedKeys;
+            Set<RawString> selectedKeys;
             if (keys != null) {
                 selectedKeys = keys.stream().filter(key -> key.startsWith(prefix)).collect(Collectors.toSet());
                 keys.removeAll(selectedKeys);
@@ -175,7 +175,7 @@ public class CacheStatus {
             } else {
                 selectedKeys = Collections.emptySet();
             }
-            for (String key : selectedKeys) {
+            for (RawString key : selectedKeys) {
                 Set<String> clients = clientsForKey.get(key);
                 if (clients != null) {
                     clients.remove(client);
@@ -193,9 +193,9 @@ public class CacheStatus {
     public static final class ClientRemovalResult {
 
         private final int listenersCount;
-        private final Map<String, List<LockID>> locks;
+        private final Map<RawString, List<LockID>> locks;
 
-        public ClientRemovalResult(int listenersCount, Map<String, List<LockID>> locks) {
+        public ClientRemovalResult(int listenersCount, Map<RawString, List<LockID>> locks) {
             this.listenersCount = listenersCount;
             this.locks = locks;
         }
@@ -204,7 +204,7 @@ public class CacheStatus {
             return listenersCount;
         }
 
-        public Map<String, List<LockID>> getLocks() {
+        public Map<RawString, List<LockID>> getLocks() {
             return locks;
         }
 
@@ -214,7 +214,7 @@ public class CacheStatus {
         AtomicInteger count = new AtomicInteger();
         lock.writeLock().lock();
         try {
-            Set<String> keys = keysForClient.get(clientId);
+            Set<RawString> keys = keysForClient.get(clientId);
             if (keys != null) {
                 keys.forEach((key) -> {
                     count.incrementAndGet();
@@ -232,7 +232,7 @@ public class CacheStatus {
         } finally {
             lock.writeLock().unlock();
         }
-        Map<String, List<LockID>> locksForClient;
+        Map<RawString, List<LockID>> locksForClient;
         remoteLocksLock.lock();
         try {
             locksForClient = remoteLocks.remove(clientId);
@@ -252,17 +252,17 @@ public class CacheStatus {
         }
     }
 
-    List<String> selectExpiredEntries(long now, int max) {
+    List<RawString> selectExpiredEntries(long now, int max) {
         lock.readLock().lock();
         try {
             return entryExpireTime.entrySet().stream().filter(entry -> entry.getValue() < now)
-                    .map(entry -> entry.getKey()).limit(max).collect(Collectors.toList());
+                .map(entry -> entry.getKey()).limit(max).collect(Collectors.toList());
         } finally {
             lock.readLock().unlock();
         }
     }
 
-    void touchKeyFromClient(String key, String clientId, long expiretime) {
+    void touchKeyFromClient(RawString key, String clientId, long expiretime) {
         LOGGER.log(Level.FINEST, "touchKeyFromClient key={0} client={1} expiretime={2}", new Object[]{key, clientId, expiretime});
         lock.writeLock().lock();
         try {
@@ -278,10 +278,10 @@ public class CacheStatus {
         }
     }
 
-    void clientLockedKey(String sourceClientId, String key, LockID lockID) {
+    void clientLockedKey(String sourceClientId, RawString key, LockID lockID) {
         remoteLocksLock.lock();
         try {
-            Map<String, List<LockID>> locksForClient = remoteLocks.get(sourceClientId);
+            Map<RawString, List<LockID>> locksForClient = remoteLocks.get(sourceClientId);
             if (locksForClient == null) {
                 locksForClient = new HashMap<>();
                 remoteLocks.put(sourceClientId, locksForClient);
@@ -297,10 +297,10 @@ public class CacheStatus {
         }
     }
 
-    void clientUnlockedKey(String sourceClientId, String key, LockID lockID) {
+    void clientUnlockedKey(String sourceClientId, RawString key, LockID lockID) {
         remoteLocksLock.lock();
         try {
-            Map<String, List<LockID>> locksForClient = remoteLocks.get(sourceClientId);
+            Map<RawString, List<LockID>> locksForClient = remoteLocks.get(sourceClientId);
             if (locksForClient == null) {
                 return;
             }

@@ -19,6 +19,7 @@
  */
 package blazingcache.network;
 
+import blazingcache.utils.RawString;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.HashMap;
@@ -35,20 +36,20 @@ public final class Message {
         return new Message(clientId, TYPE_ACK, new HashMap<>());
     }
 
-    public static Message FETCH_ENTRY(String clientId, String key) {
+    public static Message FETCH_ENTRY(String clientId, RawString key) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
         return new Message(clientId, TYPE_FETCH_ENTRY, data);
     }
 
-    public static Message TOUCH_ENTRY(String clientId, String key, long expiretime) {
+    public static Message TOUCH_ENTRY(String clientId, RawString key, long expiretime) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
         data.put("expiretime", expiretime);
         return new Message(clientId, TYPE_TOUCH_ENTRY, data);
     }
 
-    public static Message PUT_ENTRY(String clientId, String key, byte[] serializedData, long expiretime) {
+    public static Message PUT_ENTRY(String clientId, RawString key, byte[] serializedData, long expiretime) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
         data.put("data", serializedData);
@@ -56,7 +57,7 @@ public final class Message {
         return new Message(clientId, TYPE_PUT_ENTRY, data);
     }
 
-    public static Message LOAD_ENTRY(String clientId, String key, byte[] serializedData, long expiretime) {
+    public static Message LOAD_ENTRY(String clientId, RawString key, byte[] serializedData, long expiretime) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
         data.put("data", serializedData);
@@ -64,7 +65,7 @@ public final class Message {
         return new Message(clientId, TYPE_PUT_ENTRY, data);
     }
 
-    public static Message UNREGISTER_ENTRY(String clientId, String key) {
+    public static Message UNREGISTER_ENTRY(String clientId, RawString key) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
         return new Message(clientId, TYPE_UNREGISTER_ENTRY, data);
@@ -117,26 +118,26 @@ public final class Message {
         return new Message(clientId, TYPE_CLIENT_SHUTDOWN, new HashMap<>());
     }
 
-    public static Message INVALIDATE(String clientId, String key) {
+    public static Message INVALIDATE(String clientId, RawString key) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
         return new Message(clientId, TYPE_INVALIDATE, data);
     }
 
-    public static Message LOCK(String clientId, String key) {
+    public static Message LOCK(String clientId, RawString key) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
         return new Message(clientId, TYPE_LOCK_ENTRY, data);
     }
 
-    public static Message UNLOCK(String clientId, String key, String lockId) {
+    public static Message UNLOCK(String clientId, RawString key, String lockId) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
         data.put("lockId", lockId);
         return new Message(clientId, TYPE_UNLOCK_ENTRY, data);
     }
 
-    public static Message INVALIDATE_BY_PREFIX(String clientId, String prefix) {
+    public static Message INVALIDATE_BY_PREFIX(String clientId, RawString prefix) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("prefix", prefix);
         return new Message(clientId, TYPE_INVALIDATE_BY_PREFIX, data);

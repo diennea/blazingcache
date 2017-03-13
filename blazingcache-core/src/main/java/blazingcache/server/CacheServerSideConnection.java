@@ -29,6 +29,7 @@ import blazingcache.network.Message;
 import blazingcache.network.ReplyCallback;
 import blazingcache.network.ServerSideConnection;
 import blazingcache.security.sasl.SaslNettyServer;
+import blazingcache.utils.RawString;
 
 /**
  * Connection to a node from the server side
@@ -122,7 +123,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     if (token == null) {
                         token = new byte[0];
                     }
-                    String mech = (String) message.parameters.get("mech");
+                    String mech = ((RawString) message.parameters.get("mech")).toString();
                     if (saslNettyServer == null) {
                         saslNettyServer = new SaslNettyServer(server.getSharedSecret(), mech);
                     }
@@ -171,8 +172,8 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     _channel.sendReplyMessage(message, error);
                     return;
                 }
-                String challenge = (String) message.parameters.get("challenge");
-                String ts = (String) message.parameters.get("ts");
+                String challenge = ((RawString) message.parameters.get("challenge")).toString();
+                String ts = ((RawString) message.parameters.get("ts")).toString();
                 int fetchPriority = 10;
                 if (message.parameters.containsKey("fetchPriority")) {
                     fetchPriority = Integer.parseInt(message.parameters.get("fetchPriority") + "");
@@ -197,7 +198,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     }
                 } else {
                     // legacy 1.1.x clients
-                    String sharedSecret = (String) message.parameters.get("secret");
+                    String sharedSecret = ((RawString) message.parameters.get("secret")).toString();
                     if (sharedSecret == null || !sharedSecret.equals(server.getSharedSecret())) {
                         answerConnectionNotAcceptedAndClose(message, new Exception("invalid network secret"));
                         return;
@@ -239,7 +240,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     _channel.sendReplyMessage(message, error);
                     return;
                 }
-                String key = (String) message.parameters.get("key");
+                RawString key = (RawString) message.parameters.get("key");
                 server.addPendingOperations(1);
                 server.lockKey(key, clientId, new SimpleCallback<String>() {
                     @Override
@@ -256,8 +257,9 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     _channel.sendReplyMessage(message, error);
                     return;
                 }
-                String key = (String) message.parameters.get("key");
-                String lockId = (String) message.parameters.get("lockId");
+                RawString key = (RawString) message.parameters.get("key");
+                RawString _lockId = RawString.of(message.parameters.get("lockId"));
+                String lockId = _lockId != null ? _lockId.toString() : null;
                 server.addPendingOperations(1);
                 server.unlockKey(key, clientId, lockId, new SimpleCallback<String>() {
                     @Override
@@ -275,12 +277,13 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     _channel.sendReplyMessage(message, error);
                     return;
                 }
-                String key = (String) message.parameters.get("key");
-                String lockId = (String) message.parameters.get("lockId");
+                RawString key = (RawString) message.parameters.get("key");
+                RawString _lockId = RawString.of(message.parameters.get("lockId"));
+                String lockId = _lockId != null ? _lockId.toString() : null;
                 server.addPendingOperations(1);
-                server.invalidateKey(key, clientId, lockId, new SimpleCallback<String>() {
+                server.invalidateKey(key, clientId, lockId, new SimpleCallback<RawString>() {
                     @Override
-                    public void onResult(String result, Throwable error) {
+                    public void onResult(RawString result, Throwable error) {
                         server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
                     }
@@ -294,11 +297,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     _channel.sendReplyMessage(message, error);
                     return;
                 }
-                String key = (String) message.parameters.get("key");
+                RawString key = (RawString) message.parameters.get("key");
                 server.addPendingOperations(1);
-                server.unregisterEntry(key, clientId, new SimpleCallback<String>() {
+                server.unregisterEntry(key, clientId, new SimpleCallback<RawString>() {
                     @Override
-                    public void onResult(String result, Throwable error) {
+                    public void onResult(RawString result, Throwable error) {
                         server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
                     }
@@ -312,8 +315,9 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     _channel.sendReplyMessage(message, error);
                     return;
                 }
-                String key = (String) message.parameters.get("key");
-                String lockId = (String) message.parameters.get("lockId");
+                RawString key = (RawString) message.parameters.get("key");
+                RawString _lockId = RawString.of(message.parameters.get("lockId"));
+                String lockId = _lockId != null ? _lockId.toString() : null;
                 server.addPendingOperations(1);
                 server.fetchEntry(key, clientId, lockId, new SimpleCallback<Message>() {
                     @Override
@@ -337,7 +341,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     _channel.sendReplyMessage(message, error);
                     return;
                 }
-                String key = (String) message.parameters.get("key");
+                RawString key = (RawString) message.parameters.get("key");
                 long expiretime = (long) message.parameters.get("expiretime");
                 server.addPendingOperations(1);
                 server.touchEntry(key, clientId, expiretime);
@@ -351,11 +355,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     _channel.sendReplyMessage(message, error);
                     return;
                 }
-                String prefix = (String) message.parameters.get("prefix");
+                RawString prefix = (RawString) message.parameters.get("prefix");
                 server.addPendingOperations(1);
-                server.invalidateByPrefix(prefix, clientId, new SimpleCallback<String>() {
+                server.invalidateByPrefix(prefix, clientId, new SimpleCallback<RawString>() {
                     @Override
-                    public void onResult(String result, Throwable error) {
+                    public void onResult(RawString result, Throwable error) {
                         server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("prefix", prefix));
                     }
@@ -369,14 +373,15 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     _channel.sendReplyMessage(message, error);
                     return;
                 }
-                String key = (String) message.parameters.get("key");
+                RawString key = (RawString) message.parameters.get("key");
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
-                String lockId = (String) message.parameters.get("lockId");
+                RawString _lockId = RawString.of(message.parameters.get("lockId"));
+                String lockId = _lockId != null ? _lockId.toString() : null;
                 server.addPendingOperations(1);
-                server.putEntry(key, data, expiretime, clientId, lockId, new SimpleCallback<String>() {
+                server.putEntry(key, data, expiretime, clientId, lockId, new SimpleCallback<RawString>() {
                     @Override
-                    public void onResult(String result, Throwable error) {
+                    public void onResult(RawString result, Throwable error) {
                         server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
                     }
@@ -389,14 +394,15 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     _channel.sendReplyMessage(message, error);
                     return;
                 }
-                String key = (String) message.parameters.get("key");
+                RawString key = (RawString) message.parameters.get("key");
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
-                String lockId = (String) message.parameters.get("lockId");
+                RawString _lockId = RawString.of(message.parameters.get("lockId"));
+                String lockId = _lockId != null ? _lockId.toString() : null;
                 server.addPendingOperations(1);
-                server.loadEntry(key, data, expiretime, clientId, lockId, new SimpleCallback<String>() {
+                server.loadEntry(key, data, expiretime, clientId, lockId, new SimpleCallback<RawString>() {
                     @Override
-                    public void onResult(String result, Throwable error) {
+                    public void onResult(RawString result, Throwable error) {
                         server.addPendingOperations(-1);
                         _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
                     }
@@ -487,7 +493,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         return "CacheServerSideConnection{" + "clientId=" + clientId + " , connectionId=" + connectionId + ", channel=" + channel + ", lastReceivedMessageTs=" + lastReceivedMessageTs + ", user=" + username + '}';
     }
 
-    void sendKeyInvalidationMessage(String sourceClientId, String key, BroadcastRequestStatus invalidation) {
+    void sendKeyInvalidationMessage(String sourceClientId, RawString key, BroadcastRequestStatus invalidation) {
         Channel _channel = channel;
         if (_channel == null || !_channel.isValid()) {
             // not connected, quindi cache vuota            
@@ -515,7 +521,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         });
     }
 
-    void sendPutEntry(String sourceClientId, String key, byte[] serializedData, long expireTime, BroadcastRequestStatus invalidation) {
+    void sendPutEntry(String sourceClientId, RawString key, byte[] serializedData, long expireTime, BroadcastRequestStatus invalidation) {
         Channel _channel = channel;
         if (_channel == null || !_channel.isValid()) {
             // not connected, quindi cache vuota
@@ -543,7 +549,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
 
     }
 
-    void sendPrefixInvalidationMessage(String sourceClientId, String prefix, BroadcastRequestStatus invalidation) {
+    void sendPrefixInvalidationMessage(String sourceClientId, RawString prefix, BroadcastRequestStatus invalidation) {
         Channel _channel = channel;
         if (_channel == null || !_channel.isValid()) {
             // not connected, quindi cache vuota
@@ -564,7 +570,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         });
     }
 
-    void sendFetchKeyMessage(String remoteClientId, String key, SimpleCallback<Message> onFinish) {
+    void sendFetchKeyMessage(String remoteClientId, RawString key, SimpleCallback<Message> onFinish) {
         Channel _channel = channel;
         if (_channel == null || !_channel.isValid()) {
             onFinish.onResult(Message.ERROR(clientId, new Exception("client " + clientId + " disconnected while serving fetch request")), null);

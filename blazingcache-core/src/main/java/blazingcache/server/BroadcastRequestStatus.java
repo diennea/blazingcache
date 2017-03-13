@@ -19,6 +19,7 @@
  */
 package blazingcache.server;
 
+import blazingcache.utils.RawString;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -37,13 +38,13 @@ public final class BroadcastRequestStatus {
     private final long id;
     private final String description;
     private final Set<String> remaingClients;
-    private final SimpleCallback<String> onFinish;
+    private final SimpleCallback<RawString> onFinish;
     private final SimpleCallback<String> onClientDone;
     private final ReentrantLock lock = new ReentrantLock(false);
     private boolean done;
     private BroadcastRequestStatusMonitor broadcastRequestStatusMonitor;
 
-    public BroadcastRequestStatus(String description, Set<String> remaingClients, SimpleCallback<String> onFinish, SimpleCallback<String> onClientDone) {
+    public BroadcastRequestStatus(String description, Set<String> remaingClients, SimpleCallback<RawString> onFinish, SimpleCallback<String> onClientDone) {
         this.description = description;
         this.id = newId.incrementAndGet();
         this.remaingClients = new HashSet<>(remaingClients);

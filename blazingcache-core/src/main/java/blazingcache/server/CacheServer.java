@@ -42,6 +42,7 @@ import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyChannelAcceptor;
 import blazingcache.server.management.BlazingCacheServerStatusMXBean;
 import blazingcache.server.management.CacheServerStatusMXBean;
+import blazingcache.utils.RawString;
 import blazingcache.zookeeper.LeaderShipChangeListener;
 import blazingcache.zookeeper.ZKClusterManager;
 
@@ -137,7 +138,7 @@ public class CacheServer implements AutoCloseable {
         return cacheStatus;
     }
 
-    void touchEntry(String key, String clientId, long expiretime) {
+    void touchEntry(RawString key, String clientId, long expiretime) {
         cacheStatus.touchKeyFromClient(key, clientId, expiretime);
     }
 
@@ -208,16 +209,16 @@ public class CacheServer implements AutoCloseable {
             while (!stopped) {
                 if (isLeader()) {
                     long now = System.currentTimeMillis();
-                    List<String> entries = cacheStatus.selectExpiredEntries(now, 1000);
+                    List<RawString> entries = cacheStatus.selectExpiredEntries(now, 1000);
                     if (!entries.isEmpty()) {
 
                         CountDownLatch latch = new CountDownLatch(entries.size());
-                        for (String key : entries) {
+                        for (RawString key : entries) {
                             LOGGER.log(Level.FINER, "expiring entry {0}", key);
-                            invalidateKey(key, "expire-timer", null, new SimpleCallback<String>() {
+                            invalidateKey(key, "expire-timer", null, new SimpleCallback<RawString>() {
 
                                 @Override
-                                public void onResult(String result, Throwable error) {
+                                public void onResult(RawString result, Throwable error) {
                                     if (error != null) {
                                         LOGGER.log(Level.SEVERE, "expired entry {0} {1}", new Object[]{key, error});
                                     } else {
@@ -287,7 +288,7 @@ public class CacheServer implements AutoCloseable {
         channelsHandlers.shutdown();
     }
 
-    public void putEntry(String key, byte[] data, long expiretime, String sourceClientId, String clientProvidedLockId, SimpleCallback<String> onFinish) {
+    public void putEntry(RawString key, byte[] data, long expiretime, String sourceClientId, String clientProvidedLockId, SimpleCallback<RawString> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId, clientProvidedLockId);
             if (lockID == null) {
@@ -300,12 +301,9 @@ public class CacheServer implements AutoCloseable {
             }
             LOGGER.log(Level.FINEST, "putEntry from {0}, key={1}, clientsForKey:{2}", new Object[]{sourceClientId, key, clientsForKey});
             cacheStatus.registerKeyForClient(key, sourceClientId, expiretime);
-            SimpleCallback<String> finishAndReleaseLock = new SimpleCallback<String>() {
-                @Override
-                public void onResult(String result, Throwable error) {
-                    locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
-                    onFinish.onResult(result, error);
-                }
+            SimpleCallback<RawString> finishAndReleaseLock = (RawString result, Throwable error) -> {
+                locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+                onFinish.onResult(result, error);
             };
             if (clientsForKey.isEmpty()) {
                 finishAndReleaseLock.onResult(key, null);
@@ -327,7 +325,7 @@ public class CacheServer implements AutoCloseable {
         executeOnHandler("putEntry " + sourceClientId + "," + key, action);
     }
 
-    public void loadEntry(String key, byte[] data, long expiretime, String sourceClientId, String clientProvidedLockId, SimpleCallback<String> onFinish) {
+    public void loadEntry(RawString key, byte[] data, long expiretime, String sourceClientId, String clientProvidedLockId, SimpleCallback<RawString> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId, clientProvidedLockId);
             if (lockID == null) {
@@ -346,7 +344,7 @@ public class CacheServer implements AutoCloseable {
         executeOnHandler("loadEntry " + sourceClientId + "," + key, action);
     }
 
-    public void invalidateKey(String key, String sourceClientId, String clientProvidedLockId, SimpleCallback<String> onFinish) {
+    public void invalidateKey(RawString key, String sourceClientId, String clientProvidedLockId, SimpleCallback<RawString> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId, clientProvidedLockId);
             if (lockID == null) {
@@ -357,9 +355,9 @@ public class CacheServer implements AutoCloseable {
             if (sourceClientId != null) {
                 clientsForKey.remove(sourceClientId);
             }
-            SimpleCallback<String> finishAndReleaseLock = new SimpleCallback<String>() {
+            SimpleCallback<RawString> finishAndReleaseLock = new SimpleCallback<RawString>() {
                 @Override
-                public void onResult(String result, Throwable error) {
+                public void onResult(RawString result, Throwable error) {
                     locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
                     onFinish.onResult(result, error);
                 }
@@ -388,7 +386,7 @@ public class CacheServer implements AutoCloseable {
         executeOnHandler("invalidateKey " + sourceClientId + "," + key, action);
     }
 
-    public void lockKey(String key, String sourceClientId, SimpleCallback<String> onFinish) {
+    public void lockKey(RawString key, String sourceClientId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
             cacheStatus.clientLockedKey(sourceClientId, key, lockID);
@@ -397,7 +395,7 @@ public class CacheServer implements AutoCloseable {
         executeOnHandler("lockKey " + sourceClientId + "," + key, action);
     }
 
-    public void unlockKey(String key, String sourceClientId, String lockId, SimpleCallback<String> onFinish) {
+    public void unlockKey(RawString key, String sourceClientId, String lockId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
             LockID lockID = new LockID(Long.parseLong(lockId));
             locksManager.releaseWriteLockForKey(key, lockId, lockID);
@@ -407,7 +405,7 @@ public class CacheServer implements AutoCloseable {
         executeOnHandler("unlockKey " + sourceClientId + "," + key, action);
     }
 
-    public void unregisterEntry(String key, String sourceClientId, SimpleCallback<String> onFinish) {
+    public void unregisterEntry(RawString key, String sourceClientId, SimpleCallback<RawString> onFinish) {
         LOGGER.log(Level.FINER, "client " + sourceClientId + " evicted entry " + key);
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
@@ -421,7 +419,7 @@ public class CacheServer implements AutoCloseable {
         executeOnHandler("unregisterEntry " + sourceClientId + "," + key, action);
     }
 
-    public void fetchEntry(String key, String clientId, String clientProvidedLockId, SimpleCallback<Message> onFinish) {
+    public void fetchEntry(RawString key, String clientId, String clientProvidedLockId, SimpleCallback<Message> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId, clientProvidedLockId);
             if (lockID == null) {
@@ -487,7 +485,7 @@ public class CacheServer implements AutoCloseable {
         executeOnHandler("fetchEntry " + clientId + "," + key, action);
     }
 
-    public void invalidateByPrefix(String prefix, String sourceClientId, SimpleCallback<String> onFinish) {
+    public void invalidateByPrefix(RawString prefix, String sourceClientId, SimpleCallback<RawString> onFinish) {
         Runnable action = () -> {
             // LOCKS ??
             Set<String> clients = cacheStatus.getAllClientsWithListener();
@@ -527,7 +525,7 @@ public class CacheServer implements AutoCloseable {
     void clientDisconnected(String clientId) {
         CacheStatus.ClientRemovalResult removalResult = cacheStatus.removeClientListeners(clientId);
         int count = removalResult.getListenersCount();
-        Map<String, List<LockID>> locks = removalResult.getLocks();
+        Map<RawString, List<LockID>> locks = removalResult.getLocks();
         LOGGER.log(Level.SEVERE, "client " + clientId + " disconnected, removed " + count + " key listeners, locks:" + locks);
         if (locks != null) {
             locks.forEach((key, locksForKey) -> {

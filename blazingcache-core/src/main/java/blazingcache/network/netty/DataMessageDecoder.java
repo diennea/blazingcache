@@ -35,7 +35,7 @@ public class DataMessageDecoder extends ChannelInboundHandlerAdapter {
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         ByteBuf in = (ByteBuf) msg;
         try {
-            ctx.fireChannelRead(DodoMessageUtils.decodeMessage(in));
+            ctx.fireChannelRead(MessageUtils.decodeMessage(in));
         } finally {
             ReferenceCountUtil.release(msg);
         }

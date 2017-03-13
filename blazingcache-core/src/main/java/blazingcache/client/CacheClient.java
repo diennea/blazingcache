@@ -47,6 +47,7 @@ import blazingcache.network.SendResultCallback;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.ServerNotAvailableException;
 import blazingcache.network.ServerRejectedConnectionException;
+import blazingcache.utils.RawString;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -60,7 +61,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     private static final Logger LOGGER = Logger.getLogger(CacheClient.class.getName());
 
-    private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<RawString, CacheEntry> cache = new ConcurrentHashMap<>();
     private final ServerLocator brokerLocator;
     private final Thread coreThread;
     private final String clientId;
@@ -476,7 +477,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
             CountDownLatch count = new CountDownLatch(evictable.size());
             for (final CacheEntry entry : evictable) {
-                final String key = entry.getKey();
+                final RawString key = entry.getKey();
                 LOGGER.log(Level.FINEST, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{key, entry.getSerializedData().length, entry.getLastGetTime()});
 
                 final CacheEntry removed = cache.remove(key);
@@ -542,7 +543,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         LOGGER.log(Level.FINER, "{0} messageReceived {1}", new Object[]{clientId, message});
         switch (message.type) {
             case Message.TYPE_INVALIDATE: {
-                String key = (String) message.parameters.get("key");
+                RawString key = (RawString) message.parameters.get("key");
                 LOGGER.log(Level.FINEST, clientId + " invalidate " + key + " from " + message.clientId);
                 runningFetches.cancelFetchesForKey(key);
                 CacheEntry removed = cache.remove(key);
@@ -556,9 +557,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
             break;
             case Message.TYPE_INVALIDATE_BY_PREFIX: {
-                String prefix = (String) message.parameters.get("prefix");
+                RawString prefix = (RawString) message.parameters.get("prefix");
                 LOGGER.log(Level.FINEST, "{0} invalidateByPrefix {1} from {2}", new Object[]{clientId, prefix, message.clientId});
-                Collection<String> keys = cache.keySet().stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
+                Collection<RawString> keys = cache.keySet().stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
                 keys.forEach((key) -> {
                     runningFetches.cancelFetchesForKey(key);
                     CacheEntry removed = cache.remove(key);
@@ -574,7 +575,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             break;
 
             case Message.TYPE_PUT_ENTRY: {
-                String key = (String) message.parameters.get("key");
+                RawString key = (RawString) message.parameters.get("key");
                 runningFetches.cancelFetchesForKey(key);
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
@@ -593,7 +594,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
             break;
             case Message.TYPE_FETCH_ENTRY: {
-                String key = (String) message.parameters.get("key");
+                RawString key = (RawString) message.parameters.get("key");
                 CacheEntry entry = cache.get(key);
                 LOGGER.log(Level.FINEST, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
                 Channel _channel = channel;
@@ -688,50 +689,51 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #fetchObject(java.lang.String)
      */
     public CacheEntry fetch(String key, KeyLock lock) throws InterruptedException {
+        RawString _key = RawString.of(key);
         Channel _channel = channel;
         if (_channel == null) {
-            LOGGER.log(Level.SEVERE, "fetch failed {0}, not connected", key);
+            LOGGER.log(Level.SEVERE, "fetch failed {0}, not connected", _key);
             return null;
         }
-        CacheEntry entry = cache.get(key);
+        CacheEntry entry = cache.get(_key);
         this.clientFetches.incrementAndGet();
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
             this.clientHits.incrementAndGet();
             return entry;
         }
-        long fetchId = runningFetches.registerFetchForKey(key);
+        long fetchId = runningFetches.registerFetchForKey(_key);
         boolean fetchConsumed = false;
         try {
-            Message request_message = Message.FETCH_ENTRY(clientId, key);
+            Message request_message = Message.FETCH_ENTRY(clientId, _key);
             if (lock != null) {
-                if (!lock.getKey().equals(key)) {
-                    LOGGER.log(Level.SEVERE, "lock {0} is not for key {1}", new Object[]{lock, key});
+                if (!lock.getKey().equals(_key)) {
+                    LOGGER.log(Level.SEVERE, "lock {0} is not for key {1}", new Object[]{lock, _key});
                     return null;
                 }
                 request_message.setParameter("lockId", lock.getLockId());
             }
             Message message = _channel.sendMessageWithReply(request_message, invalidateTimeout);
-            LOGGER.log(Level.FINEST, "fetch result " + key + ", answer is " + message);
+            LOGGER.log(Level.FINEST, "fetch result " + _key + ", answer is " + message);
             if (internalClientListener != null) {
-                internalClientListener.onFetchResponse(key, message);
+                internalClientListener.onFetchResponse(_key.toString(), message);
             }
-            boolean fetchStillValid = runningFetches.consumeAndValidateFetchForKey(key, fetchId);
+            boolean fetchStillValid = runningFetches.consumeAndValidateFetchForKey(_key, fetchId);
             fetchConsumed = true;
             if (message.type == Message.TYPE_ACK && fetchStillValid) {
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
-                entry = new CacheEntry(key, System.nanoTime(), data, expiretime);
+                entry = new CacheEntry(_key, System.nanoTime(), data, expiretime);
                 storeEntry(entry);
                 this.clientMissedGetsToSuccessfulFetches.incrementAndGet();
                 this.clientHits.incrementAndGet();
                 return entry;
             }
         } catch (TimeoutException err) {
-            LOGGER.log(Level.SEVERE, "fetch failed " + key + ": " + err);
+            LOGGER.log(Level.SEVERE, "fetch failed " + _key + ": " + err);
         } finally {
             if (!fetchConsumed) {
-                runningFetches.consumeAndValidateFetchForKey(key, fetchId);
+                runningFetches.consumeAndValidateFetchForKey(_key, fetchId);
             }
         }
         this.clientMissedGetsToMissedFetches.incrementAndGet();
@@ -761,12 +763,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      *
      * @param key
      * @param expiretime
+     * @param lock
      * @see #lock(java.lang.String)
      */
     public void touchEntry(String key, long expiretime, KeyLock lock) {
         Channel _channel = channel;
         if (_channel != null) {
-            Message request = Message.TOUCH_ENTRY(clientId, key, expiretime);
+            Message request = Message.TOUCH_ENTRY(clientId, RawString.of(key), expiretime);
             if (lock != null) {
                 if (!lock.getKey().equals(key)) {
                     return;
@@ -801,7 +804,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.log(Level.SEVERE, "get failed " + key + ", not connected");
             return null;
         }
-        CacheEntry entry = cache.get(key);
+        CacheEntry entry = cache.get(RawString.of(key));
         this.clientGets.incrementAndGet();
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
@@ -825,14 +828,18 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     public void invalidate(String key, KeyLock lock) throws InterruptedException {
+        invalidate(RawString.of(key), lock);
+    }
+
+    private void invalidate(RawString _key, KeyLock lock) throws InterruptedException {
         if (lock != null) {
-            if (!lock.getKey().equals(key)) {
+            if (!lock.getKey().equals(_key.toString())) {
                 return;
             }
         }
 
         // subito rimuoviamo dal locale
-        CacheEntry removed = cache.remove(key);
+        CacheEntry removed = cache.remove(_key);
         if (removed != null) {
             actualMemory.addAndGet(-removed.getSerializedData().length);
         }
@@ -840,25 +847,25 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         while (!stopped) {
             Channel _channel = channel;
             if (_channel == null || !_channel.isValid()) {
-                LOGGER.log(Level.SEVERE, "invalidate " + key + ", not connected");
+                LOGGER.log(Level.SEVERE, "invalidate " + _key + ", not connected");
                 Thread.sleep(1000);
                 // if we are disconnected no lock can be valid
                 lock = null;
             } else {
                 try {
-                    Message request = Message.INVALIDATE(clientId, key);
+                    Message request = Message.INVALIDATE(clientId, _key);
                     if (lock != null) {
                         request.setParameter("lockId", lock.getLockId());
                     }
                     Message response = _channel.sendMessageWithReply(request, invalidateTimeout);
-                    LOGGER.log(Level.FINEST, "invalidate " + key + ", -> " + response);
+                    LOGGER.log(Level.FINEST, "invalidate " + _key + ", -> " + response);
                     this.clientInvalidations.incrementAndGet();
                     return;
                 } catch (InterruptedException error) {
-                    LOGGER.log(Level.SEVERE, "invalidate " + key + ", interrupted, " + error);
+                    LOGGER.log(Level.SEVERE, "invalidate " + _key + ", interrupted, " + error);
                     throw error;
                 } catch (Exception error) {
-                    LOGGER.log(Level.SEVERE, "invalidate " + key + ", timeout " + error);
+                    LOGGER.log(Level.SEVERE, "invalidate " + _key + ", timeout " + error);
                     Thread.sleep(1000);
                 }
             }
@@ -875,7 +882,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public void invalidateByPrefix(String prefix) throws InterruptedException {
         // subito rimuoviamo dal locale
-        Collection<String> keys = cache.keySet().stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
+        RawString _prefix = RawString.of(prefix);
+        Collection<RawString> keys = cache.keySet()
+            .stream().filter(s -> s.startsWith(_prefix)).collect(Collectors.toList());
         keys.forEach((key) -> {
             CacheEntry removed = cache.remove(key);
             if (removed != null) {
@@ -890,7 +899,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 Thread.sleep(1000);
             } else {
                 try {
-                    Message response = _channel.sendMessageWithReply(Message.INVALIDATE_BY_PREFIX(clientId, prefix), invalidateTimeout);
+                    Message response = _channel.sendMessageWithReply(Message.INVALIDATE_BY_PREFIX(clientId, _prefix), invalidateTimeout);
                     LOGGER.log(Level.FINEST, "invalidateByPrefix " + prefix + ", -> " + response);
                     this.clientInvalidations.incrementAndGet();
                     return;
@@ -955,7 +964,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #lock(java.lang.String)
      */
     public boolean put(String key, byte[] data, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
-        return put(key, data, null, expireTime, lock);
+        return put(RawString.of(key), data, null, expireTime, lock);
     }
 
     /**
@@ -995,7 +1004,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public boolean putObject(String key, Object object, long expireTime) throws InterruptedException, CacheException {
         byte[] data = entrySerializer.serializeObject(key, object);
-        return put(key, data, object, expireTime, null);
+        return put(RawString.of(key), data, object, expireTime, null);
     }
 
     /**
@@ -1032,7 +1041,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public boolean putObject(String key, Object object, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
         byte[] data = entrySerializer.serializeObject(key, object);
-        return put(key, data, object, expireTime, lock);
+        return put(RawString.of(key), data, object, expireTime, lock);
     }
 
     /**
@@ -1055,6 +1064,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     private boolean load(String key, byte[] data, Object reference, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
+        RawString _key = RawString.of(key);
         Channel _chanel = channel;
         if (_chanel == null) {
             LOGGER.log(Level.SEVERE, "cache load failed " + key + ", not connected");
@@ -1065,13 +1075,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
 
         try {
-            CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime, reference);
-            CacheEntry prev = cache.put(key, entry);
+            CacheEntry entry = new CacheEntry(_key, System.nanoTime(), data, expireTime, reference);
+            CacheEntry prev = cache.put(_key, entry);
             if (prev != null) {
                 actualMemory.addAndGet(-prev.getSerializedData().length);
             }
             actualMemory.addAndGet(data.length);
-            Message request = Message.LOAD_ENTRY(clientId, key, data, expireTime);
+            Message request = Message.LOAD_ENTRY(clientId, RawString.of(key), data, expireTime);
             if (lock != null) {
                 request.setParameter("lockId", lock.getLockId());
             }
@@ -1081,7 +1091,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
             // race condition: if two clients perform a put on the same entry maybe after the network trip we get another value, different from the expected one.
             // it is better to invalidate the entry for all
-            CacheEntry afterNetwork = cache.get(key);
+            CacheEntry afterNetwork = cache.get(_key);
             if (afterNetwork != null) {
                 if (!Arrays.equals(afterNetwork.getSerializedData(), data)) {
                     LOGGER.log(Level.SEVERE, "detected conflict on load of " + key + ", invalidating entry");
@@ -1095,44 +1105,44 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
-    private boolean put(String key, byte[] data, Object reference, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
+    private boolean put(RawString _key, byte[] data, Object reference, long expireTime, KeyLock lock) throws InterruptedException, CacheException {
         Channel _chanel = channel;
         if (_chanel == null) {
-            LOGGER.log(Level.SEVERE, "cache put failed " + key + ", not connected");
+            LOGGER.log(Level.SEVERE, "cache put failed " + _key + ", not connected");
             return false;
         }
-        if (lock != null && !lock.getKey().equals(key)) {
-            throw new CacheException("lock " + lock + " is not for key " + key);
+        if (lock != null && !lock.getKey().equals(_key.toString())) {
+            throw new CacheException("lock " + lock + " is not for key " + _key);
         }
 
         try {
-            CacheEntry entry = new CacheEntry(key, System.nanoTime(), data, expireTime, reference);
-            CacheEntry prev = cache.put(key, entry);
+            CacheEntry entry = new CacheEntry(_key, System.nanoTime(), data, expireTime, reference);
+            CacheEntry prev = cache.put(_key, entry);
             if (prev != null) {
                 actualMemory.addAndGet(-prev.getSerializedData().length);
             }
             actualMemory.addAndGet(data.length);
-            Message request = Message.PUT_ENTRY(clientId, key, data, expireTime);
+            Message request = Message.PUT_ENTRY(clientId, _key, data, expireTime);
             if (lock != null) {
                 request.setParameter("lockId", lock.getLockId());
             }
             Message response = _chanel.sendMessageWithReply(request, invalidateTimeout);
             if (response.type != Message.TYPE_ACK) {
-                throw new CacheException("error while putting key " + key + " (" + response + ")");
+                throw new CacheException("error while putting key " + _key + " (" + response + ")");
             }
             // race condition: if two clients perform a put on the same entry maybe after the network trip we get another value, different from the expected one.
             // it is better to invalidate the entry for all
-            CacheEntry afterNetwork = cache.get(key);
+            CacheEntry afterNetwork = cache.get(_key);
             if (afterNetwork != null) {
                 if (!Arrays.equals(afterNetwork.getSerializedData(), data)) {
-                    LOGGER.log(Level.SEVERE, "detected conflict on put of " + key + ", invalidating entry");
-                    invalidate(key);
+                    LOGGER.log(Level.SEVERE, "detected conflict on put of " + _key + ", invalidating entry");
+                    invalidate(_key, null);
                 }
             }
             this.clientPuts.incrementAndGet();
             return true;
         } catch (TimeoutException timedOut) {
-            throw new CacheException("error while putting for key " + key + ":" + timedOut, timedOut);
+            throw new CacheException("error while putting for key " + _key + ":" + timedOut, timedOut);
         }
 
     }
@@ -1144,11 +1154,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return null;
         }
         try {
-            Message response = _chanel.sendMessageWithReply(Message.LOCK(clientId, key), invalidateTimeout);
+            Message response = _chanel.sendMessageWithReply(Message.LOCK(clientId, RawString.of(key)), invalidateTimeout);
             if (response.type != Message.TYPE_ACK) {
                 throw new CacheException("error while locking key " + key + " (" + response + ")");
             }
-            String lockId = (String) response.parameters.get("lockId");
+            String lockId = RawString.of(response.parameters.get("lockId")).toString();
             KeyLock result = new KeyLock();
             result.setLockId(lockId);
             result.setKey(key);
@@ -1168,7 +1178,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return;
         }
         try {
-            Message response = _chanel.sendMessageWithReply(Message.UNLOCK(clientId, keyLock.getKey(), keyLock.getLockId()), invalidateTimeout);
+            Message response = _chanel.sendMessageWithReply(Message.UNLOCK(clientId, RawString.of(keyLock.getKey()), keyLock.getLockId()), invalidateTimeout);
             if (response.type != Message.TYPE_ACK) {
                 throw new CacheException("error while unlocking key " + keyLock.getKey() + " with lockID " + keyLock.getLockId() + " (" + response + ")");
             }
@@ -1184,7 +1194,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @return
      */
     public Set<String> getLocalKeySetByPrefix(String prefix) {
-        return cache.keySet().stream().filter(k -> k.startsWith(prefix)).collect(Collectors.toSet());
+        RawString _prefix = RawString.of(prefix);
+        return cache.keySet().stream()
+            .filter(k -> k.startsWith(_prefix)).map(s->s.toString()).collect(Collectors.toSet());
     }
 
     /**

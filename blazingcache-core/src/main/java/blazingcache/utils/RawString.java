@@ -31,6 +31,14 @@ public class RawString implements Comparable<RawString> {
     private String string;
     private final int hashcode;
 
+    public static RawString of(Object string) {
+        if (string == null) {
+            return null;
+        }
+        String s = string.toString();
+        return new RawString(s.getBytes(StandardCharsets.UTF_8), s);
+    }
+
     public static RawString of(String string) {
         return new RawString(string.getBytes(StandardCharsets.UTF_8), string);
     }

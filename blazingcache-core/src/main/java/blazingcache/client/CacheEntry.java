@@ -19,6 +19,7 @@
  */
 package blazingcache.client;
 
+import blazingcache.utils.RawString;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.lang.ref.SoftReference;
 
@@ -32,12 +33,12 @@ public final class CacheEntry {
 
     private long lastGetTime;
     private final long putTime;
-    private final String key;
+    private final RawString key;
     private final byte[] serializedData;
     private final long expiretime;
     private SoftReference<Object> reference;
 
-    public CacheEntry(String key, long lastGetTimeNanos, byte[] serializedData, long expiretime, Object deserialized) {
+    public CacheEntry(RawString key, long lastGetTimeNanos, byte[] serializedData, long expiretime, Object deserialized) {
         this.key = key;
         this.lastGetTime = lastGetTimeNanos;
         this.putTime = lastGetTimeNanos;
@@ -46,7 +47,7 @@ public final class CacheEntry {
         this.reference = deserialized != null ? new SoftReference<>(deserialized) : null;
     }
 
-    public CacheEntry(String key, long lastGetTimeNanos, byte[] serializedData, long expiretime) {
+    public CacheEntry(RawString key, long lastGetTimeNanos, byte[] serializedData, long expiretime) {
         this.key = key;
         this.lastGetTime = lastGetTimeNanos;
         this.putTime = lastGetTimeNanos;
@@ -57,13 +58,13 @@ public final class CacheEntry {
     synchronized Object resolveReference(EntrySerializer serializer) throws CacheException {
         Object resolved = reference != null ? reference.get() : null;
         if (resolved == null) {
-            resolved = serializer.deserializeObject(key, serializedData);
+            resolved = serializer.deserializeObject(key.toString(), serializedData);
             reference = new SoftReference<>(resolved);
         }
         return resolved;
     }
 
-    public String getKey() {
+    public RawString getKey() {
         return key;
     }
 

@@ -19,6 +19,7 @@
  */
 package blazingcache.client.impl;
 
+import blazingcache.utils.RawString;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -33,11 +34,11 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class PendingFetchesManager {
 
-    private final Map<String, Set<Long>> pendingFetchesByKey = new HashMap<>();
+    private final Map<RawString, Set<Long>> pendingFetchesByKey = new HashMap<>();
     private final AtomicLong idgenerator = new AtomicLong();
     private final ReentrantLock lock = new ReentrantLock();
 
-    public long registerFetchForKey(String key) {
+    public long registerFetchForKey(RawString key) {
         long id = idgenerator.incrementAndGet();
         lock.lock();
         try {
@@ -53,7 +54,7 @@ public class PendingFetchesManager {
         return id;
     }
 
-    public boolean consumeAndValidateFetchForKey(String key, long fetchId) {
+    public boolean consumeAndValidateFetchForKey(RawString key, long fetchId) {
         lock.lock();
         try {
             Set<Long> actual = pendingFetchesByKey.get(key);
@@ -63,7 +64,7 @@ public class PendingFetchesManager {
         }
     }
 
-    public void cancelFetchesForKey(String key) {
+    public void cancelFetchesForKey(RawString key) {
         lock.lock();
         try {
             pendingFetchesByKey.remove(key);

@@ -23,7 +23,7 @@ import blazingcache.network.Channel;
 import blazingcache.network.Message;
 import blazingcache.network.ReplyCallback;
 import blazingcache.network.SendResultCallback;
-import blazingcache.network.netty.DodoMessageUtils;
+import blazingcache.network.netty.MessageUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
@@ -62,8 +62,8 @@ public class JVMChannel extends Channel {
 
     private Message cloneMessage(Message message) {
         ByteBuf buf = Unpooled.buffer();
-        DodoMessageUtils.encodeMessage(buf, message);
-        return DodoMessageUtils.decodeMessage(buf);
+        MessageUtils.encodeMessage(buf, message);
+        return MessageUtils.decodeMessage(buf);
     }
 
     private void receiveMessageFromPeer(Message message) {

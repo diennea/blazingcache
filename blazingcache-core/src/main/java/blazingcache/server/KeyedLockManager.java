@@ -19,6 +19,7 @@
  */
 package blazingcache.server;
 
+import blazingcache.utils.RawString;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -40,15 +41,16 @@ public class KeyedLockManager {
         return new StampedLock();
     }
     private final ReentrantLock generalLock = new ReentrantLock(true);
-    private final Map<String, StampedLock> liveLocks = new HashMap<>();
-    private final Map<String, AtomicInteger> locksCounter = new HashMap<>();
+    private final Map<RawString, StampedLock> liveLocks = new HashMap<>();
+    private final Map<RawString, AtomicInteger> locksCounter = new HashMap<>();
 
     /**
      * Debug operation to see actual locked keys
-     * @return 
+     *
+     * @return
      */
-    public Map<String, Integer> getLockedKeys() {
-        HashMap<String, Integer> result = new HashMap<>();
+    public Map<RawString, Integer> getLockedKeys() {
+        HashMap<RawString, Integer> result = new HashMap<>();
         generalLock.lock();
         try {
             locksCounter.forEach((k, v) -> {
@@ -73,7 +75,7 @@ public class KeyedLockManager {
         }
     }
 
-    private StampedLock makeLockForKey(String key) {
+    private StampedLock makeLockForKey(RawString key) {
         StampedLock lock;
         generalLock.lock();
         try {
@@ -91,7 +93,7 @@ public class KeyedLockManager {
         return lock;
     }
 
-    private StampedLock getLockForKey(String key) {
+    private StampedLock getLockForKey(RawString key) {
         StampedLock lock;
         generalLock.lock();
         try {
@@ -102,7 +104,7 @@ public class KeyedLockManager {
         return lock;
     }
 
-    private StampedLock returnLockForKey(String key) throws IllegalStateException {
+    private StampedLock returnLockForKey(RawString key) throws IllegalStateException {
         StampedLock lock;
         generalLock.lock();
         try {
@@ -122,7 +124,7 @@ public class KeyedLockManager {
         return lock;
     }
 
-    LockID acquireWriteLockForKey(String key, String clientId, String clientProvidedLockId) {
+    LockID acquireWriteLockForKey(RawString key, String clientId, String clientProvidedLockId) {
         if (clientProvidedLockId != null) {
             return useClientProvidedLockForKey(key, Long.parseLong(clientProvidedLockId));
         } else {
@@ -130,13 +132,13 @@ public class KeyedLockManager {
         }
     }
 
-    LockID acquireWriteLockForKey(String key, String clientId) {
+    LockID acquireWriteLockForKey(RawString key, String clientId) {
         StampedLock lock = makeLockForKey(key);
         LockID result = new LockID(lock.writeLock());
         return result;
     }
 
-    void releaseWriteLockForKey(String key, String clientId, LockID lockStamp) {
+    void releaseWriteLockForKey(RawString key, String clientId, LockID lockStamp) {
         if (lockStamp == LockID.VALIDATED_CLIENT_PROVIDED_LOCK) {
             return;
         }
@@ -144,7 +146,7 @@ public class KeyedLockManager {
         lock.unlock(lockStamp.stamp);
     }
 
-    LockID useClientProvidedLockForKey(String key, long stamp) {
+    LockID useClientProvidedLockForKey(RawString key, long stamp) {
         StampedLock lock = getLockForKey(key);
         if (lock.validate(stamp)) {
             return LockID.VALIDATED_CLIENT_PROVIDED_LOCK;

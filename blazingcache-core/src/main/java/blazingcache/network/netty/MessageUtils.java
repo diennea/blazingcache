@@ -20,6 +20,7 @@
 package blazingcache.network.netty;
 
 import blazingcache.network.Message;
+import blazingcache.utils.RawString;
 import io.netty.buffer.ByteBuf;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -34,7 +35,7 @@ import java.util.Set;
  *
  * @author enrico.olivelli
  */
-public class DodoMessageUtils {
+public class MessageUtils {
 
     private static final byte VERSION = 'a';
 
@@ -93,6 +94,9 @@ public class DodoMessageUtils {
         } else if (o instanceof String) {
             encoded.writeByte(OPCODE_STRING_VALUE);
             writeUTF8String(encoded, (String) o);
+        } else if (o instanceof RawString) {
+            encoded.writeByte(OPCODE_STRING_VALUE);
+            writeUTF8String(encoded, ((RawString) o).toString());
         } else if (o instanceof Integer) {
             encoded.writeByte(OPCODE_INT_VALUE);
             encoded.writeInt((Integer) o);
@@ -138,7 +142,7 @@ public class DodoMessageUtils {
             case OPCODE_NULL_VALUE:
                 return null;
             case OPCODE_STRING_VALUE:
-                return readUTF8String(encoded);
+                return RawString.of(readUTF8String(encoded));
             case OPCODE_INT_VALUE:
                 return encoded.readInt();
             case OPCODE_MAP_VALUE: {
@@ -206,7 +210,7 @@ public class DodoMessageUtils {
                     for (int i = 0; i < size; i++) {
                         Object key = readEncodedSimpleValue(encoded);
                         Object value = readEncodedSimpleValue(encoded);
-                        params.put((String) key, value);
+                        params.put( ((RawString) key).toString(), value);
                     }
                     break;
                 default:
