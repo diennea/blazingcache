@@ -65,18 +65,13 @@ public class JAASKerberosTest {
         kdc.start();
 
         String localhostName = "localhost.localdomain";
-        InetAddress byName = InetAddress.getByName(localhostName);
-        System.err.println("debug InetAddress of "+localhostName+" is "+byName);
-        System.err.println("InetAddress of "+localhostName+" is "+byName.getHostAddress());
-        System.err.println("InetAddress of "+localhostName+" is "+byName.getCanonicalHostName());
-        System.err.println("InetAddress of "+localhostName+" is "+byName.getHostName());
         String principalServerNoRealm = "blazingcache/" + localhostName;
         String principalServer = "blazingcache/" + localhostName + "@" + kdc.getRealm();
         String principalClientNoRealm = "blazingcacheclient/" + localhostName;
         String principalClient = principalClientNoRealm + "@" + kdc.getRealm();
 
-        System.out.println("adding principal: " + principalServerNoRealm+" -> "+byName);
-        System.out.println("adding principal: " + principalClientNoRealm+" -> "+byName);
+        System.out.println("adding principal: " + principalServerNoRealm);
+        System.out.println("adding principal: " + principalClientNoRealm);
 
         File keytabClient = new File(kerberosWorkDir.getRoot(), "blazingcacheclient.keytab");
         kdc.createPrincipal(keytabClient, principalClientNoRealm);
@@ -154,7 +149,7 @@ public class JAASKerberosTest {
 
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
 
-        ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
+        ServerHostData serverHostData = new ServerHostData("localhost.localdomain", 1234, "test", false, null);
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
             cacheServer.setClientFetchTimeout(1000);
             cacheServer.start();

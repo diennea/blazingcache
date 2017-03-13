@@ -68,13 +68,13 @@ public class SaslNettyClient {
         clientSubject = loginClient();
 
         if (clientSubject == null) {
-            LOG.log(Level.SEVERE, "Using plain SASL/DIGEST-MD5 auth to connect to " + serverHostname);
+            LOG.log(Level.INFO, "Using plain SASL/DIGEST-MD5 auth to connect to " + serverHostname);
             saslClient = Sasl.createSaslClient(
                 new String[]{SaslUtils.AUTH_DIGEST_MD5}, null, null,
                 SaslUtils.DEFAULT_REALM, SaslUtils.getSaslProps(),
                 new SaslClientCallbackHandler(username, password.toCharArray()));
         } else if (clientSubject.getPrincipals().isEmpty()) {
-            LOG.log(Level.SEVERE, "Using JAAS/SASL/DIGEST-MD5 auth to connect to " + serverPrincipal);
+            LOG.log(Level.INFO, "Using JAAS/SASL/DIGEST-MD5 auth to connect to " + serverPrincipal);
             String[] mechs = {"DIGEST-MD5"};
             username = (String) (clientSubject.getPublicCredentials().toArray()[0]);
             password = (String) (clientSubject.getPrivateCredentials().toArray()[0]);
@@ -88,7 +88,7 @@ public class SaslNettyClient {
             final String serviceName = serviceKerberosName.getServiceName();
             final String serviceHostname = serviceKerberosName.getHostName();
             final String clientPrincipalName = clientKerberosName.toString();
-            LOG.log(Level.SEVERE, "Using JAAS/SASL/GSSAPI auth to connect to server Principal " + serverPrincipal);
+            LOG.log(Level.INFO, "Using JAAS/SASL/GSSAPI auth to connect to server Principal " + serverPrincipal);
             saslClient = Subject.doAs(clientSubject, new PrivilegedExceptionAction<SaslClient>() {
                 @Override
                 public SaslClient run() throws SaslException {
@@ -136,7 +136,7 @@ public class SaslNettyClient {
         try {
             LoginContext loginContext = new LoginContext(clientSection, new ClientCallbackHandler(null));
             loginContext.login();
-            LOG.log(Level.SEVERE, "Using JAAS Configuration subject: " + loginContext.getSubject());
+            LOG.log(Level.FINEST, "Using JAAS Configuration subject: " + loginContext.getSubject());
             return loginContext.getSubject();
         } catch (LoginException error) {
             LOG.log(Level.SEVERE, "Error JAAS Configuration subject: " + error, error);
