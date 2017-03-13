@@ -19,6 +19,7 @@
  */
 package blazingcache.server;
 
+import blazingcache.utils.RawString;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -42,9 +43,9 @@ public class CacheStatus {
 
     private static final Logger LOGGER = Logger.getLogger(CacheStatus.class.getName());
 
-    private final Map<String, Set<String>> clientsForKey = new HashMap<>();
-    private final Map<String, Set<String>> keysForClient = new HashMap<>();
-    private final Map<String, Long> entryExpireTime = new HashMap<>();
+    private final Map<RawString, Set<String>> clientsForKey = new HashMap<>();
+    private final Map<String, Set<RawString>> keysForClient = new HashMap<>();
+    private final Map<RawString, Long> entryExpireTime = new HashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
     private final Map<String, Map<String, List<LockID>>> remoteLocks = new HashMap<>();
     private final ReentrantLock remoteLocksLock = new ReentrantLock(true);
@@ -59,7 +60,7 @@ public class CacheStatus {
         }
     }
 
-    public void registerKeyForClient(String key, String client, long expiretime) {
+    public void registerKeyForClient(RawString key, String client, long expiretime) {
         LOGGER.log(Level.FINEST, "registerKeyForClient key={0} client={1}", new Object[]{key, client});
         lock.writeLock().lock();
         try {
@@ -70,7 +71,7 @@ public class CacheStatus {
             }
             clients.add(client);
 
-            Set<String> keys = keysForClient.get(client);
+            Set<RawString> keys = keysForClient.get(client);
             if (keys == null) {
                 keys = new HashSet<>();
                 keysForClient.put(client, keys);
@@ -109,7 +110,7 @@ public class CacheStatus {
         }
     }
 
-    public Set<String> getKeys() {
+    public Set<RawString> getKeys() {
         lock.readLock().lock();
         try {
             return new HashSet<>(clientsForKey.keySet());
@@ -118,10 +119,10 @@ public class CacheStatus {
         }
     }
 
-    public List<String> getKeysForClient(String client) {
+    public List<RawString> getKeysForClient(String client) {
         lock.readLock().lock();
         try {
-            Set<String> keys = keysForClient.get(client);
+            Set<RawString> keys = keysForClient.get(client);
             if (keys == null) {
                 return Collections.emptyList();
             } else {
@@ -145,7 +146,7 @@ public class CacheStatus {
                 }
             }
 
-            Set<String> keys = keysForClient.get(client);
+            Set<RawString> keys = keysForClient.get(client);
             if (keys != null) {
                 keys.remove(key);
                 if (keys.isEmpty()) {
@@ -158,12 +159,12 @@ public class CacheStatus {
         LOGGER.log(Level.FINEST, "removeKeyForClient key={0} client={1} -> keysForClient {2}", new Object[]{key, client, keysForClient});
     }
 
-    public void removeKeyByPrefixForClient(String prefix, String client) {
+    public void removeKeyByPrefixForClient(RawString prefix, String client) {
         LOGGER.log(Level.FINEST, "removeKeyByPrefixForClient prefix={0} client={1}", new Object[]{prefix, client});
         lock.writeLock().lock();
         try {
 
-            Set<String> keys = keysForClient.get(client);
+            Set<RawString> keys = keysForClient.get(client);
             Set<String> selectedKeys;
             if (keys != null) {
                 selectedKeys = keys.stream().filter(key -> key.startsWith(prefix)).collect(Collectors.toSet());
