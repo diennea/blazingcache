@@ -66,10 +66,10 @@ public class JAASKerberosTest {
 
         String localhostName = "localhost.localdomain";
         InetAddress byName = InetAddress.getByName(localhostName);
-        System.out.println("debug InetAddress of "+localhostName+" is "+byName);
-        System.out.println("InetAddress of "+localhostName+" is "+byName.getHostAddress());
-        System.out.println("InetAddress of "+localhostName+" is "+byName.getCanonicalHostName());
-        System.out.println("InetAddress of "+localhostName+" is "+byName.getHostName());
+        System.err.println("debug InetAddress of "+localhostName+" is "+byName);
+        System.err.println("InetAddress of "+localhostName+" is "+byName.getHostAddress());
+        System.err.println("InetAddress of "+localhostName+" is "+byName.getCanonicalHostName());
+        System.err.println("InetAddress of "+localhostName+" is "+byName.getHostName());
         String principalServerNoRealm = "blazingcache/" + localhostName;
         String principalServer = "blazingcache/" + localhostName + "@" + kdc.getRealm();
         String principalClientNoRealm = "blazingcacheclient/" + localhostName;
