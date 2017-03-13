@@ -120,6 +120,7 @@ public class JAASKerberosTest {
 
         System.setProperty("java.security.auth.login.config", jaas_file.getAbsolutePath());
         System.setProperty("java.security.krb5.conf", krb5file.getAbsolutePath());
+        System.setProperty("sun.security.krb5.debug", "true");
         javax.security.auth.login.Configuration.getConfiguration().refresh();
 
     }
