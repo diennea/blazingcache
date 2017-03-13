@@ -25,6 +25,7 @@ import blazingcache.network.Message;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
+import blazingcache.utils.RawString;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -50,7 +51,7 @@ public class LostFetchMessageTest {
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
             cacheServer.start();
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
-                    CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
                 client1.start();
                 client2.start();
                 assertTrue(client1.waitForConnection(10000));
@@ -63,12 +64,11 @@ public class LostFetchMessageTest {
                         System.out.println("CLIENT1 onConnection");
                     }
 
-                                        
                     @Override
                     public boolean messageReceived(Message message, Channel channel) {
                         if (message.type == Message.TYPE_FETCH_ENTRY) {
-                            String key = (String) message.parameters.get("key");
-                            if (key.equals("lost-fetch")) {
+                            RawString key = RawString.of(message.parameters.get("key"));
+                            if (key.toString().equals("lost-fetch")) {
                                 return false;
                             }
                         }
@@ -122,7 +122,7 @@ public class LostFetchMessageTest {
 
                 // clean up test
                 thread.join();
-                
+
                 // now the client1 should autoreconnect
                 assertTrue(client1.waitForConnection(10000));
             }

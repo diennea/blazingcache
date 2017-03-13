@@ -25,6 +25,7 @@ import blazingcache.network.Message;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
+import blazingcache.utils.RawString;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -63,8 +64,8 @@ public class LockOnLostFetchMessageTest {
                     @Override
                     public boolean messageReceived(Message message, Channel channel) {
                         if (message.type == Message.TYPE_FETCH_ENTRY) {
-                            String key = (String) message.parameters.get("key");
-                            if (key.equals("lost-fetch")) {
+                            RawString key = RawString.of(message.parameters.get("key"));
+                            if (key.toString().equals("lost-fetch")) {
                                 return false;
                             }
                         }
