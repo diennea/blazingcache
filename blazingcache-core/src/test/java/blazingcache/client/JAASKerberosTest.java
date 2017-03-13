@@ -24,6 +24,7 @@ import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
 import java.io.File;
 import java.io.FileWriter;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.logging.ConsoleHandler;
@@ -64,6 +65,11 @@ public class JAASKerberosTest {
         kdc.start();
 
         String localhostName = "localhost.localdomain";
+        InetAddress byName = InetAddress.getByName(localhostName);
+        System.out.println("InetAddress of "+localhostName+" is "+byName);
+        System.out.println("InetAddress of "+localhostName+" is "+byName.getHostAddress());
+        System.out.println("InetAddress of "+localhostName+" is "+byName.getCanonicalHostName());
+        System.out.println("InetAddress of "+localhostName+" is "+byName.getHostName());
         String principalServerNoRealm = "blazingcache/" + localhostName;
         String principalServer = "blazingcache/" + localhostName + "@" + kdc.getRealm();
         String principalClientNoRealm = "blazingcacheclient/" + localhostName;
@@ -120,6 +126,7 @@ public class JAASKerberosTest {
 
         System.setProperty("java.security.auth.login.config", jaas_file.getAbsolutePath());
         System.setProperty("java.security.krb5.conf", krb5file.getAbsolutePath());
+        System.setProperty("sun.security.krb5.debug", "true");
         javax.security.auth.login.Configuration.getConfiguration().refresh();
 
     }
