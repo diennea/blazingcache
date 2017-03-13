@@ -66,7 +66,7 @@ public class JAASKerberosTest {
 
         String localhostName = "localhost.localdomain";
         InetAddress byName = InetAddress.getByName(localhostName);
-        System.out.println("InetAddress of "+localhostName+" is "+byName);
+        System.out.println("debug InetAddress of "+localhostName+" is "+byName);
         System.out.println("InetAddress of "+localhostName+" is "+byName.getHostAddress());
         System.out.println("InetAddress of "+localhostName+" is "+byName.getCanonicalHostName());
         System.out.println("InetAddress of "+localhostName+" is "+byName.getHostName());
