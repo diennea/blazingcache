@@ -51,7 +51,7 @@ public class LostFetchMessageAutoCloseClientTest {
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
             cacheServer.start();
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
-                    CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
                 client1.start();
                 client2.start();
                 assertTrue(client1.waitForConnection(10000));
@@ -64,7 +64,6 @@ public class LostFetchMessageAutoCloseClientTest {
                         System.out.println("CLIENT1 onConnection");
                     }
 
-                                        
                     @Override
                     public boolean messageReceived(Message message, Channel channel) {
                         if (message.type == Message.TYPE_FETCH_ENTRY) {
@@ -102,19 +101,18 @@ public class LostFetchMessageAutoCloseClientTest {
 
                 // wait for fetches to be issued on network and locks to be held
                 for (int i = 0; i < 100; i++) {
-                    Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get("lost-fetch");
+                    Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get(RawString.of("lost-fetch"));
                     System.out.println("LockedKeys:" + cacheServer.getLocksManager().getLockedKeys());
                     Thread.sleep(1000);
                     if (locksCountOnKey != null && locksCountOnKey.intValue() == 1) {
                         break;
                     }
                 }
-                Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get("lost-fetch");
+                Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get(RawString.of("lost-fetch"));
                 assertEquals(Integer.valueOf(1), locksCountOnKey);
 
                 // do shut down the bad client here, the pending fetch will be canceled on reply timeout
 //                client1.disconnect();
-
                 // wait to exit the wait
                 assertTrue(latch.await(20, TimeUnit.SECONDS));
 
@@ -123,7 +121,7 @@ public class LostFetchMessageAutoCloseClientTest {
 
                 // clean up test
                 thread.join();
-                
+
                 // now the client1 should autoreconnect
                 assertTrue(client1.waitForConnection(10000));
             }

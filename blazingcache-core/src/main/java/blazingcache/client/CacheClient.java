@@ -707,7 +707,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         try {
             Message request_message = Message.FETCH_ENTRY(clientId, _key);
             if (lock != null) {
-                if (!lock.getKey().equals(_key)) {
+                if (!lock.getKey().equals(key)) {
                     LOGGER.log(Level.SEVERE, "lock {0} is not for key {1}", new Object[]{lock, _key});
                     return null;
                 }

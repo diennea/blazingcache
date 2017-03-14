@@ -49,8 +49,8 @@ public class LockOnLostFetchMessageTest {
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
             cacheServer.start();
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
-                    CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
-                    CacheClient client3 = new CacheClient("theClient3", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
+                CacheClient client3 = new CacheClient("theClient3", "ciao", new NettyCacheServerLocator(serverHostData));) {
                 client1.start();
                 client2.start();
                 client3.start();
@@ -120,14 +120,14 @@ public class LockOnLostFetchMessageTest {
 
                 // wait for fetches to be issued on network and locks to be held
                 for (int i = 0; i < 100; i++) {
-                    Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get("lost-fetch");
+                    Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get(RawString.of("lost-fetch"));
                     System.out.println("LockedKeys:" + cacheServer.getLocksManager().getLockedKeys());
                     Thread.sleep(1000);
-                    if (locksCountOnKey != null && locksCountOnKey.intValue() == 2) {
+                    if (locksCountOnKey != null && locksCountOnKey == 2) {
                         break;
                     }
                 }
-                Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get("lost-fetch");
+                Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get(RawString.of("lost-fetch"));
                 assertEquals(Integer.valueOf(2), locksCountOnKey);
 
                 // shut down the bad client, the pending fetchs will be canceled
@@ -138,7 +138,7 @@ public class LockOnLostFetchMessageTest {
                 assertTrue(latch_3.await(10, TimeUnit.SECONDS));
 
                 assertTrue(cacheServer.getLocksManager().getLockedKeys().isEmpty());
-                
+
                 // clean up test
                 thread_2.join();
                 thread_3.join();
