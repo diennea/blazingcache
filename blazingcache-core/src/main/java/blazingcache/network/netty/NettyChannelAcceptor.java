@@ -183,7 +183,7 @@ public class NettyChannelAcceptor implements AutoCloseable {
                 }
             });
         }
-        if (NetworkUtils.isEnableEpoolNative()) {
+        if (NetworkUtils.isEnableEpollNative()) {
             bossGroup = new EpollEventLoopGroup(workerThreads);
             workerGroup = new EpollEventLoopGroup(workerThreads);
             LOGGER.log(Level.INFO, "Using netty-native-epoll network type");
@@ -193,7 +193,7 @@ public class NettyChannelAcceptor implements AutoCloseable {
         }
         ServerBootstrap b = new ServerBootstrap();
         b.group(bossGroup, workerGroup)
-            .channel(NetworkUtils.isEnableEpoolNative() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
+            .channel(NetworkUtils.isEnableEpollNative() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
             .childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 public void initChannel(SocketChannel ch) throws Exception {

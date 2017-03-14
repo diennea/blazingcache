@@ -108,7 +108,7 @@ public class NettyConnector implements AutoCloseable {
         if (ssl) {
             this.sslCtx = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
         }
-        if (NetworkUtils.isEnableEpoolNative()) {
+        if (NetworkUtils.isEnableEpollNative()) {
             group = new EpollEventLoopGroup();
         } else {
             group = new NioEventLoopGroup();
@@ -116,7 +116,7 @@ public class NettyConnector implements AutoCloseable {
 
         Bootstrap b = new Bootstrap();
         b.group(group)
-            .channel(NetworkUtils.isEnableEpoolNative() ? EpollSocketChannel.class : NioSocketChannel.class)
+            .channel(NetworkUtils.isEnableEpollNative() ? EpollSocketChannel.class : NioSocketChannel.class)
             .option(ChannelOption.TCP_NODELAY, true)
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeout)
             .handler(new ChannelInitializer<SocketChannel>() {

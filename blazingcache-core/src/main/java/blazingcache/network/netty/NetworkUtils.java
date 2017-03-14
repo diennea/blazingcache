@@ -21,10 +21,10 @@ package blazingcache.network.netty;
 
 public class NetworkUtils {
 
-    private static final boolean ENABLE_EPOOL_NATIVE = System.getProperty("os.name").equalsIgnoreCase("linux")
+    private static final boolean ENABLE_EPOLL_NATIVE = System.getProperty("os.name").equalsIgnoreCase("linux")
         && !Boolean.getBoolean("blazingcache.network.disablenativeepoll");
 
-    public static boolean isEnableEpoolNative() {
-        return ENABLE_EPOOL_NATIVE;
+    public static boolean isEnableEpollNative() {
+        return ENABLE_EPOLL_NATIVE;
     }
 }
