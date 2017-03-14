@@ -406,18 +406,20 @@ public class CacheServer implements AutoCloseable {
         executeOnHandler("unlockKey " + sourceClientId + "," + key, action);
     }
 
-    public void unregisterEntry(RawString key, String sourceClientId, SimpleCallback<RawString> onFinish) {
-        LOGGER.log(Level.FINER, "client " + sourceClientId + " evicted entry " + key);
+    public void unregisterEntries(final List<RawString> keys, String sourceClientId, SimpleCallback<RawString> onFinish) {
+        LOGGER.log(Level.FINER, "client {0} evicted entries {1}", new Object[]{sourceClientId, keys});
         Runnable action = () -> {
-            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
-            try {
-                cacheStatus.removeKeyForClient(key, sourceClientId);
-            } finally {
-                locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+            for (RawString key : keys) {
+                final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
+                try {
+                    cacheStatus.removeKeyForClient(key, sourceClientId);
+                } finally {
+                    locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+                }
             }
             onFinish.onResult(null, null);
         };
-        executeOnHandler("unregisterEntry " + sourceClientId + "," + key, action);
+        executeOnHandler("unregisterEntries " + sourceClientId + "," + keys, action);
     }
 
     public void fetchEntry(RawString key, String clientId, String clientProvidedLockId, SimpleCallback<Message> onFinish) {

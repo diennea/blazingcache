@@ -60,6 +60,7 @@ import java.util.concurrent.TimeUnit;
 public class CacheClient implements ChannelEventListener, ConnectionRequestInfo, AutoCloseable {
 
     private static final Logger LOGGER = Logger.getLogger(CacheClient.class.getName());
+    private static final Logger CONNECTION_MANAGER_LOGGER = Logger.getLogger(CacheClient.ConnectionManager.class.getName().replace("$", "."));
 
     private final ConcurrentHashMap<RawString, CacheEntry> cache = new ConcurrentHashMap<>();
     private final ServerLocator brokerLocator;
@@ -75,6 +76,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private long connectionTimestamp;
     private long lastPerformedEvictionTimestamp;
     private int fetchPriority = 10;
+    private int evictionBatchSize = 100;
 
     private final AtomicLong oldestEvictedKeyAge;
     private final AtomicLong clientPuts;
@@ -137,6 +139,19 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public void setFetchPriority(int fetchPriority) {
         this.fetchPriority = fetchPriority;
+    }
+
+    public int getEvictionBatchSize() {
+        return evictionBatchSize;
+    }
+
+    /**
+     * Define the dimension of the network message sent to notify the local evition of entries. Defaults to 100 'keys'
+     *
+     * @param evictionBatchSize
+     */
+    public void setEvictionBatchSize(int evictionBatchSize) {
+        this.evictionBatchSize = evictionBatchSize;
     }
 
     public EntrySerializer getEntrySerializer() {
@@ -346,7 +361,67 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
-    private static final Logger CONNECTION_MANAGER_LOGGER = Logger.getLogger(CacheClient.ConnectionManager.class.getName().replace("$", "."));
+    private void batchEvictEntries(List<CacheEntry> batch) throws InterruptedException {
+
+        List<CacheEntry> removedEntries = new ArrayList<>();
+        List<RawString> keys = new ArrayList<>();
+        for (CacheEntry entry : batch) {
+            final RawString key = entry.getKey();
+            final CacheEntry removed = cache.remove(key);
+            if (removed != null) {
+                removedEntries.add(removed);
+                this.clientEvictions.incrementAndGet();
+                actualMemory.addAndGet(-removed.getSerializedData().length);
+                keys.add(removed.getKey());
+            }
+        }
+        if (removedEntries.isEmpty()) {
+            return;
+        }
+
+        CountDownLatch count = new CountDownLatch(1);
+        {
+            final Channel _channel = channel;
+            if (_channel == null) {
+                return;
+            }
+
+            if (LOGGER.isLoggable(Level.FINEST)) {
+                LOGGER.log(Level.FINEST, "sending notification of eviction for {0} entries", keys.size());
+            }
+
+            _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, keys), invalidateTimeout, new ReplyCallback() {
+
+                @Override
+                public void replyReceived(Message originalMessage, Message message, Throwable error) {
+                    if (error != null) {
+                        if (LOGGER.isLoggable(Level.FINEST)) {
+                            LOGGER.log(Level.FINEST, "error while unregistering entries " + keys + ": " + error, error);
+                        } else {
+                            LOGGER.log(Level.SEVERE, "error while unregistering entries " + keys + ": " + error);
+                        }
+                    }
+                    count.countDown();
+                }
+            });
+        }
+
+        int countWait = 0;
+
+        while (true) {
+            LOGGER.log(Level.FINER, "waiting for evict ack from server (#{0})", countWait);
+            boolean done = count.await(1, TimeUnit.SECONDS);
+            if (done) {
+                break;
+            }
+            final Channel _channel = channel;
+            if (_channel == null || !_channel.isValid()) {
+                LOGGER.log(Level.SEVERE, "channel closed during eviction");
+                break;
+            }
+            countWait++;
+        }
+    }
 
     private final class ConnectionManager implements Runnable {
 
@@ -388,7 +463,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     }
 
                     try {
-                        // TODO: wait for IO error or stop condition before reconnect 
+                        // TODO: wait for IO error or stop condition before reconnect
                         CONNECTION_MANAGER_LOGGER.log(Level.FINEST, "connected");
                         Thread.sleep(2000);
                     } catch (InterruptedException exit) {
@@ -475,53 +550,18 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             //the oldest one is the first entry in evictable
             this.oldestEvictedKeyAge.getAndSet(System.nanoTime() - evictable.get(0).getPutTime());
 
-            CountDownLatch count = new CountDownLatch(evictable.size());
+            List<CacheEntry> batch = new ArrayList<>();
+
             for (final CacheEntry entry : evictable) {
-                final RawString key = entry.getKey();
-                LOGGER.log(Level.FINEST, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{key, entry.getSerializedData().length, entry.getLastGetTime()});
-
-                final CacheEntry removed = cache.remove(key);
-                if (removed != null) {
-                    this.clientEvictions.incrementAndGet();
-                    actualMemory.addAndGet(-removed.getSerializedData().length);
-                    final Channel _channel = channel;
-                    if (_channel != null) {
-                        _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, key), invalidateTimeout, new ReplyCallback() {
-
-                            @Override
-                            public void replyReceived(Message originalMessage, Message message, Throwable error) {
-                                if (error != null) {
-                                    if (LOGGER.isLoggable(Level.FINEST)) {
-                                        LOGGER.log(Level.FINEST, "error while unregistering entry " + key + ": " + error, error);
-                                    } else {
-                                        LOGGER.log(Level.SEVERE, "error while unregistering entry " + key + ": " + error);
-                                    }
-                                }
-                                count.countDown();
-                            }
-                        });
-                    } else {
-                        count.countDown();
-                    }
-                } else {
-                    count.countDown();
+                LOGGER.log(Level.FINEST, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{entry.getKey(), entry.getSerializedData().length, entry.getLastGetTime()});
+                batch.add(entry);
+                if (batch.size() >= this.evictionBatchSize) {
+                    batchEvictEntries(batch);
+                    batch.clear();
                 }
             }
+            batchEvictEntries(batch);
 
-            int countWait = 0;
-            while (true) {
-                LOGGER.log(Level.FINER, "waiting for evict ack from server (#{0})", countWait);
-                boolean done = count.await(1, TimeUnit.SECONDS);
-                if (done) {
-                    break;
-                }
-                final Channel _channel = channel;
-                if (_channel == null || !_channel.isValid()) {
-                    LOGGER.log(Level.SEVERE, "channel closed during eviction");
-                    break;
-                }
-                countWait++;
-            }
             LOGGER.log(Level.SEVERE, "eviction finished");
         }
     }
@@ -1196,7 +1236,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public Set<String> getLocalKeySetByPrefix(String prefix) {
         RawString _prefix = RawString.of(prefix);
         return cache.keySet().stream()
-            .filter(k -> k.startsWith(_prefix)).map(s->s.toString()).collect(Collectors.toSet());
+            .filter(k -> k.startsWith(_prefix)).map(s -> s.toString()).collect(Collectors.toSet());
     }
 
     /**

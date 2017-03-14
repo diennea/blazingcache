@@ -30,6 +30,8 @@ import blazingcache.network.ReplyCallback;
 import blazingcache.network.ServerSideConnection;
 import blazingcache.security.sasl.SaslNettyServer;
 import blazingcache.utils.RawString;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Connection to a node from the server side
@@ -298,12 +300,16 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     return;
                 }
                 RawString key = (RawString) message.parameters.get("key");
+                List<RawString> keys = (List<RawString>) message.parameters.get("keys");
+                if (key != null && keys == null) {
+                    keys = Collections.singletonList(key);
+                }
                 server.addPendingOperations(1);
-                server.unregisterEntry(key, clientId, new SimpleCallback<RawString>() {
+                server.unregisterEntries(keys, clientId, new SimpleCallback<RawString>() {
                     @Override
                     public void onResult(RawString result, Throwable error) {
                         server.addPendingOperations(-1);
-                        _channel.sendReplyMessage(message, Message.ACK(null).setParameter("key", key));
+                        _channel.sendReplyMessage(message, Message.ACK(null));
                     }
                 });
                 break;

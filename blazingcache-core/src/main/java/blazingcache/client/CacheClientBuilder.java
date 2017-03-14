@@ -43,6 +43,7 @@ public class CacheClientBuilder {
     private int connectTimeout = 10000;
     private int socketTimeout = 0;
     private int fetchPriority = 10;
+    private int evictionBatchSize = 100;
     private ServerLocator locator;
     private String zkConnectString = "localhost:1281";
     private int zkSessionTimeout = 40000;
@@ -88,6 +89,17 @@ public class CacheClientBuilder {
      */
     public CacheClientBuilder fetchPriority(int fetchPriority) {
         this.fetchPriority = fetchPriority;
+        return this;
+    }
+
+    /**
+     * Define the dimension of the network message sent to notify the local evition of entries. Defaults to 100 'keys'
+     *
+     * @param evictionBatchSize
+     * @return
+     */
+    public CacheClientBuilder evictionBatchSize(int evictionBatchSize) {
+        this.evictionBatchSize = evictionBatchSize;
         return this;
     }
 
@@ -300,6 +312,7 @@ public class CacheClientBuilder {
         res.setMaxLocalEntryAge(maxLocalEntryAge);
         res.setEntrySerializer(entrySerializer);
         res.setFetchPriority(fetchPriority);
+        res.setEvictionBatchSize(evictionBatchSize);
         if (this.jmx) {
             res.enableJmx(true);
         }

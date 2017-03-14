@@ -39,7 +39,7 @@ public class ExpireTest {
 
                 client1.put("pippo", data, 0);
                 Assert.assertArrayEquals(data, client1.get("pippo").getSerializedData());
-                client2.put("pippo", data2, System.currentTimeMillis() + 20000);
+                client2.put("pippo", data2, System.currentTimeMillis() + 5000);
                 Assert.assertArrayEquals(data2, client1.get("pippo").getSerializedData());
                 Assert.assertArrayEquals(data2, client2.get("pippo").getSerializedData());
 

@@ -23,6 +23,7 @@ import blazingcache.utils.RawString;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -65,9 +66,10 @@ public final class Message {
         return new Message(clientId, TYPE_PUT_ENTRY, data);
     }
 
-    public static Message UNREGISTER_ENTRY(String clientId, RawString key) {
+    public static Message UNREGISTER_ENTRY(String clientId, List<RawString> keys) {
         HashMap<String, Object> data = new HashMap<>();
-        data.put("key", key);
+        // clients before 12.0 will set only one 'key'
+        data.put("keys", keys);
         return new Message(clientId, TYPE_UNREGISTER_ENTRY, data);
     }
 
