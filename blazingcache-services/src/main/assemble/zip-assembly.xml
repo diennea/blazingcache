@@ -32,7 +32,7 @@
             <useStrictFiltering>true</useStrictFiltering>
             <unpack>false</unpack>           
             <includes>
-                <include>*:jar</include>                
+                <include>*:jar:*</include>                
             </includes>            
             <outputDirectory>lib</outputDirectory>
         </dependencySet>         
