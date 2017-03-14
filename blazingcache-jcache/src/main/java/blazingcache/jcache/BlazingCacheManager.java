@@ -107,7 +107,7 @@ public class BlazingCacheManager implements CacheManager {
             int sockettimeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.sockettimeout", "0"));
             int connecttimeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.connecttimeout", "10000"));
             switch (mode) {
-                case "clustered":
+                case "clustered": {
                     String connect = properties_and_params.getProperty("blazingcache.zookeeper.connectstring", "localhost:1281");
                     int timeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.sessiontimeout", "40000"));
                     String path = properties_and_params.getProperty("blazingcache.zookeeper.path", "/blazingcache");
@@ -116,8 +116,29 @@ public class BlazingCacheManager implements CacheManager {
                     ((ZKCacheServerLocator) locator).setConnectTimeout(connecttimeout);
                     this.client = new CacheClient(clientId, secret, locator);
                     this.embeddedServer = null;
+                }
+                break;
+                case "server": {
+                    String connect = properties_and_params.getProperty("blazingcache.zookeeper.connectstring", "localhost:1281");
+                    int timeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.sessiontimeout", "40000"));
+                    String path = properties_and_params.getProperty("blazingcache.zookeeper.path", "/blazingcache");
+                    boolean writeacls = Boolean.parseBoolean(properties_and_params.getProperty("blazingcache.zookeeper.writeacls", "false"));
+                    String host = properties_and_params.getProperty("blazingcache.server.host", "");
+                    int port = Integer.parseInt(properties_and_params.getProperty("blazingcache.server.port", "7000"));
+                    boolean ssl = Boolean.parseBoolean(properties_and_params.getProperty("blazingcache.server.ssl", "false"));
+                    if (host.isEmpty()) {
+                        host = InetAddress.getLocalHost().getCanonicalHostName();
+                    }
+                    locator = new ZKCacheServerLocator(connect, timeout, path);
+                    ((ZKCacheServerLocator) locator).setSocketTimeout(sockettimeout);
+                    ((ZKCacheServerLocator) locator).setConnectTimeout(connecttimeout);
+                    this.client = new CacheClient(clientId, secret, locator);
+                    ServerHostData hostData = new ServerHostData(host, port, "", ssl, new HashMap<>());
+                    this.embeddedServer = new CacheServer(secret, hostData);
+                    this.embeddedServer.setupCluster(connect, timeout, path, hostData, writeacls);
                     break;
-                case "static":
+                }
+                case "static": {
                     String host = properties_and_params.getProperty("blazingcache.server.host", "localhost");
                     int port = Integer.parseInt(properties_and_params.getProperty("blazingcache.server.port", "1025"));
                     boolean ssl = Boolean.parseBoolean(properties_and_params.getProperty("blazingcache.server.ssl", "false"));
@@ -127,7 +148,8 @@ public class BlazingCacheManager implements CacheManager {
                     this.client = new CacheClient(clientId, secret, locator);
                     this.embeddedServer = null;
                     break;
-                case "local":
+                }
+                case "local": {
                     this.embeddedServer = new CacheServer(secret, new ServerHostData("localhost", -1, "", false, new HashMap<>()));
                     if (JSR107_TCK_101_COMPAT_MODE) {
                         this.embeddedServer.setExpirerPeriod(1);
@@ -135,6 +157,7 @@ public class BlazingCacheManager implements CacheManager {
                     locator = new blazingcache.network.jvm.JVMServerLocator(embeddedServer, false);
                     this.client = new CacheClient(clientId, secret, locator);
                     break;
+                }
                 default:
                     throw new RuntimeException("unsupported blazingcache.mode=" + mode);
             }
@@ -187,7 +210,8 @@ public class BlazingCacheManager implements CacheManager {
     }
 
     @Override
-    public <K, V, C extends Configuration<K, V>> Cache<K, V> createCache(String cacheName, C configuration) throws IllegalArgumentException {
+    public <K, V, C extends Configuration<K, V>>
+        Cache<K, V> createCache(String cacheName, C configuration) throws IllegalArgumentException {
         checkClosed();
         if (cacheName == null || configuration == null) {
             throw new NullPointerException();
