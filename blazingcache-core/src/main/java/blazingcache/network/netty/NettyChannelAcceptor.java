@@ -26,6 +26,8 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -181,35 +183,41 @@ public class NettyChannelAcceptor implements AutoCloseable {
                 }
             });
         }
-        bossGroup = new NioEventLoopGroup(workerThreads);
-        workerGroup = new NioEventLoopGroup(workerThreads);
+        if (NetworkUtils.isEnableEpoolNative()) {
+            bossGroup = new EpollEventLoopGroup(workerThreads);
+            workerGroup = new EpollEventLoopGroup(workerThreads);
+            LOGGER.log(Level.INFO, "Using netty-native-epoll network type");
+        } else {
+            bossGroup = new NioEventLoopGroup(workerThreads);
+            workerGroup = new NioEventLoopGroup(workerThreads);
+        }
         ServerBootstrap b = new ServerBootstrap();
         b.group(bossGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
-                .childHandler(new ChannelInitializer<SocketChannel>() {
-                    @Override
-                    public void initChannel(SocketChannel ch) throws Exception {
-                        NettyChannel session = new NettyChannel("unnamed", ch, callbackExecutor, null);
-                        if (acceptor != null) {
-                            acceptor.createConnection(session);
-                        }
+            .channel(NetworkUtils.isEnableEpoolNative() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
+            .childHandler(new ChannelInitializer<SocketChannel>() {
+                @Override
+                public void initChannel(SocketChannel ch) throws Exception {
+                    NettyChannel session = new NettyChannel("unnamed", ch, callbackExecutor, null);
+                    if (acceptor != null) {
+                        acceptor.createConnection(session);
+                    }
 
 //                        ch.pipeline().addLast(new LoggingHandler());
-                        // Add SSL handler first to encrypt and decrypt everything.
-                        if (ssl) {
-                            ch.pipeline().addLast(sslCtx.newHandler(ch.alloc()));
-                        }
-
-                        ch.pipeline().addLast("lengthprepender", new LengthFieldPrepender(4));
-                        ch.pipeline().addLast("lengthbaseddecoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
-//
-                        ch.pipeline().addLast("messageencoder", new DataMessageEncoder());
-                        ch.pipeline().addLast("messagedecoder", new DataMessageDecoder());
-                        ch.pipeline().addLast(new InboundMessageHandler(session));
+                    // Add SSL handler first to encrypt and decrypt everything.
+                    if (ssl) {
+                        ch.pipeline().addLast(sslCtx.newHandler(ch.alloc()));
                     }
-                })
-                .option(ChannelOption.SO_BACKLOG, 128)
-                .childOption(ChannelOption.SO_KEEPALIVE, true);
+
+                    ch.pipeline().addLast("lengthprepender", new LengthFieldPrepender(4));
+                    ch.pipeline().addLast("lengthbaseddecoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
+//
+                    ch.pipeline().addLast("messageencoder", new DataMessageEncoder());
+                    ch.pipeline().addLast("messagedecoder", new DataMessageDecoder());
+                    ch.pipeline().addLast(new InboundMessageHandler(session));
+                }
+            })
+            .option(ChannelOption.SO_BACKLOG, 128)
+            .childOption(ChannelOption.SO_KEEPALIVE, true);
 
         ChannelFuture f = b.bind(host, port).sync(); // (7)
         this.channel = f.channel();

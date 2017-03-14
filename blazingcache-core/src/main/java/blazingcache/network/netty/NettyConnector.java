@@ -26,6 +26,8 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -106,32 +108,36 @@ public class NettyConnector implements AutoCloseable {
         if (ssl) {
             this.sslCtx = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
         }
-        group = new NioEventLoopGroup();
+        if (NetworkUtils.isEnableEpoolNative()) {
+            group = new EpollEventLoopGroup();
+        } else {
+            group = new NioEventLoopGroup();
+        }
 
         Bootstrap b = new Bootstrap();
         b.group(group)
-                .channel(NioSocketChannel.class)
-                .option(ChannelOption.TCP_NODELAY, true)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeout)
-                .handler(new ChannelInitializer<SocketChannel>() {
-                    @Override
-                    public void initChannel(SocketChannel ch) throws Exception {
-                        channel = new NettyChannel(host + ":" + port, ch, callbackExecutor, NettyConnector.this);
-                        channel.setMessagesReceiver(receiver);
-                        if (ssl) {
-                            ch.pipeline().addLast(sslCtx.newHandler(ch.alloc(), host, port));
-                        }
-                        if (socketTimeout > 0) {
-                            ch.pipeline().addLast("readTimeoutHandler", new ReadTimeoutHandler(socketTimeout));
-                        }
-                        ch.pipeline().addLast("lengthprepender", new LengthFieldPrepender(4));
-                        ch.pipeline().addLast("lengthbaseddecoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
-//
-                        ch.pipeline().addLast("messageencoder", new DataMessageEncoder());
-                        ch.pipeline().addLast("messagedecoder", new DataMessageDecoder());
-                        ch.pipeline().addLast(new InboundMessageHandler(channel));
+            .channel(NetworkUtils.isEnableEpoolNative() ? EpollSocketChannel.class : NioSocketChannel.class)
+            .option(ChannelOption.TCP_NODELAY, true)
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeout)
+            .handler(new ChannelInitializer<SocketChannel>() {
+                @Override
+                public void initChannel(SocketChannel ch) throws Exception {
+                    channel = new NettyChannel(host + ":" + port, ch, callbackExecutor, NettyConnector.this);
+                    channel.setMessagesReceiver(receiver);
+                    if (ssl) {
+                        ch.pipeline().addLast(sslCtx.newHandler(ch.alloc(), host, port));
                     }
-                });
+                    if (socketTimeout > 0) {
+                        ch.pipeline().addLast("readTimeoutHandler", new ReadTimeoutHandler(socketTimeout));
+                    }
+                    ch.pipeline().addLast("lengthprepender", new LengthFieldPrepender(4));
+                    ch.pipeline().addLast("lengthbaseddecoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
+//
+                    ch.pipeline().addLast("messageencoder", new DataMessageEncoder());
+                    ch.pipeline().addLast("messagedecoder", new DataMessageDecoder());
+                    ch.pipeline().addLast(new InboundMessageHandler(channel));
+                }
+            });
 
         ChannelFuture f = b.connect(host, port).sync();
         socketchannel = f.channel();

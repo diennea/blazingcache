@@ -21,7 +21,7 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
     </properties>
-     <build>
+    <build>
         <plugins>
             <plugin>
                 <groupId>org.apache.felix</groupId>
@@ -42,6 +42,13 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-codec</artifactId>
             <version>${libs.netty4}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport-native-epoll</artifactId>
+            <version>${libs.netty4}</version>
+            <scope>compile</scope>
+            <classifier>linux-x86_64</classifier>
         </dependency>
         <dependency>
             <groupId>javax.servlet</groupId>
