@@ -51,6 +51,12 @@
             <classifier>linux-x86_64</classifier>
         </dependency>
         <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-tcnative-boringssl-static</artifactId>
+            <version>${libs.netty4.tcnative}</version>
+            <scope>compile</scope>            
+        </dependency>
+        <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
             <version>${libs.servletapi}</version>

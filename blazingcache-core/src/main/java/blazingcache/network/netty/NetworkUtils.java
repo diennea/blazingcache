@@ -19,6 +19,10 @@
  */
 package blazingcache.network.netty;
 
+import io.netty.handler.ssl.OpenSsl;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public class NetworkUtils {
 
     private static final boolean ENABLE_EPOLL_NATIVE = System.getProperty("os.name").equalsIgnoreCase("linux")
@@ -27,4 +31,23 @@ public class NetworkUtils {
     public static boolean isEnableEpollNative() {
         return ENABLE_EPOLL_NATIVE;
     }
+
+    private static Boolean openSslAvailable;
+    private static final Logger LOG = Logger.getLogger(NetworkUtils.class.getName());
+
+    public static boolean isOpenSslAvailable() {
+        if (openSslAvailable != null) {
+            return openSslAvailable;
+        }
+        if (OpenSsl.isAvailable()) {
+            OpenSsl.ensureAvailability();
+            openSslAvailable = true;
+        } else {
+            Throwable cause = OpenSsl.unavailabilityCause();
+            LOG.log(Level.INFO, "Native OpenSSL support is not available on this platform: " + cause);
+            openSslAvailable = false;
+        }
+        return openSslAvailable;
+    }
+
 }

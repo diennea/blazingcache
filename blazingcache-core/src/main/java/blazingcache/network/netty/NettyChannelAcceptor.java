@@ -33,8 +33,10 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import java.io.File;
 import java.util.List;
@@ -62,6 +64,7 @@ public class NettyChannelAcceptor implements AutoCloseable {
     private ServerSideConnectionAcceptor acceptor;
     private SslContext sslCtx;
     private List<String> sslCiphers;
+    private boolean sslEnableOpenSsl = true;
     private File sslCertChainFile;
     private File sslCertFile;
     private String sslCertPassword;
@@ -125,6 +128,14 @@ public class NettyChannelAcceptor implements AutoCloseable {
         this.sslCiphers = sslCiphers;
     }
 
+    public boolean isSslEnableOpenSsl() {
+        return sslEnableOpenSsl;
+    }
+
+    public void setSslEnableOpenSsl(boolean sslEnableOpenSsl) {
+        this.sslEnableOpenSsl = sslEnableOpenSsl;
+    }
+
     public int getPort() {
         return port;
     }
@@ -150,24 +161,32 @@ public class NettyChannelAcceptor implements AutoCloseable {
     }
 
     public void start() throws Exception {
+
         if (ssl) {
+            boolean useOpenSSL = sslEnableOpenSsl && NetworkUtils.isOpenSslAvailable();
             if (sslCertFile == null) {
-                LOGGER.log(Level.SEVERE, "start SSL with self-signed auto-generated certificate");
+                LOGGER.log(Level.SEVERE, "start SSL with self-signed auto-generated certificate, useOpenSSL:" + useOpenSSL);
                 if (sslCiphers != null) {
                     LOGGER.log(Level.SEVERE, "required sslCiphers " + sslCiphers);
                 }
                 SelfSignedCertificate ssc = new SelfSignedCertificate();
                 try {
-                    sslCtx = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).ciphers(sslCiphers).build();
+                    sslCtx = SslContextBuilder
+                        .forServer(ssc.certificate(), ssc.privateKey())
+                        .sslProvider(useOpenSSL ? SslProvider.OPENSSL : SslProvider.JDK)
+                        .ciphers(sslCiphers)
+                        .build();
                 } finally {
                     ssc.delete();
                 }
             } else {
-                LOGGER.log(Level.SEVERE, "start SSL with certificate " + sslCertFile.getAbsolutePath() + " chain file " + sslCertChainFile.getAbsolutePath());
+                LOGGER.log(Level.SEVERE, "start SSL with certificate " + sslCertFile.getAbsolutePath() + " chain file " + sslCertChainFile.getAbsolutePath() + ", useOpenSSL:" + useOpenSSL);
                 if (sslCiphers != null) {
                     LOGGER.log(Level.SEVERE, "required sslCiphers " + sslCiphers);
                 }
-                sslCtx = SslContextBuilder.forServer(sslCertChainFile, sslCertFile, sslCertPassword).ciphers(sslCiphers).build();
+                sslCtx = SslContextBuilder.forServer(sslCertChainFile, sslCertFile, sslCertPassword)
+                    .sslProvider(useOpenSSL ? SslProvider.OPENSSL : SslProvider.JDK)
+                    .ciphers(sslCiphers).build();
             }
 
         }

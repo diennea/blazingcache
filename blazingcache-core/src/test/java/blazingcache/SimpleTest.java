@@ -9,12 +9,10 @@ import java.nio.charset.StandardCharsets;
 import blazingcache.client.CacheClient;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
-import blazingcache.network.netty.NettyChannelAcceptor;
 import blazingcache.server.CacheServer;
 import org.junit.Assert;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import org.junit.Test;
 
 /**
