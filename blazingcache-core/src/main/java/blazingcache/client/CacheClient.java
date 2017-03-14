@@ -380,31 +380,30 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
 
         CountDownLatch count = new CountDownLatch(1);
-        {
-            final Channel _channel = channel;
-            if (_channel == null) {
-                return;
-            }
 
-            if (LOGGER.isLoggable(Level.FINEST)) {
-                LOGGER.log(Level.FINEST, "sending notification of eviction for {0} entries", keys.size());
-            }
-
-            _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, keys), invalidateTimeout, new ReplyCallback() {
-
-                @Override
-                public void replyReceived(Message originalMessage, Message message, Throwable error) {
-                    if (error != null) {
-                        if (LOGGER.isLoggable(Level.FINEST)) {
-                            LOGGER.log(Level.FINEST, "error while unregistering entries " + keys + ": " + error, error);
-                        } else {
-                            LOGGER.log(Level.SEVERE, "error while unregistering entries " + keys + ": " + error);
-                        }
-                    }
-                    count.countDown();
-                }
-            });
+        final Channel _channel = channel;
+        if (_channel == null || !_channel.isValid()) {
+            return;
         }
+
+        if (LOGGER.isLoggable(Level.FINEST)) {
+            LOGGER.log(Level.FINEST, "sending notification of eviction for {0} entries", keys.size());
+        }
+
+        _channel.sendMessageWithAsyncReply(Message.UNREGISTER_ENTRY(clientId, keys), invalidateTimeout, new ReplyCallback() {
+
+            @Override
+            public void replyReceived(Message originalMessage, Message message, Throwable error) {
+                if (error != null) {
+                    if (LOGGER.isLoggable(Level.FINEST)) {
+                        LOGGER.log(Level.FINEST, "error while unregistering entries " + keys + ": " + error, error);
+                    } else {
+                        LOGGER.log(Level.SEVERE, "error while unregistering entries " + keys + ": " + error);
+                    }
+                }
+                count.countDown();
+            }
+        });
 
         int countWait = 0;
 
@@ -414,8 +413,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (done) {
                 break;
             }
-            final Channel _channel = channel;
-            if (_channel == null || !_channel.isValid()) {
+
+            if (!_channel.isValid()) {
                 LOGGER.log(Level.SEVERE, "channel closed during eviction");
                 break;
             }
