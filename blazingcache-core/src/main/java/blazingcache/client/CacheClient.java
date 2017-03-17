@@ -437,7 +437,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     } catch (InterruptedException exit) {
                         continue;
                     } catch (ServerNotAvailableException | ServerRejectedConnectionException retry) {
-                        CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "no broker available:" + retry);
+                        if (CONNECTION_MANAGER_LOGGER.isLoggable(Level.FINEST)) {
+                            CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "no broker available:" + retry, retry);
+                        } else {
+                            CONNECTION_MANAGER_LOGGER.log(Level.SEVERE, "no broker available:" + retry);
+                        }
                     }
 
                     if (channel == null) {
