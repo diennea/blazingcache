@@ -150,8 +150,7 @@ public class NettyConnector implements AutoCloseable {
     }
 
     @Override
-    public void close() {
-        LOGGER.log(Level.SEVERE, "close channel {0}", channel);
+    public void close() {        
         if (socketchannel != null) {
             try {
                 socketchannel.close().await();
