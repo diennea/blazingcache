@@ -105,7 +105,7 @@ public class SaslNettyServer {
                     }
 
                     final String _mech = "GSSAPI";
-                    LOG.severe("serviceHostname is '" + serviceHostname + "', servicePrincipalName is '" + servicePrincipalName + "', SASL mechanism(mech) is '" + _mech + "', Subject is '" + subject + "'");
+                    LOG.log(Level.INFO, "serviceHostname is ''{0}'', servicePrincipalName is ''{1}", new Object[]{serviceHostname, servicePrincipalName});
 
                     try {
                         return Subject.doAs(subject, new PrivilegedExceptionAction<SaslServer>() {
