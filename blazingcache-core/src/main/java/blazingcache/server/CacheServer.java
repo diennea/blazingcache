@@ -102,12 +102,11 @@ public class CacheServer implements AutoCloseable {
         this.connectedClients = new AtomicInteger();
     }
 
-    public void setupSsl(File certificateFile, String password, File certificateChain, List<String> sslCiphers, boolean enableOpenSsl) {
+    public void setupSsl(File certificateFile, String password, File certificateChain, List<String> sslCiphers) {
         this.server.setSslCertChainFile(certificateChain);
         this.server.setSslCertChainFile(certificateFile);
         this.server.setSslCertPassword(password);
         this.server.setSslCiphers(sslCiphers);
-        this.server.setSslEnableOpenSsl(enableOpenSsl);
     }
 
     public int getChannelHandlersThreads() {

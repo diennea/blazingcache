@@ -35,6 +35,7 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import java.util.concurrent.ExecutorService;
@@ -58,6 +59,7 @@ public class NettyConnector implements AutoCloseable {
     private EventLoopGroup group;
     private SslContext sslCtx;
     private boolean ssl;
+    private boolean sslUnsecure = true;
     protected int connectTimeout = 60000;
     protected int socketTimeout = 240000;
     private final ExecutorService callbackExecutor = Executors.newCachedThreadPool();
@@ -98,6 +100,14 @@ public class NettyConnector implements AutoCloseable {
         this.ssl = ssl;
     }
 
+    public boolean isSslUnsecure() {
+        return sslUnsecure;
+    }
+
+    public void setSslUnsecure(boolean sslUnsecure) {
+        this.sslUnsecure = sslUnsecure;
+    }
+
     private ChannelEventListener receiver;
 
     public NettyConnector(ChannelEventListener receiver) {
@@ -106,7 +116,19 @@ public class NettyConnector implements AutoCloseable {
 
     public NettyChannel connect() throws Exception {
         if (ssl) {
-            this.sslCtx = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+            boolean useOpenSSL = NetworkUtils.isOpenSslAvailable();
+            if (sslUnsecure) {
+                this.sslCtx = SslContextBuilder
+                    .forClient()
+                    .sslProvider(useOpenSSL ? SslProvider.OPENSSL : SslProvider.JDK)
+                    .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                    .build();
+            } else {
+                this.sslCtx = SslContextBuilder
+                    .forClient()
+                    .sslProvider(useOpenSSL ? SslProvider.OPENSSL : SslProvider.JDK)
+                    .build();
+            }
         }
         if (NetworkUtils.isEnableEpollNative()) {
             group = new EpollEventLoopGroup();
@@ -150,7 +172,7 @@ public class NettyConnector implements AutoCloseable {
     }
 
     @Override
-    public void close() {        
+    public void close() {
         if (socketchannel != null) {
             try {
                 socketchannel.close().await();

@@ -64,7 +64,6 @@ public class NettyChannelAcceptor implements AutoCloseable {
     private ServerSideConnectionAcceptor acceptor;
     private SslContext sslCtx;
     private List<String> sslCiphers;
-    private boolean sslEnableOpenSsl = true;
     private File sslCertChainFile;
     private File sslCertFile;
     private String sslCertPassword;
@@ -128,14 +127,6 @@ public class NettyChannelAcceptor implements AutoCloseable {
         this.sslCiphers = sslCiphers;
     }
 
-    public boolean isSslEnableOpenSsl() {
-        return sslEnableOpenSsl;
-    }
-
-    public void setSslEnableOpenSsl(boolean sslEnableOpenSsl) {
-        this.sslEnableOpenSsl = sslEnableOpenSsl;
-    }
-
     public int getPort() {
         return port;
     }
@@ -163,7 +154,7 @@ public class NettyChannelAcceptor implements AutoCloseable {
     public void start() throws Exception {
 
         if (ssl) {
-            boolean useOpenSSL = sslEnableOpenSsl && NetworkUtils.isOpenSslAvailable();
+            boolean useOpenSSL = NetworkUtils.isOpenSslAvailable();
             if (sslCertFile == null) {
                 LOGGER.log(Level.SEVERE, "start SSL with self-signed auto-generated certificate, useOpenSSL:" + useOpenSSL);
                 if (sslCiphers != null) {

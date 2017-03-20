@@ -15,19 +15,15 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
-/**
- *
- * @author enrico.olivelli
- */
 public class SimpleSSLTest {
 
     @Test
-    public void basicTestOpenSsl() throws Exception {
+    public void basicTestSsl() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
 
         ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", true, null);
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
-            cacheServer.setupSsl(null, null, null, null, true);
+            cacheServer.setupSsl(null, null, null, null);
             cacheServer.start();
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
                 CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
@@ -52,34 +48,4 @@ public class SimpleSSLTest {
 
     }
 
-    @Test
-    public void basicTestNoOpenSsl() throws Exception {
-        byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
-
-        ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", true, null);
-        try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
-            cacheServer.setupSsl(null, null, null, null, false);
-            cacheServer.start();
-            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
-                CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
-                client1.start();
-                client2.start();
-                assertTrue(client1.waitForConnection(10000));
-                assertTrue(client2.waitForConnection(10000));
-
-                client1.put("pippo", data, 0);
-                client2.put("pippo", data, 0);
-
-                Assert.assertArrayEquals(data, client1.get("pippo").getSerializedData());
-                Assert.assertArrayEquals(data, client2.get("pippo").getSerializedData());
-
-                client1.invalidate("pippo");
-                assertNull(client1.get("pippo"));
-                assertNull(client2.get("pippo"));
-
-            }
-
-        }
-
-    }
 }

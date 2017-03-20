@@ -28,6 +28,9 @@ public class NetworkUtils {
     private static final boolean ENABLE_EPOLL_NATIVE = System.getProperty("os.name").equalsIgnoreCase("linux")
         && !Boolean.getBoolean("blazingcache.network.disablenativeepoll");
 
+    private static final boolean ENABLE_OPENSSL
+        = !Boolean.getBoolean("blazingcache.network.disableopenssl");
+
     public static boolean isEnableEpollNative() {
         return ENABLE_EPOLL_NATIVE;
     }
@@ -39,7 +42,7 @@ public class NetworkUtils {
         if (openSslAvailable != null) {
             return openSslAvailable;
         }
-        if (OpenSsl.isAvailable()) {
+        if (ENABLE_OPENSSL && OpenSsl.isAvailable()) {
             OpenSsl.ensureAvailability();
             openSslAvailable = true;
         } else {

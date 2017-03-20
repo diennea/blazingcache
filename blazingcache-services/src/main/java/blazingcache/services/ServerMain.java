@@ -145,8 +145,7 @@ public class ServerMain implements AutoCloseable {
         boolean ssl = Boolean.parseBoolean(configuration.getProperty("server.ssl", "false"));
         boolean jmx = Boolean.parseBoolean(configuration.getProperty("server.jmx", "true"));
         String certfile = configuration.getProperty("server.ssl.certificatefile", "");
-        String certchainfile = configuration.getProperty("server.ssl.certificatechainfile", "");
-        boolean enableOpenSsl = Boolean.parseBoolean(configuration.getProperty("server.ssl.openssl", "true"));
+        String certchainfile = configuration.getProperty("server.ssl.certificatechainfile", "");        
         String certpassword = configuration.getProperty("server.ssl.certificatefilepassword", null);
         String sslciphers = configuration.getProperty("server.ssl.ciphers", "");
         String sharedsecret = configuration.getProperty("sharedsecret", "blazingcache");
@@ -202,7 +201,7 @@ public class ServerMain implements AutoCloseable {
             ciphers = Stream.of(sslciphers.split(",")).map(s -> s.trim()).filter(s -> !s.isEmpty()).collect(Collectors.toList());
         }
         if (!certfile.isEmpty() || sslciphers != null) {
-            cacheServer.setupSsl(sslCertChainFile, certpassword, sslCertFile, ciphers, enableOpenSsl);
+            cacheServer.setupSsl(sslCertChainFile, certpassword, sslCertFile, ciphers);
         }
 
         cacheServer.start();
