@@ -37,6 +37,12 @@
             <projectNameForChangelog>BlazingCache</projectNameForChangelog>
             <releases>
                 <release>
+                    <version>1.12.0</version>
+                    <date>April 2017</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10106</href>
+                    <text>BlazingCache 1.12.0 introduces Netty 4.1.X, Native-Epol on Linux, OpenSSL and JCache single server embedded mode</text>
+                </release>
+                <release>
                     <version>1.11.0</version>
                     <date>November 2016</date>
                     <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10104</href>
