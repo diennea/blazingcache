@@ -556,7 +556,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             List<CacheEntry> batch = new ArrayList<>();
 
             for (final CacheEntry entry : evictable) {
-                LOGGER.log(Level.FINEST, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{entry.getKey(), entry.getSerializedData().length, entry.getLastGetTime()});
+                if (LOGGER.isLoggable(Level.FINEST)) {
+                    LOGGER.log(Level.FINEST, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{entry.getKey(), entry.getSerializedData().length, entry.getLastGetTime()});
+                }
                 batch.add(entry);
                 if (batch.size() >= this.evictionBatchSize) {
                     batchEvictEntries(batch);
@@ -587,7 +589,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         switch (message.type) {
             case Message.TYPE_INVALIDATE: {
                 RawString key = (RawString) message.parameters.get("key");
-                LOGGER.log(Level.FINEST, clientId + " invalidate " + key + " from " + message.clientId);
+                if (LOGGER.isLoggable(Level.FINEST)) {
+                    LOGGER.log(Level.FINEST, "{0} invalidate {1} from {2}", new Object[]{clientId, key, message.clientId});
+                }
                 runningFetches.cancelFetchesForKey(key);
                 CacheEntry removed = cache.remove(key);
                 if (removed != null) {
@@ -601,7 +605,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             break;
             case Message.TYPE_INVALIDATE_BY_PREFIX: {
                 RawString prefix = (RawString) message.parameters.get("prefix");
-                LOGGER.log(Level.FINEST, "{0} invalidateByPrefix {1} from {2}", new Object[]{clientId, prefix, message.clientId});
+                if (LOGGER.isLoggable(Level.FINEST)) {
+                    LOGGER.log(Level.FINEST, "{0} invalidateByPrefix {1} from {2}", new Object[]{clientId, prefix, message.clientId});
+                }
                 Collection<RawString> keys = cache.keySet().stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
                 keys.forEach((key) -> {
                     runningFetches.cancelFetchesForKey(key);
@@ -622,7 +628,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 runningFetches.cancelFetchesForKey(key);
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
-                LOGGER.log(Level.FINEST, "{0} put {1} from {2}", new Object[]{clientId, key, message.clientId});
+                if (LOGGER.isLoggable(Level.FINEST)) {
+                    LOGGER.log(Level.FINEST, "{0} put {1} from {2}", new Object[]{clientId, key, message.clientId});
+                }
                 CacheEntry cacheEntry = new CacheEntry(key, System.nanoTime(), data, expiretime);
                 CacheEntry previous = cache.put(key, cacheEntry);
                 if (previous != null) {
@@ -639,7 +647,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             case Message.TYPE_FETCH_ENTRY: {
                 RawString key = (RawString) message.parameters.get("key");
                 CacheEntry entry = cache.get(key);
-                LOGGER.log(Level.FINEST, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
+                if (LOGGER.isLoggable(Level.FINEST)) {
+                    LOGGER.log(Level.FINEST, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
+                }
                 Channel _channel = channel;
                 if (_channel != null) {
                     if (entry != null) {
@@ -757,7 +767,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 request_message.setParameter("lockId", lock.getLockId());
             }
             Message message = _channel.sendMessageWithReply(request_message, invalidateTimeout);
-            LOGGER.log(Level.FINEST, "fetch result " + _key + ", answer is " + message);
+            if (LOGGER.isLoggable(Level.FINEST)) {
+                LOGGER.log(Level.FINEST, "fetch result {0}, answer is {1}", new Object[]{_key, message});
+            }
             if (internalClientListener != null) {
                 internalClientListener.onFetchResponse(_key.toString(), message);
             }
@@ -825,7 +837,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     if (error != null) {
                         LOGGER.log(Level.SEVERE, "touch " + key + " failed ", error);
                     } else {
-                        LOGGER.log(Level.FINEST, "touch " + key);
+                        if (LOGGER.isLoggable(Level.FINEST)) {
+                            LOGGER.log(Level.FINEST, "touch " + key);
+                        }
                         clientTouches.incrementAndGet();
                     }
                 }
@@ -901,7 +915,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                         request.setParameter("lockId", lock.getLockId());
                     }
                     Message response = _channel.sendMessageWithReply(request, invalidateTimeout);
-                    LOGGER.log(Level.FINEST, "invalidate " + _key + ", -> " + response);
+                    if (LOGGER.isLoggable(Level.FINEST)) {
+                        LOGGER.log(Level.FINEST, "invalidate {0}, -> {1}", new Object[]{_key, response});
+                    }
                     this.clientInvalidations.incrementAndGet();
                     return;
                 } catch (InterruptedException error) {
@@ -943,7 +959,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             } else {
                 try {
                     Message response = _channel.sendMessageWithReply(Message.INVALIDATE_BY_PREFIX(clientId, _prefix), invalidateTimeout);
-                    LOGGER.log(Level.FINEST, "invalidateByPrefix " + prefix + ", -> " + response);
+                    if (LOGGER.isLoggable(Level.FINEST)) {
+                        LOGGER.log(Level.FINEST, "invalidateByPrefix {0}, -> {1}", new Object[]{prefix, response});
+                    }
                     this.clientInvalidations.incrementAndGet();
                     return;
                 } catch (TimeoutException error) {
