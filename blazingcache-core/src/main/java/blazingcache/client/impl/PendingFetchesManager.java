@@ -58,7 +58,15 @@ public class PendingFetchesManager {
         lock.lock();
         try {
             Set<Long> actual = pendingFetchesByKey.get(key);
-            return actual != null && actual.remove(fetchId);
+            if (actual == null) {
+                return false;
+            } else {
+                boolean removed = actual.remove(fetchId);
+                if (actual.isEmpty()) {
+                    pendingFetchesByKey.remove(key);
+                }
+                return removed;
+            }
         } finally {
             lock.unlock();
         }
@@ -81,6 +89,10 @@ public class PendingFetchesManager {
         } finally {
             lock.unlock();
         }
+    }
+    
+    protected Map<RawString, Set<Long>> getPendingFetchesForTest() {
+        return pendingFetchesByKey;
     }
 
 }
