@@ -9,12 +9,12 @@ cd jsr107tck
 git reset --hard
 git checkout v1.0.1-release
 sed -i -- 's/\${implementation-version}/1.0.0/g' spring-annotations-test-harness/pom.xml cdi-weld-annotations-test-harness/pom.xml guice-annotations-test-harness/pom.xml
-mvn clean install -Dimplementation-version=1.13.0-SNAPSHOT -Dimplementation-groupId=org.blazingcache -Dimplementation-artifactId=blazingcache-jcache  -DCacheManagerImpl=blazingcache.jcache.BlazingCacheManager -DCacheImpl=blazingcache.jcache.BlazingCacheCache -DCacheEntryImpl=blazingcache.jcache.BlazingCacheEntry -Djavax.management.builder.initial=blazingcache.jcache.BlazingCacheMBeanServerBuilder -Dorg.jsr107.tck.management.agentId=RIMBeanServer -Dorg.blazingcache.jsr107tck101compatmode=true
+mvn clean install -Dimplementation-version=1.13.0-ALPHA1 -Dimplementation-groupId=org.blazingcache -Dimplementation-artifactId=blazingcache-jcache  -DCacheManagerImpl=blazingcache.jcache.BlazingCacheManager -DCacheImpl=blazingcache.jcache.BlazingCacheCache -DCacheEntryImpl=blazingcache.jcache.BlazingCacheEntry -Djavax.management.builder.initial=blazingcache.jcache.BlazingCacheMBeanServerBuilder -Dorg.jsr107.tck.management.agentId=RIMBeanServer -Dorg.blazingcache.jsr107tck101compatmode=true
 
 then if you want to test against the latest (master) version of the TCK
 
 git reset --hard
 git checkout master
 sed -i -- 's/\${implementation-version}/1.0.0/g' spring-annotations-test-harness/pom.xml cdi-weld-annotations-test-harness/pom.xml guice-annotations-test-harness/pom.xml
-mvn clean install -Dimplementation-version=1.13.0-SNAPSHOT -Dimplementation-groupId=org.blazingcache -Dimplementation-artifactId=blazingcache-jcache -DCacheManagerImpl=blazingcache.jcache.BlazingCacheManager -DCacheImpl=blazingcache.jcache.BlazingCacheCache -DCacheEntryImpl=blazingcache.jcache.BlazingCacheEntry -Djavax.management.builder.initial=blazingcache.jcache.BlazingCacheMBeanServerBuilder -Dorg.jsr107.tck.management.agentId=RIMBeanServer
+mvn clean install -Dimplementation-version=1.13.0-ALPHA1 -Dimplementation-groupId=org.blazingcache -Dimplementation-artifactId=blazingcache-jcache -DCacheManagerImpl=blazingcache.jcache.BlazingCacheManager -DCacheImpl=blazingcache.jcache.BlazingCacheCache -DCacheEntryImpl=blazingcache.jcache.BlazingCacheEntry -Djavax.management.builder.initial=blazingcache.jcache.BlazingCacheMBeanServerBuilder -Dorg.jsr107.tck.management.agentId=RIMBeanServer
 
