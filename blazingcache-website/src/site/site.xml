@@ -37,6 +37,12 @@
             <projectNameForChangelog>BlazingCache</projectNameForChangelog>
             <releases>
                 <release>
+                    <version>1.13.0</version>
+                    <date>July 2017</date>
+                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10200</href>
+                    <text>BlazingCache 1.13.0 introduces Netty4 upgrade and other minor fixes</text>
+                </release>
+                <release>
                     <version>1.12.0</version>
                     <date>April 2017</date>
                     <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10106</href>
