@@ -13,8 +13,6 @@ Since version 1.4.0 BlazingCache implements JSR107 JCache API.
 
 See our [docs](https://blazingcache.readme.io)
 
-Give us [feedback](https://dev.blazingcache.org/jira/secure/Dashboard.jspa)
-
 Join the [mailing list](http://lists.blazingcache.org/mailman/listinfo)
 
 ## License
