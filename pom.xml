@@ -63,15 +63,25 @@
         <libs.junit>4.12</libs.junit>
         <libs.jackson.mapper>1.9.11</libs.jackson.mapper>
         <libs.zookeeper>3.4.8</libs.zookeeper>
-        <libs.curator>2.8.0</libs.curator>        
-        <libs.findbugsannotations>3.0.0</libs.findbugsannotations>        
+        <libs.curator>2.8.0</libs.curator>     
     </properties>  
     <dependencies>
         <dependency>
-            <groupId>com.google.code.findbugs</groupId>
-            <artifactId>annotations</artifactId>
-            <version>${libs.findbugsannotations}</version>
-            <scope>provided</scope>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>net.jcip</groupId>
+            <artifactId>jcip-annotations</artifactId>
+            <version>1.0</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs-annotations</artifactId>
+            <version>3.1.0</version>
+            <optional>true</optional>
         </dependency>
     </dependencies>
     <profiles>
@@ -97,9 +107,9 @@
             <build>               
                 <plugins>
                     <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>findbugs-maven-plugin</artifactId>
-                        <version>3.0.4</version>
+                        <groupId>com.github.spotbugs</groupId>
+                        <artifactId>spotbugs-maven-plugin</artifactId>
+                        <version>3.1.0-RC6</version>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
