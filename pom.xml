@@ -49,6 +49,11 @@
             <name>Nicolò Boschi</name>
             <organization>Diennea</organization>
         </developer>
+        <developer>
+            <id>mino181295</id>
+            <name>Matteo Minardi</name>
+            <organization>Diennea</organization>
+        </developer>
     </developers>
     <issueManagement>
         <url>https://dev.blazingcache.org/jira</url>		
@@ -56,24 +61,47 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.target>1.8</maven.compiler.target>        
         <libs.netty4>4.1.12.Final</libs.netty4>
         <libs.netty4.tcnative>2.0.3.Final</libs.netty4.tcnative>
         <libs.servletapi>3.1.0</libs.servletapi>
         <libs.junit>4.12</libs.junit>
         <libs.jackson.mapper>1.9.11</libs.jackson.mapper>
         <libs.zookeeper>3.4.8</libs.zookeeper>
-        <libs.curator>2.8.0</libs.curator>        
-        <libs.findbugsannotations>3.0.0</libs.findbugsannotations>        
+        <libs.curator>2.8.0</libs.curator>
+        <libs.spotbugs>3.1.0</libs.spotbugs> 
+        <libs.jcipi-annotations>1.0</libs.jcipi-annotations> 
+        <libs.spotbugsannotations>3.1.0</libs.spotbugsannotations>
+        <libs.spotbugsmaven>3.1.0-RC6</libs.spotbugsmaven>   
     </properties>  
     <dependencies>
         <dependency>
-            <groupId>com.google.code.findbugs</groupId>
-            <artifactId>annotations</artifactId>
-            <version>${libs.findbugsannotations}</version>
-            <scope>provided</scope>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs</artifactId>
+            <version>${libs.spotbugs}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.jcip</groupId>
+            <artifactId>jcip-annotations</artifactId>
+            <version>${libs.jcipi-annotations}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs-annotations</artifactId>
+            <version>${libs.spotbugsannotations}</version>
+            <optional>true</optional>
         </dependency>
     </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>${libs.spotbugsmaven}</version>
+            </plugin>
+        </plugins>
+    </build>
     <profiles>
         <profile>
             <id>default</id>
@@ -96,11 +124,6 @@
             </distributionManagement>     
             <build>               
                 <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>findbugs-maven-plugin</artifactId>
-                        <version>3.0.4</version>
-                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
