@@ -49,6 +49,11 @@
             <name>Nicolò Boschi</name>
             <organization>Diennea</organization>
         </developer>
+        <developer>
+            <id>mino181295</id>
+            <name>Matteo Minardi</name>
+            <organization>Diennea</organization>
+        </developer>
     </developers>
     <issueManagement>
         <url>https://dev.blazingcache.org/jira</url>		
