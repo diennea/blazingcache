@@ -21,6 +21,8 @@ package blazingcache.jcache;
 
 import blazingcache.jcache.BlazingCacheCache;
 import java.lang.management.ManagementFactory;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.cache.CacheException;
 import javax.management.InstanceAlreadyExistsException;
 import javax.management.InstanceNotFoundException;
@@ -40,12 +42,14 @@ public class JMXUtils {
 
     private static MBeanServer platformMBeanServer;
     private static Throwable mBeanServerLookupError;
+    private static final Logger LOG = Logger.getLogger(JMXUtils.class.getName());
 
     static {
         try {
-            platformMBeanServer = MBeanServerFactory.createMBeanServer();
+            platformMBeanServer = ManagementFactory.getPlatformMBeanServer();
         } catch (Exception err) {
             mBeanServerLookupError = err;
+            LOG.log(Level.SEVERE, "cannot access PlatformMBeanServer", err);
             err.printStackTrace();
             platformMBeanServer = null;
         }
@@ -63,11 +67,11 @@ public class JMXUtils {
         if (platformMBeanServer == null) {
             throw new CacheException("PlatformMBeanServer not available", mBeanServerLookupError);
         }
-        String cacheManagerName = safeName(cache.getCacheManager().getURI().toString());        
-        String cacheName = safeName(cache.getName());        
+        String cacheManagerName = safeName(cache.getCacheManager().getURI().toString());
+        String cacheName = safeName(cache.getName());
 
         try {
-            ObjectName name = new ObjectName("javax.cache:type=CacheStatistics,CacheManager=" + cacheManagerName + ",Cache=" + cacheName);            
+            ObjectName name = new ObjectName("javax.cache:type=CacheStatistics,CacheManager=" + cacheManagerName + ",Cache=" + cacheName);
 
             if (platformMBeanServer.isRegistered(name)) {
                 try {

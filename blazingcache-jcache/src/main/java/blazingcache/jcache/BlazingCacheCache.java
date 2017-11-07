@@ -30,6 +30,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.cache.Cache;
 import javax.cache.CacheManager;
@@ -78,7 +80,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     private final BlazingCacheConfigurationMXBean<K, V> configurationMXBean;
     private final BlazingCacheStatisticsMXBean<K, V> statisticsMXBean;
     private boolean needPreviuosValueForListeners = false;
-    private List<BlazingCacheCacheEntryListenerWrapper> listeners = new ArrayList<>();
+    private List<BlazingCacheCacheEntryListenerWrapper<K, V>> listeners = new ArrayList<>();
 
     public BlazingCacheCache(String cacheName, CacheClient client, CacheManager cacheManager, Serializer<K, String> keysSerializer, Serializer<V, byte[]> valuesSerializer, boolean usefetch, Configuration<K, V> configuration) {
         this.cacheName = cacheName;
@@ -129,8 +131,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             }
         } else {
             this.configuration = new MutableConfiguration<K, V>()
-                    .setTypes(configuration.getKeyType(), configuration.getValueType())
-                    .setStoreByValue(configuration.isStoreByValue());
+                .setTypes(configuration.getKeyType(), configuration.getValueType())
+                .setStoreByValue(configuration.isStoreByValue());
             this.policy = null; // means "eternal"
             cacheLoader = null;
             needPreviuosValueForListeners = false;
@@ -989,11 +991,11 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             if (isWriteThrough || needPreviuosValueForListeners || configuration.isStatisticsEnabled()) {
                 int prefixLen = (cacheName + "#").length();
                 localKeys = client
-                        .getLocalKeySetByPrefix(cacheName + "#")
-                        .stream()
-                        .map(s -> {
-                            return (K) keysSerializer.deserialize(s.substring(prefixLen));
-                        }).collect(Collectors.toSet());
+                    .getLocalKeySetByPrefix(cacheName + "#")
+                    .stream()
+                    .map(s -> {
+                        return (K) keysSerializer.deserialize(s.substring(prefixLen));
+                    }).collect(Collectors.toSet());
                 if (needPreviuosValueForListeners) {
                     previousValuesForListener = new HashMap<>();
                     for (K key : localKeys) {
@@ -1060,7 +1062,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
     @Override
     public <C extends Configuration<K, V>>
-            C getConfiguration(Class<C> clazz) {
+        C getConfiguration(Class<C> clazz) {
         return (C) configuration;
     }
 
@@ -1180,6 +1182,17 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         configuration.setManagementEnabled(enabled);
     }
 
+    private void closeCustomization(Object object) {
+        if (object != null && object instanceof AutoCloseable) {
+            try {
+                ((AutoCloseable) object).close();
+            } catch (Exception suppress) {
+                LOG.log(Level.SEVERE, "error while closing customization " + object, suppress);
+            }
+        }
+    }
+    private static final Logger LOG = Logger.getLogger(BlazingCacheCache.class.getName());
+
     private static class EntryProcessorResultImpl<T> implements EntryProcessorResult<T> {
 
         private final T value;
@@ -1239,9 +1252,22 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             return;
         }
         clear();
+        closeCustomizations();
         setStatisticsEnabled(false);
         setManagementEnabled(false);
         closed = true;
+    }
+
+    private void closeCustomizations() {
+        closeCustomization(cacheLoader);
+        closeCustomization(cacheWriter);
+        closeCustomization(policy);
+        closeCustomization(keysSerializer);
+        closeCustomization(valuesSerializer);
+        listeners.forEach((l) -> {
+            closeCustomization(l);
+        });
+
     }
 
     @Override
@@ -1274,9 +1300,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     @Override
     public void deregisterCacheEntryListener(CacheEntryListenerConfiguration<K, V> cacheEntryListenerConfiguration) {
         checkClosed();
-        List<BlazingCacheCacheEntryListenerWrapper> newList = new ArrayList<>();
+        List<BlazingCacheCacheEntryListenerWrapper<K, V>> newList = new ArrayList<>();
         boolean _needPreviuosValueForListeners = false;
-        for (BlazingCacheCacheEntryListenerWrapper listenerWrapper : listeners) {
+        for (BlazingCacheCacheEntryListenerWrapper<K, V> listenerWrapper : listeners) {
             if (!listenerWrapper.configuration.equals(cacheEntryListenerConfiguration)) {
                 newList.add(listenerWrapper);
                 _needPreviuosValueForListeners = _needPreviuosValueForListeners | listenerWrapper.needPreviousValue;
@@ -1287,14 +1313,15 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         this.configuration.removeCacheEntryListenerConfiguration(cacheEntryListenerConfiguration);
     }
 
+    @SuppressWarnings("unchecked")
     private void configureListener(CacheEntryListenerConfiguration<K, V> listenerConfig) {
         BlazingCacheCacheEntryListenerWrapper wrapper = new BlazingCacheCacheEntryListenerWrapper(
-                listenerConfig.isSynchronous(),
-                listenerConfig.isOldValueRequired(),
-                listenerConfig.getCacheEntryListenerFactory().create(),
-                listenerConfig.getCacheEntryEventFilterFactory() != null ? listenerConfig.getCacheEntryEventFilterFactory().create() : null,
-                listenerConfig,
-                this
+            listenerConfig.isSynchronous(),
+            listenerConfig.isOldValueRequired(),
+            listenerConfig.getCacheEntryListenerFactory().create(),
+            listenerConfig.getCacheEntryEventFilterFactory() != null ? listenerConfig.getCacheEntryEventFilterFactory().create() : null,
+            listenerConfig,
+            this
         );
         listeners.add(wrapper);
         needPreviuosValueForListeners = needPreviuosValueForListeners | wrapper.needPreviousValue || policy != null;
@@ -1349,13 +1376,13 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         checkClosed();
         int prefixLen = (cacheName + "#").length();
         Set<K> localKeys = client
-                .getLocalKeySetByPrefix(cacheName + "#")
-                .stream()
-                .map(s -> {
-                    String noPrefix = s.substring(prefixLen);
-                    K key = keysSerializer.deserialize(noPrefix);
-                    return (K) key;
-                }).collect(Collectors.toSet());
+            .getLocalKeySetByPrefix(cacheName + "#")
+            .stream()
+            .map(s -> {
+                String noPrefix = s.substring(prefixLen);
+                K key = keysSerializer.deserialize(noPrefix);
+                return (K) key;
+            }).collect(Collectors.toSet());
         Iterator<K> keysIterator = localKeys.iterator();
         return new EntryIterator(keysIterator, this);
 

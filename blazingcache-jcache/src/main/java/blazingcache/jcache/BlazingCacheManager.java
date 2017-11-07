@@ -251,21 +251,13 @@ public class BlazingCacheManager implements CacheManager {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public <K, V> Cache<K, V> getCache(String cacheName) {
         checkClosed();
         if (cacheName == null) {
             throw new NullPointerException();
         }
-        Cache<K, V> res = caches.get(cacheName);
-        if (res == null) {
-            return null;
-        }
-        Configuration configuration = res.getConfiguration(Configuration.class);
-        if ((configuration.getKeyType() != null && !configuration.getKeyType().equals(Object.class))
-            || (configuration.getValueType() != null && !configuration.getValueType().equals(Object.class))) {
-            throw new IllegalArgumentException();
-        }
-        return res;
+        return caches.get(cacheName);
     }
 
     @Override

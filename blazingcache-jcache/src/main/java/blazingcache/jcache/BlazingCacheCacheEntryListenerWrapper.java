@@ -31,7 +31,7 @@ import javax.cache.event.EventType;
  *
  * @author enrico.olivelli
  */
-final class BlazingCacheCacheEntryListenerWrapper<K, V> {
+final class BlazingCacheCacheEntryListenerWrapper<K, V> implements AutoCloseable {
 
     final boolean synchronous;
     final boolean oldValueRequired;
@@ -62,12 +62,14 @@ final class BlazingCacheCacheEntryListenerWrapper<K, V> {
         private final K key;
         private final V oldValue;
         private final V value;
+        private final boolean oldValuePresent;
 
-        public BlazingCacheCacheEntryEvent(K key, V oldValue, V value, Cache source, EventType eventType) {
+        public BlazingCacheCacheEntryEvent(K key, V oldValue, V value, Cache source, EventType eventType, boolean oldValuePresent) {
             super(source, eventType);
             this.key = key;
             this.oldValue = oldValue;
             this.value = value;
+            this.oldValuePresent = oldValuePresent && needPreviousValue;
         }
 
         @Override
@@ -77,7 +79,7 @@ final class BlazingCacheCacheEntryListenerWrapper<K, V> {
 
         @Override
         public boolean isOldValueAvailable() {
-            return needPreviousValue;
+            return oldValuePresent;
         }
 
         @Override
@@ -103,7 +105,7 @@ final class BlazingCacheCacheEntryListenerWrapper<K, V> {
 
     void onEntryCreated(K key, V value) {
         if (onCreate) {
-            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, null, value, parent, EventType.CREATED);
+            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, null, value, parent, EventType.CREATED, false);
             if (filter != null && !filter.evaluate(event)) {
                 return;
             }
@@ -113,7 +115,7 @@ final class BlazingCacheCacheEntryListenerWrapper<K, V> {
 
     void onEntryUpdated(K key, V oldValue, V value) {
         if (onUpdate) {
-            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, oldValue, value, parent, EventType.UPDATED);
+            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, oldValue, value, parent, EventType.UPDATED, true);
             if (filter != null && !filter.evaluate(event)) {
                 return;
             }
@@ -123,11 +125,24 @@ final class BlazingCacheCacheEntryListenerWrapper<K, V> {
 
     void onEntryRemoved(K key, V oldValue) {
         if (onRemove) {
-            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, oldValue, oldValue, parent, EventType.REMOVED);
+            BlazingCacheCacheEntryEvent event = new BlazingCacheCacheEntryEvent(key, oldValue, oldValue, parent, EventType.REMOVED, true);
             if (filter != null && !filter.evaluate(event)) {
                 return;
             }
             ((CacheEntryRemovedListener) listener).onRemoved(Arrays.asList(event));
+        }
+    }
+
+    @Override
+    public void close() throws Exception {
+        try {
+            if (listener != null && listener instanceof AutoCloseable) {
+                ((AutoCloseable) listener).close();
+            }
+        } finally {
+            if (filter != null && filter instanceof AutoCloseable) {
+                ((AutoCloseable) filter).close();
+            }
         }
     }
 
