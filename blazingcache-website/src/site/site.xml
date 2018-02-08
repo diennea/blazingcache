@@ -37,6 +37,12 @@
             <projectNameForChangelog>BlazingCache</projectNameForChangelog>
             <releases>
                 <release>
+                    <version>1.14.0</version>
+                    <date>TO BE DEFINED</date>
+                    <href>TO BE DEFINED</href>
+                    <text>BlazingCache 1.14.0 implements JCache 1.1 API</text>
+                </release>
+                <release>
                     <version>1.13.0</version>
                     <date>July 2017</date>
                     <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10200</href>
