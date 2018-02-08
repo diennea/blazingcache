@@ -5,16 +5,12 @@
         <navigationBar>
             <items>
                 <item>
-                    <text>Guide</text>
+                    <text>Documentation</text>
                     <href>https://blazingcache.readme.io/</href>
                 </item>
                 <item>
                     <text>Community</text>
                     <href>http://lists.blazingcache.org/mailman/listinfo</href>
-                </item>
-                <item>
-                    <text>Bugs</text>
-                    <href>https://dev.blazingcache.org/jira/</href>
                 </item>
                 <item>
                     <text>GitHub</text>
@@ -45,67 +41,67 @@
                 <release>
                     <version>1.13.0</version>
                     <date>July 2017</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10200</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.13.0 introduces Netty4 upgrade and other minor fixes</text>
                 </release>
                 <release>
                     <version>1.12.0</version>
                     <date>April 2017</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10106</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.12.0 introduces Netty 4.1.X, Native-Epol on Linux, OpenSSL and JCache single server embedded mode</text>
                 </release>
                 <release>
                     <version>1.11.0</version>
                     <date>November 2016</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10104</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.11.0 introduces SASL/Kerberos authentication</text>
                 </release>
                 <release>
                     <version>1.10.0</version>
                     <date>September 2016</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10101</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.10.0 introduces CacheClient.load() feature</text>
                 </release>
                 <release>
                     <version>1.9.0</version>
                     <date>June 2016</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10009</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.9.0 introduces JCache JSR107 support for StoreByReference optional feature</text>
                 </release>
                 <release>
                     <version>1.8.0</version>
                     <date>May 2016</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10007</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.8.0 is a GA release</text>
                 </release>
                 <release>
                     <version>1.7.0</version>
                     <date>April 2016</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10006</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.7.0 introduces fetchObject, getObject and putObject methods</text>
                 </release>
                 <release>
                     <version>1.6.0</version>
                     <date>26 March 2016</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10005</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.6.0 introduces fetch/put/invalidate serialization</text>
                 </release>s
                 <release>
                     <version>1.5.0</version>
                     <date>1 March 2016</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10004</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.5.0 introduces detailed performance counters</text>
                 </release>
                 <release>
                     <version>1.4.0</version>
                     <date>26 January 2016</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10003</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.4.0 introduces distributed locks</text>
                 </release>
                 <release>
                     <version>1.3.0</version>
                     <date>21 January 2016</date>
-                    <href>https://dev.blazingcache.org/jira/secure/ReleaseNote.jspa?projectId=10000&amp;version=10001</href>
+                    <href>https://github.com/diennea/blazingcache/releases</href>
                     <text>BlazingCache 1.3.0 introduces JSR107 API, first public release</text>
                 </release>
             </releases>
