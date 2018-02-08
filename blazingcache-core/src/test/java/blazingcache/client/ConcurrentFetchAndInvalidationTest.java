@@ -29,8 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import javax.xml.ws.Holder;
-import static org.junit.Assert.assertEquals;
+import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.Assert.assertNull;
 import org.junit.Test;
 import static org.junit.Assert.assertTrue;
@@ -90,12 +89,12 @@ public class ConcurrentFetchAndInvalidationTest {
 
                 client1.put("entry", "test".getBytes(StandardCharsets.UTF_8), -1);
 
-                Holder<CacheEntry> result = new Holder<>();
+                
 
                 Thread slow_fetch = new Thread(() -> {
                     try {
-                        result.value = client2.fetch("entry");
-                        System.out.println("FETCH RETURNED " + result.value);
+                        CacheEntry entry = client2.fetch("entry");
+                        System.out.println("FETCH RETURNED " + entry);
                         actions.add("FETCH-RETURNED");
                     } catch (InterruptedException err) {
                     }

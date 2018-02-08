@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.cache.Cache;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
@@ -35,7 +36,6 @@ import javax.cache.processor.EntryProcessor;
 import javax.cache.processor.EntryProcessorException;
 import javax.cache.processor.MutableEntry;
 import javax.cache.spi.CachingProvider;
-import javax.xml.ws.Holder;
 import org.junit.Test;
 import static org.junit.Assert.assertSame;
 
@@ -88,25 +88,25 @@ public class StoreByReferenceSimpleTest {
             assertSame(bean_one, result.get("one"));
             assertSame(bean_two, result.get("two"));
 
-            Holder<MyBean> result_in_invoke = new Holder<>();
+            AtomicReference<MyBean> result_in_invoke = new AtomicReference<>();
             cache.invoke("one", new EntryProcessor<String, StoreByReferenceSimpleTest.MyBean, Object>() {
                 @Override
                 public Object process(MutableEntry<String, MyBean> entry, Object... arguments) throws EntryProcessorException {
-                    result_in_invoke.value = entry.getValue();
+                    result_in_invoke.set(entry.getValue());
                     return null;
                 }
             });
-            assertSame(bean_one, result_in_invoke.value);
+            assertSame(bean_one, result_in_invoke.get());
 
-            Holder<MyBean> result_in_invoke_all = new Holder<>();
+            AtomicReference<MyBean> result_in_invoke_all = new AtomicReference<>();
             cache.invokeAll(new HashSet<>(Arrays.asList("one")), new EntryProcessor<String, StoreByReferenceSimpleTest.MyBean, Object>() {
                 @Override
                 public Object process(MutableEntry<String, MyBean> entry, Object... arguments) throws EntryProcessorException {
-                    result_in_invoke_all.value = entry.getValue();
+                    result_in_invoke_all.set(entry.getValue());
                     return null;
                 }
             });
-            assertSame(bean_one, result_in_invoke.value);
+            assertSame(bean_one, result_in_invoke.get());
         }
     }
 }
