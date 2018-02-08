@@ -230,17 +230,6 @@ public class TCKCacheManagerTest {
         Cache<String, String> cache = cacheManager.getCache("typed-cache", String.class, String.class);
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void getUnsafeTypedCacheRequest() {
-        CacheManager cacheManager = getCacheManager();
-
-        MutableConfiguration<String, Long> config = new MutableConfiguration<String, Long>().setTypes(String.class, Long.class);
-
-        cacheManager.createCache("typed-cache", config);
-
-        Cache cache = cacheManager.getCache("typed-cache");
-    }
-
     @Test
     public void getAndReplace_Missing() {
         Cache cache = getCacheManager().createCache("test", new MutableConfiguration<Object, Object>());
