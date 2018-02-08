@@ -9,6 +9,9 @@
     <artifactId>blazingcache-website-skin</artifactId>
     <packaging>jar</packaging>
     <name>BlazingCache :: Site skin</name>
+    <properties>
+        <libs.spotbugsmaven>3.1.0-RC6</libs.spotbugsmaven>
+    </properties>
     <build>
         <resources>
             <resource>
@@ -22,6 +25,13 @@
                 <filtering>true</filtering>
             </resource>
         </resources>
+        <plugins>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>${libs.spotbugsmaven}</version>
+            </plugin>
+        </plugins>
     </build>
 </project>
 
