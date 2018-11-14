@@ -109,6 +109,8 @@ public class JAASKerberosTest {
         try (FileWriter writer = new FileWriter(krb5file)) {
             writer.write("[libdefaults]\n"
                 + " default_realm = " + kdc.getRealm() + "\n"
+                // disable UDP as Kerby will listen only on TCP by default
+                + " udp_preference_limit=1\n"
                 + "\n"
                 + "\n"
                 + "[realms]\n"
