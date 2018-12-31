@@ -21,7 +21,13 @@ package blazingcache.client;
 
 import blazingcache.utils.RawString;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.ByteBufUtil;
+import java.io.InputStream;
 import java.lang.ref.SoftReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Una entry nella cache
@@ -34,31 +40,44 @@ public final class CacheEntry {
     private long lastGetTime;
     private final long putTime;
     private final RawString key;
-    private final byte[] serializedData;
+    private final ByteBuf buf;
     private final long expiretime;
     private SoftReference<Object> reference;
 
-    public CacheEntry(RawString key, long lastGetTimeNanos, byte[] serializedData, long expiretime, Object deserialized) {
+    /**
+     * Creates the entry and refcount of the given ByteBuf is not incremented
+     *
+     * @param key
+     * @param lastGetTimeNanos
+     * @param serializedData
+     * @param expiretime
+     * @param deserialized
+     */
+    CacheEntry(RawString key, long lastGetTimeNanos, ByteBuf serializedData, long expiretime, Object deserialized) {
         this.key = key;
         this.lastGetTime = lastGetTimeNanos;
         this.putTime = lastGetTimeNanos;
-        this.serializedData = serializedData;
+        this.buf = serializedData;
         this.expiretime = expiretime;
         this.reference = deserialized != null ? new SoftReference<>(deserialized) : null;
     }
 
-    public CacheEntry(RawString key, long lastGetTimeNanos, byte[] serializedData, long expiretime) {
-        this.key = key;
-        this.lastGetTime = lastGetTimeNanos;
-        this.putTime = lastGetTimeNanos;
-        this.serializedData = serializedData;
-        this.expiretime = expiretime;
+    /**
+     * Releases the internal buffer
+     */
+    void release() {
+        try {
+            this.buf.release();
+        } catch (RuntimeException err) {
+            LOG.log(Level.SEVERE, "Error while releasing entry", err);
+        }
     }
 
     synchronized Object resolveReference(EntrySerializer serializer) throws CacheException {
         Object resolved = reference != null ? reference.get() : null;
         if (resolved == null) {
-            resolved = serializer.deserializeObject(key.toString(), serializedData);
+            resolved = serializer.deserializeObject(key.toString(),
+                    getSerializedDataStream());
             reference = new SoftReference<>(resolved);
         }
         return resolved;
@@ -80,9 +99,15 @@ public final class CacheEntry {
         this.lastGetTime = lastGetTimeNanos;
     }
 
-    public byte[] getSerializedData() {
-        return serializedData;
+    public InputStream getSerializedDataStream() {
+        return new ByteBufInputStream(buf.slice());
     }
+
+    public byte[] getSerializedData() {
+        // copy data from Direct Memory to Heap
+        return ByteBufUtil.getBytes(buf);
+    }
+    private static final Logger LOG = Logger.getLogger(CacheEntry.class.getName());
 
     public long getExpiretime() {
         return expiretime;

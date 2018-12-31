@@ -16,21 +16,14 @@
 package blazingcache.jcache;
 
 import blazingcache.client.impl.JDKEntrySerializer;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.cache.CacheException;
+import java.io.InputStream;
 
 /**
  * Standard values serializer
  *
  * @author enrico.olivelli
  */
-public class StandardValuesSerializer implements Serializer<Object, byte[]> {
+public class StandardValuesSerializer implements Serializer<Object, InputStream, byte[]> {
 
     private final static JDKEntrySerializer STANDARD = new JDKEntrySerializer();
 
@@ -44,7 +37,7 @@ public class StandardValuesSerializer implements Serializer<Object, byte[]> {
     }
 
     @Override
-    public Object deserialize(byte[] cachedValue) {
+    public Object deserialize(InputStream cachedValue) {
         try {
             return STANDARD.deserializeObject(null, cachedValue);
         } catch (blazingcache.client.CacheException ex) {

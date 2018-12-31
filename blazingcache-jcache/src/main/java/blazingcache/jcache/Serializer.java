@@ -22,7 +22,7 @@ import java.util.Properties;
  *
  * @author enrico.olivelli
  */
-public interface Serializer<K, V> {
+public interface Serializer<K, V, V2> {
 
     /**
      * Serialize the give value to the value thet is to be written to the
@@ -32,7 +32,7 @@ public interface Serializer<K, V> {
      * @param value
      * @return
      */
-    public V serialize(K value);
+    public V2 serialize(K value);
 
     /**
      * Deserialize the given value from the raw type to the type required by the

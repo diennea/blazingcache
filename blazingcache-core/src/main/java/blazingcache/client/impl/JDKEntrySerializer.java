@@ -21,9 +21,9 @@ package blazingcache.client.impl;
 
 import blazingcache.client.CacheException;
 import blazingcache.client.EntrySerializer;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
@@ -48,10 +48,9 @@ public class JDKEntrySerializer implements EntrySerializer {
     }
 
     @Override
-    public Object deserializeObject(String key, byte[] value) throws CacheException {
-        try {
-            ByteArrayInputStream oo = new ByteArrayInputStream(value);
-            ObjectInputStream oo2 = new ObjectInputStream(oo);
+    public Object deserializeObject(String key, InputStream value) throws CacheException {
+        try {            
+            ObjectInputStream oo2 = new ObjectInputStream(value);
             return oo2.readUnshared();
         } catch (IOException | SecurityException | ClassNotFoundException err) {
             throw new CacheException(err);

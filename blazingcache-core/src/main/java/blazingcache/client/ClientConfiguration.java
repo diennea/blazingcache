@@ -19,17 +19,9 @@
  */
 package blazingcache.client;
 
-import java.io.InputStream;
-
 /**
- * An EntrySerializer is used to marshal/unmarshal objects to/from the byte[]
- * representation, which is the effective 'cached' value
- *
- * @author enrico.olivelli
+ * General Client Configuration 
  */
-public interface EntrySerializer {
-
-    public byte[] serializeObject(String key, Object object) throws CacheException;
-
-    public Object deserializeObject(String key, InputStream value) throws CacheException;
+public final class ClientConfiguration {
+    
 }
