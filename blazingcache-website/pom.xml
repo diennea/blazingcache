@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
     <name>BlazingCache :: Website</name>
     <properties>
-        <libs.spotbugsmaven>3.1.0-RC6</libs.spotbugsmaven>
+        <libs.spotbugsmaven>3.1.8</libs.spotbugsmaven>
     </properties>
     <build>              
         <plugins>

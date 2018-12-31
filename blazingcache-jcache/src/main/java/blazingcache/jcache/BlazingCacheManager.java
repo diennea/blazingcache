@@ -22,6 +22,7 @@ import blazingcache.network.ServerLocator;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
 import blazingcache.zookeeper.ZKCacheServerLocator;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -46,6 +47,8 @@ import javax.cache.spi.CachingProvider;
  *
  * @author enrico.olivelli
  */
+@SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE",
+        justification = "Spotbugs gives a false positive on JDK11+")
 public class BlazingCacheManager implements CacheManager {
 
     final static boolean JSR107_TCK_101_COMPAT_MODE = Boolean.getBoolean("org.blazingcache.jsr107tck101compatmode");
@@ -211,7 +214,7 @@ public class BlazingCacheManager implements CacheManager {
 
     @Override
     public <K, V, C extends Configuration<K, V>>
-        Cache<K, V> createCache(String cacheName, C configuration) throws IllegalArgumentException {
+            Cache<K, V> createCache(String cacheName, C configuration) throws IllegalArgumentException {
         checkClosed();
         if (cacheName == null || configuration == null) {
             throw new NullPointerException();
@@ -244,7 +247,7 @@ public class BlazingCacheManager implements CacheManager {
         }
         Configuration configuration = res.getConfiguration(Configuration.class);
         if ((!keyType.equals(configuration.getKeyType()))
-            || !valueType.equals(configuration.getValueType())) {
+                || !valueType.equals(configuration.getValueType())) {
             throw new ClassCastException();
         }
         return res;
