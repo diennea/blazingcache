@@ -402,7 +402,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (removed != null) {
                 removedEntries.add(removed);
                 this.clientEvictions.incrementAndGet();
-                actualMemory.addAndGet(-removed.getSerializedData().length);
+                actualMemory.addAndGet(-removed.getSerializedDataLength());
                 removed.release();
                 keys.add(removed.getKey());
             }
@@ -555,7 +555,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 if ((maxMemory > 0 && releasedMemory < to_release)
                         || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {
                     evictable.add(t);
-                    releasedMemory += t.getSerializedData().length;
+                    releasedMemory += t.getSerializedDataLength();
                 }
             }
         };
@@ -583,7 +583,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
             for (final CacheEntry entry : evictable) {
                 if (LOGGER.isLoggable(Level.FINEST)) {
-                    LOGGER.log(Level.FINEST, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{entry.getKey(), entry.getSerializedData().length, entry.getLastGetTime()});
+                    LOGGER.log(Level.FINEST, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{entry.getKey(), entry.getSerializedDataLength(), entry.getLastGetTime()});
                 }
                 batch.add(entry);
                 if (batch.size() >= this.evictionBatchSize) {
@@ -621,7 +621,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 runningFetches.cancelFetchesForKey(key);
                 CacheEntry removed = cache.remove(key);
                 if (removed != null) {
-                    actualMemory.addAndGet(-removed.getSerializedData().length);
+                    actualMemory.addAndGet(-removed.getSerializedDataLength());
                     removed.release();
                 }
                 Channel _channel = channel;
@@ -640,7 +640,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     runningFetches.cancelFetchesForKey(key);
                     CacheEntry removed = cache.remove(key);
                     if (removed != null) {
-                        actualMemory.addAndGet(-removed.getSerializedData().length);
+                        actualMemory.addAndGet(-removed.getSerializedDataLength());
                         removed.release();
                     }
                 });
@@ -665,7 +665,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
                 CacheEntry previous = cache.put(key, cacheEntry);
                 if (previous != null) {
-                    actualMemory.addAndGet(-previous.getSerializedData().length);
+                    actualMemory.addAndGet(-previous.getSerializedDataLength());
                     previous.release();
                 }
                 actualMemory.addAndGet(data.length);
@@ -844,10 +844,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private void storeEntry(CacheEntry entry) {
         CacheEntry prev = cache.put(entry.getKey(), entry);
         if (prev != null) {
-            actualMemory.addAndGet(-prev.getSerializedData().length);
+            actualMemory.addAndGet(-prev.getSerializedDataLength());
             prev.release();
         }
-        actualMemory.addAndGet(entry.getSerializedData().length);
+        actualMemory.addAndGet(entry.getSerializedDataLength());
     }
 
     /**
@@ -948,7 +948,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         // subito rimuoviamo dal locale
         CacheEntry removed = cache.remove(_key);
         if (removed != null) {
-            actualMemory.addAndGet(-removed.getSerializedData().length);
+            actualMemory.addAndGet(-removed.getSerializedDataLength());
             removed.release();
         }
 
@@ -998,7 +998,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         keys.forEach((key) -> {
             CacheEntry removed = cache.remove(key);
             if (removed != null) {
-                actualMemory.addAndGet(-removed.getSerializedData().length);
+                actualMemory.addAndGet(-removed.getSerializedDataLength());
                 removed.release();
             }
         });
@@ -1196,7 +1196,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             CacheEntry entry = new CacheEntry(_key, System.nanoTime(), buffer, expireTime, reference);
             CacheEntry prev = cache.put(_key, entry);
             if (prev != null) {
-                actualMemory.addAndGet(-prev.getSerializedData().length);
+                actualMemory.addAndGet(-prev.getSerializedDataLength());
                 prev.release();
             }
             actualMemory.addAndGet(data.length);
@@ -1239,7 +1239,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             CacheEntry entry = new CacheEntry(_key, System.nanoTime(), buffer, expireTime, reference);
             CacheEntry prev = cache.put(_key, entry);
             if (prev != null) {
-                actualMemory.addAndGet(-prev.getSerializedData().length);
+                actualMemory.addAndGet(-prev.getSerializedDataLength());
                 prev.release();
             }
             actualMemory.addAndGet(data.length);

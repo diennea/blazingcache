@@ -24,6 +24,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
+import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.SoftReference;
 import java.util.logging.Level;
@@ -42,6 +43,7 @@ public final class CacheEntry {
     private final RawString key;
     private final ByteBuf buf;
     private final long expiretime;
+    private final int dataLength;
     private SoftReference<Object> reference;
 
     /**
@@ -59,6 +61,7 @@ public final class CacheEntry {
         this.putTime = lastGetTimeNanos;
         this.buf = serializedData;
         this.expiretime = expiretime;
+        this.dataLength = serializedData.readableBytes();
         this.reference = deserialized != null ? new SoftReference<>(deserialized) : null;
     }
 
@@ -76,11 +79,18 @@ public final class CacheEntry {
     synchronized Object resolveReference(EntrySerializer serializer) throws CacheException {
         Object resolved = reference != null ? reference.get() : null;
         if (resolved == null) {
-            resolved = serializer.deserializeObject(key.toString(),
-                    getSerializedDataStream());
+            try (InputStream in = getSerializedDataStream()) {
+                resolved = serializer.deserializeObject(key.toString(), in);
+            } catch (IOException err) {
+                throw new CacheException(err);
+            }
             reference = new SoftReference<>(resolved);
         }
         return resolved;
+    }
+
+    public int getSerializedDataLength() {
+        return dataLength;
     }
 
     public RawString getKey() {
@@ -99,8 +109,15 @@ public final class CacheEntry {
         this.lastGetTime = lastGetTimeNanos;
     }
 
+    /**
+     * Access to data. You have to close the stream in order to handle correctly
+     * refcounts
+     *
+     * @return
+     */
     public InputStream getSerializedDataStream() {
-        return new ByteBufInputStream(buf.slice());
+        return new ByteBufInputStream(buf.retainedSlice(),
+                buf.readableBytes(), true /* releaseOnClose */);
     }
 
     public byte[] getSerializedData() {
