@@ -1212,7 +1212,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             // it is better to invalidate the entry for all
             CacheEntry afterNetwork = cache.get(_key);
             if (afterNetwork != null) {
-                if (!Arrays.equals(afterNetwork.getSerializedData(), data)) {
+                if (!afterNetwork.isSerializedDataEqualTo(data)) {
                     LOGGER.log(Level.SEVERE, "detected conflict on load of " + key + ", invalidating entry");
                     invalidate(key);
                 }
@@ -1255,7 +1255,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             // it is better to invalidate the entry for all
             CacheEntry afterNetwork = cache.get(_key);
             if (afterNetwork != null) {
-                if (!Arrays.equals(afterNetwork.getSerializedData(), data)) {
+                if (!afterNetwork.isSerializedDataEqualTo(data)) {
                     LOGGER.log(Level.SEVERE, "detected conflict on put of " + _key + ", invalidating entry");
                     invalidate(_key, null);
                 }

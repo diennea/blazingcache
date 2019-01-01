@@ -24,9 +24,11 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.SoftReference;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -118,6 +120,11 @@ public final class CacheEntry {
     public InputStream getSerializedDataStream() {
         return new ByteBufInputStream(buf.retainedSlice(),
                 buf.readableBytes(), true /* releaseOnClose */);
+    }
+
+    public boolean isSerializedDataEqualTo(byte[] other) {
+        // let Netty do the best not to copy memory
+        return buf.equals(Unpooled.wrappedBuffer(other));
     }
 
     public byte[] getSerializedData() {
