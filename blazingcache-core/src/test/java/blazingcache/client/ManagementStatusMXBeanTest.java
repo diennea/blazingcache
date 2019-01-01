@@ -150,6 +150,8 @@ public final class ManagementStatusMXBeanTest {
                 usedMemory = (Long) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheUsedMemory");
                 assertEquals(TEST_DATA.length * MAX_NO_OF_ENTRIES_BEFORE_EVICTION, usedMemory);
 
+                assertEquals(MAX_NO_OF_ENTRIES_BEFORE_EVICTION, cacheServer.getCacheStatus().getTotalEntryCount());
+                
                 numberOfkeys = (Integer) JMXUtils.getMBeanServer().getAttribute(statusBeanName, "CacheSize");
                 assertEquals(MAX_NO_OF_ENTRIES_BEFORE_EVICTION, numberOfkeys);
 
