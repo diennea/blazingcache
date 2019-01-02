@@ -99,7 +99,7 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${libs.jacoco}</version>
-            </plugin>            
+            </plugin>
         </plugins>
     </build>
     <profiles>
@@ -163,6 +163,11 @@
                         <configuration>
                             <encoding>${project.build.sourceEncoding}</encoding>
                         </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.eluder.coveralls</groupId>
+                        <artifactId>coveralls-maven-plugin</artifactId>
+                        <version>4.3.0</version>
                     </plugin>
                 </plugins>                
             </build>     
