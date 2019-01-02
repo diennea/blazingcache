@@ -64,7 +64,7 @@ public class JAASKerberosTest {
         kdc = new MiniKdc(conf, kdcDir.getRoot());
         kdc.start();
 
-        String localhostName = "localhost.localdomain";
+        String localhostName = "localhost";
         String principalServerNoRealm = "blazingcache/" + localhostName;
         String principalServer = "blazingcache/" + localhostName + "@" + kdc.getRealm();
         String principalClientNoRealm = "blazingcacheclient/" + localhostName;
@@ -151,7 +151,7 @@ public class JAASKerberosTest {
 
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
 
-        ServerHostData serverHostData = new ServerHostData("localhost.localdomain", 1234, "test", false, null);
+        ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
             cacheServer.setClientFetchTimeout(1000);
             cacheServer.start();
