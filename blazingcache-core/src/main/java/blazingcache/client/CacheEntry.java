@@ -142,4 +142,9 @@ public final class CacheEntry {
         return "CacheEntry{" + "key=" + key + ", lastGetTime=" + lastGetTime + ", expiretime=" + expiretime + '}';
     }
 
+    // only for tests
+    void discardInternalCachedObject() {
+        reference = null;
+    }
+
 }

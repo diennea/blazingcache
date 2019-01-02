@@ -118,7 +118,7 @@ public class BlazingCacheManager implements CacheManager {
                     locator = new ZKCacheServerLocator(connect, timeout, path);
                     ((ZKCacheServerLocator) locator).setSocketTimeout(sockettimeout);
                     ((ZKCacheServerLocator) locator).setConnectTimeout(connecttimeout);
-                    this.client = new CacheClient(clientId, secret, locator, offheap);
+                    this.client = new CacheClient(clientId, secret, locator);
                     this.embeddedServer = null;
                 }
                 break;
@@ -136,7 +136,7 @@ public class BlazingCacheManager implements CacheManager {
                     locator = new ZKCacheServerLocator(connect, timeout, path);
                     ((ZKCacheServerLocator) locator).setSocketTimeout(sockettimeout);
                     ((ZKCacheServerLocator) locator).setConnectTimeout(connecttimeout);
-                    this.client = new CacheClient(clientId, secret, locator, offheap);
+                    this.client = new CacheClient(clientId, secret, locator);
                     ServerHostData hostData = new ServerHostData(host, port, "", ssl, new HashMap<>());
                     this.embeddedServer = new CacheServer(secret, hostData);
                     this.embeddedServer.setupCluster(connect, timeout, path, hostData, writeacls);
@@ -149,7 +149,7 @@ public class BlazingCacheManager implements CacheManager {
                     locator = new NettyCacheServerLocator(host, port, ssl);
                     ((NettyCacheServerLocator) locator).setSocketTimeout(sockettimeout);
                     ((NettyCacheServerLocator) locator).setConnectTimeout(connecttimeout);
-                    this.client = new CacheClient(clientId, secret, locator, offheap);
+                    this.client = new CacheClient(clientId, secret, locator);
                     this.embeddedServer = null;
                     break;
                 }
@@ -159,12 +159,13 @@ public class BlazingCacheManager implements CacheManager {
                         this.embeddedServer.setExpirerPeriod(1);
                     }
                     locator = new blazingcache.network.jvm.JVMServerLocator(embeddedServer, false);
-                    this.client = new CacheClient(clientId, secret, locator, offheap);
+                    this.client = new CacheClient(clientId, secret, locator);
                     break;
                 }
                 default:
                     throw new RuntimeException("unsupported blazingcache.mode=" + mode);
             }
+            this.client.setOffHeap(offheap);
             if (embeddedServer != null) {
                 embeddedServer.start();
             }

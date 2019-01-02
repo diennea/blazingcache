@@ -67,7 +67,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final ByteBufAllocator allocator;
     private final ConcurrentHashMap<RawString, CacheEntry> cache = new ConcurrentHashMap<>();
     private final ServerLocator brokerLocator;
-    private final boolean offHeap;
     private final Thread coreThread;
     private final String clientId;
     private final String sharedSecret;
@@ -75,6 +74,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final CacheClientStatusMXBean statusMXBean;
     private EntrySerializer entrySerializer = new JDKEntrySerializer();
 
+    private boolean offHeap = true;
     private volatile boolean stopped = false;
     private Channel channel;
     private long connectionTimestamp;
@@ -133,6 +133,24 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public void setMaxMemory(long maxMemory) {
         this.maxMemory = maxMemory;
+    }
+
+    /**
+     * Return current configuration, to use Direct (off-heap) memory or regular
+     * heap memory
+     *
+     * @return true if the client is using off-heap memory in order to store
+     * cache entries
+     */
+    public boolean isOffHeap() {
+        return offHeap;
+    }
+
+    /**
+     * Set whether use Direct (off-heap) memory or regular heap memory.
+     */
+    public void setOffHeap(boolean offHeap) {
+        this.offHeap = offHeap;
     }
 
     @Override
@@ -203,11 +221,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     public CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator) {
-        this(clientId, sharedSecret, brokerLocator, true);
-    }
-
-    public CacheClient(String clientId, String sharedSecret,
-            ServerLocator brokerLocator, boolean offHeap) {
         this.brokerLocator = brokerLocator;
         this.sharedSecret = sharedSecret;
         this.coreThread = new Thread(new ConnectionManager(), "cache-connection-manager-" + clientId);
@@ -229,7 +242,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.clientMissedGetsToSuccessfulFetches = new AtomicLong();
         this.clientMissedGetsToMissedFetches = new AtomicLong();
         this.allocator = PooledByteBufAllocator.DEFAULT;
-        this.offHeap = offHeap;
     }
 
     /**
