@@ -1,5 +1,7 @@
 # [BlazingCache](http://blazingcache.org/)
-[![Build Status](https://dev.blazingcache.org/jenkins/buildStatus/icon?job=BlazingCache)](https://dev.blazingcache.org/jenkins/job/BlazingCache/)
+[![Build Status](https://travis-ci.org/diennea/blazingcache.svg?branch=master)](https://travis-ci.org/diennea/blazingcache)
+
+[![Coverage Status](https://coveralls.io/repos/github/diennea/blazingcache/badge.svg?branch=master)](https://coveralls.io/github/diennea/blazingcache?branch=master)
 
 BlazingCache is a Fast Cache for distributed Java applications.
 
