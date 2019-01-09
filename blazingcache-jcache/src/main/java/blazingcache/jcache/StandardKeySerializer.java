@@ -29,7 +29,7 @@ import org.jboss.netty.util.internal.ConcurrentWeakKeyHashMap;
  *
  * @author enrico.olivelli
  */
-public class StandardKeySerializer implements Serializer<Object, String> {
+public class StandardKeySerializer implements Serializer<Object, String, String> {
 
     private final ConcurrentWeakKeyHashMap<Object, String> notSerializableKeys = new ConcurrentWeakKeyHashMap<>();
 

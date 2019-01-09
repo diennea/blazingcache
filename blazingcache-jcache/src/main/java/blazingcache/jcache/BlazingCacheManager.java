@@ -62,8 +62,8 @@ public class BlazingCacheManager implements CacheManager {
     private final CacheServer embeddedServer;
     private final boolean usefetch;
     private final int fetchPriority;
-    private final Serializer<Object, String> keysSerializer;
-    private final Serializer<Object, byte[]> valuesSerializer;
+    private final Serializer<Object, String, String> keysSerializer;
+    private final Serializer<Object, InputStream, byte[]> valuesSerializer;
     private final Map<String, BlazingCacheCache> caches = new HashMap<>();
 
     BlazingCacheManager(BlazingCacheProvider provider, URI uri, ClassLoader classLoader, Properties configproperties) {
@@ -87,12 +87,12 @@ public class BlazingCacheManager implements CacheManager {
             this.fetchPriority = Integer.parseInt(properties_and_params.getProperty("blazingcache.fetchpriority", "10"));
             this.classLoader = classLoader;
             this.properties = properties_and_params;
-            String keySerializerClass = properties_and_params.getProperty("blazingcache.jcache.keyserializer", "blazingcache.jcache.StandardKeySerializer");
-            String valuesSerializerClass = properties_and_params.getProperty("blazingcache.jcache.valuesserializer", "blazingcache.jcache.StandardValuesSerializer");
+            String keySerializerClass = properties_and_params.getProperty("blazingcache.jcache.keyserializer", blazingcache.jcache.StandardKeySerializer.class.getName());
+            String valuesSerializerClass = properties_and_params.getProperty("blazingcache.jcache.valuesserializer", blazingcache.jcache.StandardValuesSerializer.class.getName());
             long maxmemory = Long.parseLong(properties_and_params.getProperty("blazingcache.jcache.maxmemory", "0"));
             long maxLocalEntryAge = Long.parseLong(properties_and_params.getProperty("blazingcache.jcache.localentryage", "0"));
-            this.keysSerializer = (Serializer<Object, String>) Class.forName(keySerializerClass, true, classLoader).newInstance();
-            this.valuesSerializer = (Serializer<Object, byte[]>) Class.forName(valuesSerializerClass, true, classLoader).newInstance();
+            this.keysSerializer = (Serializer<Object, String, String>) Class.forName(keySerializerClass, true, classLoader).getConstructor().newInstance();
+            this.valuesSerializer = (Serializer<Object, InputStream, byte[]>) Class.forName(valuesSerializerClass, true, classLoader).getConstructor().newInstance();
             this.keysSerializer.configure(properties_and_params);
             this.valuesSerializer.configure(properties_and_params);
             String clientId = properties_and_params.getProperty("blazingcache.clientId", "client");
@@ -106,6 +106,7 @@ public class BlazingCacheManager implements CacheManager {
                 }
             }
             ServerLocator locator;
+            boolean offheap = Boolean.parseBoolean(properties_and_params.getProperty("blazingcache.offheap", "true"));
             String mode = properties_and_params.getProperty("blazingcache.mode", "local");
             int sockettimeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.sockettimeout", "0"));
             int connecttimeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.connecttimeout", "10000"));
@@ -164,6 +165,7 @@ public class BlazingCacheManager implements CacheManager {
                 default:
                     throw new RuntimeException("unsupported blazingcache.mode=" + mode);
             }
+            this.client.setOffHeap(offheap);
             if (embeddedServer != null) {
                 embeddedServer.start();
             }
@@ -177,7 +179,7 @@ public class BlazingCacheManager implements CacheManager {
                 }
 
                 @Override
-                public Object deserializeObject(String key, byte[] value) throws blazingcache.client.CacheException {
+                public Object deserializeObject(String key, InputStream value) throws blazingcache.client.CacheException {
                     return valuesSerializer.deserialize(value);
                 }
             });

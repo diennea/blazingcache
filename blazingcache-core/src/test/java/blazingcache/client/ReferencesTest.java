@@ -22,12 +22,15 @@ package blazingcache.client;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
+import io.netty.util.IllegalReferenceCountException;
 import java.io.IOException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import org.junit.Test;
 
 /**
@@ -76,28 +79,51 @@ public class ReferencesTest {
                 assertEquals(0, countObjectReads.get());
 
                 client2.putObject(key, myObject1, -1);
-                
+
                 assertEquals(2, countObjectWrites.get());
-                assertEquals(0, countObjectReads.get());                
+                assertEquals(0, countObjectReads.get());
                 MyBean reference_to_object1_changed = client1.fetchObject(key);
-                System.out.println("qui "+reference_to_object1_changed);
+                System.out.println("qui " + reference_to_object1_changed);
                 Assert.assertNotSame(reference_to_object1_changed, myObject1);
-                
+
                 assertEquals(2, countObjectWrites.get());
                 assertEquals(1, countObjectReads.get());
 
                 System.out.println("qua");
                 MyBean reference_to_object1_changed_2 = client1.fetchObject(key);
                 Assert.assertSame(reference_to_object1_changed, reference_to_object1_changed_2);
-                
+
                 assertEquals(2, countObjectWrites.get());
-                assertEquals(1, countObjectReads.get());                                
-                
+                assertEquals(1, countObjectReads.get());
+
                 MyBean reference_to_object1_changed_3 = client1.fetchObject(key);
                 Assert.assertSame(reference_to_object1_changed, reference_to_object1_changed_3);
-                
+
                 assertEquals(2, countObjectWrites.get());
-                assertEquals(1, countObjectReads.get());                                
+                assertEquals(1, countObjectReads.get());
+
+                CacheEntry entry = client1.get(key);
+                entry.discardInternalCachedObject();
+
+                MyBean reference_to_object1_changed_3b = client1.fetchObject(key);
+                Assert.assertNotSame(reference_to_object1_changed, reference_to_object1_changed_3b);
+
+                assertEquals(2, countObjectWrites.get());
+                assertEquals(2, countObjectReads.get());
+
+                // disconnection clears internal cache and releases all of the references
+                // to direct memory
+                client1.disconnect();
+                assertTrue(client1.waitForConnection(10000));
+
+                assertEquals(0, client1.getCacheSize());
+                // old reference to cache entry is not valid any more
+                // we can expect a Netty error
+                try {
+                    entry.getSerializedData();
+                    fail("should not work, refcount is now 0");
+                } catch (IllegalReferenceCountException expected) {
+                }
 
             }
 

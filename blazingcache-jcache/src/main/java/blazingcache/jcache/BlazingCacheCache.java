@@ -19,6 +19,7 @@ import blazingcache.client.CacheClient;
 import blazingcache.client.CacheEntry;
 import blazingcache.client.CacheException;
 import blazingcache.client.KeyLock;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -62,8 +63,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
     private final String cacheName;
     private final CacheClient client;
-    private final Serializer<K, String> keysSerializer;
-    private final Serializer<V, byte[]> valuesSerializer;
+    private final Serializer<K, String, String> keysSerializer;
+    private final Serializer<V, InputStream, byte[]> valuesSerializer;
     private final boolean usefetch;
     private final MutableConfiguration<K, V> configuration;
     private final CacheManager cacheManager;
@@ -82,7 +83,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     private boolean needPreviuosValueForListeners = false;
     private List<BlazingCacheCacheEntryListenerWrapper<K, V>> listeners = new ArrayList<>();
 
-    public BlazingCacheCache(String cacheName, CacheClient client, CacheManager cacheManager, Serializer<K, String> keysSerializer, Serializer<V, byte[]> valuesSerializer, boolean usefetch, Configuration<K, V> configuration) {
+    public BlazingCacheCache(String cacheName, CacheClient client, CacheManager cacheManager, Serializer<K, String, String> keysSerializer,
+            Serializer<V, InputStream, byte[]> valuesSerializer, boolean usefetch, Configuration<K, V> configuration) {
         this.cacheName = cacheName;
         this.cacheManager = cacheManager;
         this.client = client;
@@ -131,8 +133,8 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             }
         } else {
             this.configuration = new MutableConfiguration<K, V>()
-                .setTypes(configuration.getKeyType(), configuration.getValueType())
-                .setStoreByValue(configuration.isStoreByValue());
+                    .setTypes(configuration.getKeyType(), configuration.getValueType())
+                    .setStoreByValue(configuration.isStoreByValue());
             this.policy = null; // means "eternal"
             cacheLoader = null;
             needPreviuosValueForListeners = false;
@@ -184,7 +186,9 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
         CacheEntry result = client.get(serializedKey);
         if (result != null) {
-            return (V) valuesSerializer.deserialize(result.getSerializedData());
+            return (V) valuesSerializer.deserialize(
+                    result.getSerializedDataStream()
+            );
         } else {
             return null;
         }
@@ -251,7 +255,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
     private V get(K key, boolean allowLoader, boolean checkExpiryAccess, KeyLock lock) {
         checkClosed();
-        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+        String serializedKey = cacheNameAndKey(key);
         try {
             V resultObject = null;
             boolean hit = false;
@@ -271,7 +275,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 }
                 if (result != null) {
                     hit = true;
-                    resultObject = (V) valuesSerializer.deserialize(result.getSerializedData());
+                    resultObject = (V) valuesSerializer.deserialize(result.getSerializedDataStream());
                 }
             }
             if (hit) {
@@ -329,7 +333,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             }
             for (K key : keys) {
 
-                String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+                String serializedKey = cacheNameAndKey(key);
                 V r = null;
                 boolean hit = false;
                 V resultObject = null;
@@ -351,7 +355,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     }
                     if (result != null) {
                         hit = true;
-                        resultObject = (V) valuesSerializer.deserialize(result.getSerializedData());
+                        resultObject = (V) valuesSerializer.deserialize(result.getSerializedDataStream());
                     }
                 }
                 if (hit) {
@@ -379,7 +383,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     K key = entry.getKey();
                     V loaded = entry.getValue();
                     if (loaded != null) {
-                        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+                        String serializedKey = cacheNameAndKey(key);
                         long createdExpireTime = getCreatedExpireTime();
                         if (createdExpireTime != 0) {
                             long expireTs = nowPlusDuration(createdExpireTime);
@@ -409,7 +413,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         if (key == null) {
             throw new NullPointerException();
         }
-        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+        String serializedKey = cacheNameAndKey(key);
         return _containsKey(serializedKey);
     }
 
@@ -470,7 +474,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                         K key = loaded_entry.getKey();
                         V value = loaded_entry.getValue();
                         if (value != null) {
-                            String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+                            String serializedKey = cacheNameAndKey(key);
                             if (needPreviuosValueForListeners) {
                                 V actual = getNoFetch(serializedKey);
                                 if (actual == null) {
@@ -516,6 +520,11 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         }
     }
 
+    private String cacheNameAndKey(K key) {
+        String serializeKey = keysSerializer.serialize(key);
+        return cacheName + "#" + serializeKey;
+    }
+
     private void runtimeCheckType(K key, V value) {
         if (key != null && keyType != null && !keyType.isInstance(key)) {
             throw new ClassCastException(key.getClass().toString());
@@ -551,7 +560,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     throw new CacheWriterException(err);
                 }
             }
-            String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+            String serializedKey = cacheNameAndKey(key);
             long updatedExpireTime = getUpdatedExpireTime();
             if (updatedExpireTime != 0) {
                 long expireTs = nowPlusDuration(updatedExpireTime);
@@ -588,7 +597,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     throw new CacheWriterException(err);
                 }
             }
-            String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+            String serializedKey = cacheNameAndKey(key);
             V actual = getNoFetch(serializedKey);
             if (actual == null) {
                 cacheMisses.incrementAndGet();
@@ -659,7 +668,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 V value = entry.getValue();
                 runtimeCheckType(key, value);
                 if (needPreviuosValueForListeners) {
-                    String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+                    String serializedKey = cacheNameAndKey(key);
                     V previousForListener = getNoFetch(serializedKey);
 
                     if (previousForListener == null) {
@@ -684,7 +693,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 } else {
                     long createdExpireTime = getCreatedExpireTime();
                     if (createdExpireTime != 0) {
-                        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+                        String serializedKey = cacheNameAndKey(key);
                         long expireTs = nowPlusDuration(createdExpireTime);
                         _put(serializedKey, value, expireTs, null);
                         cachePuts.incrementAndGet();
@@ -735,7 +744,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             throw new NullPointerException();
         }
         try {
-            String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+            String serializedKey = cacheNameAndKey(key);
             V actual = getNoFetch(serializedKey);
             if (allowWriteThrough && isWriteThrough) {
                 try {
@@ -765,7 +774,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             throw new NullPointerException();
         }
         try {
-            String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+            String serializedKey = cacheNameAndKey(key);
             KeyLock lock = client.lock(serializedKey);
             if (lock == null) {
                 throw new CacheException("could not lock key " + key);
@@ -821,7 +830,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     throw new CacheWriterException(err);
                 }
             }
-            String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+            String serializedKey = cacheNameAndKey(key);
             V actual = getNoFetch(serializedKey);
             client.invalidate(serializedKey);
             if (actual != null) {
@@ -844,7 +853,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         if (key == null || oldValue == null || newValue == null) {
             throw new NullPointerException();
         }
-        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+        String serializedKey = cacheNameAndKey(key);
 
         if (_containsKey(serializedKey)) {
             try {
@@ -891,7 +900,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         if (key == null || value == null) {
             throw new NullPointerException();
         }
-        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+        String serializedKey = cacheNameAndKey(key);
         if (_containsKey(serializedKey)) {
             try {
                 KeyLock lock = client.lock(serializedKey);
@@ -923,7 +932,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         if (key == null || value == null) {
             throw new NullPointerException();
         }
-        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+        String serializedKey = cacheNameAndKey(key);
         if (_containsKey(serializedKey)) {
             try {
                 KeyLock lock = client.lock(serializedKey);
@@ -991,15 +1000,15 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             if (isWriteThrough || needPreviuosValueForListeners || configuration.isStatisticsEnabled()) {
                 int prefixLen = (cacheName + "#").length();
                 localKeys = client
-                    .getLocalKeySetByPrefix(cacheName + "#")
-                    .stream()
-                    .map(s -> {
-                        return (K) keysSerializer.deserialize(s.substring(prefixLen));
-                    }).collect(Collectors.toSet());
+                        .getLocalKeySetByPrefix(cacheName + "#")
+                        .stream()
+                        .map(s -> {
+                            return (K) keysSerializer.deserialize(s.substring(prefixLen));
+                        }).collect(Collectors.toSet());
                 if (needPreviuosValueForListeners) {
                     previousValuesForListener = new HashMap<>();
                     for (K key : localKeys) {
-                        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+                        String serializedKey = cacheNameAndKey(key);
                         V value = getNoFetch(serializedKey);
                         previousValuesForListener.put(key, value);
                     }
@@ -1062,7 +1071,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
 
     @Override
     public <C extends Configuration<K, V>>
-        C getConfiguration(Class<C> clazz) {
+            C getConfiguration(Class<C> clazz) {
         return (C) configuration;
     }
 
@@ -1072,7 +1081,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         if (key == null || entryProcessor == null) {
             throw new NullPointerException();
         }
-        String serializedKey = cacheName + "#" + keysSerializer.serialize(key);
+        String serializedKey = cacheNameAndKey(key);
 
         try {
             KeyLock lock = client.lock(serializedKey);
@@ -1316,12 +1325,12 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     @SuppressWarnings("unchecked")
     private void configureListener(CacheEntryListenerConfiguration<K, V> listenerConfig) {
         BlazingCacheCacheEntryListenerWrapper wrapper = new BlazingCacheCacheEntryListenerWrapper(
-            listenerConfig.isSynchronous(),
-            listenerConfig.isOldValueRequired(),
-            listenerConfig.getCacheEntryListenerFactory().create(),
-            listenerConfig.getCacheEntryEventFilterFactory() != null ? listenerConfig.getCacheEntryEventFilterFactory().create() : null,
-            listenerConfig,
-            this
+                listenerConfig.isSynchronous(),
+                listenerConfig.isOldValueRequired(),
+                listenerConfig.getCacheEntryListenerFactory().create(),
+                listenerConfig.getCacheEntryEventFilterFactory() != null ? listenerConfig.getCacheEntryEventFilterFactory().create() : null,
+                listenerConfig,
+                this
         );
         listeners.add(wrapper);
         needPreviuosValueForListeners = needPreviuosValueForListeners | wrapper.needPreviousValue || policy != null;
@@ -1376,13 +1385,13 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
         checkClosed();
         int prefixLen = (cacheName + "#").length();
         Set<K> localKeys = client
-            .getLocalKeySetByPrefix(cacheName + "#")
-            .stream()
-            .map(s -> {
-                String noPrefix = s.substring(prefixLen);
-                K key = keysSerializer.deserialize(noPrefix);
-                return (K) key;
-            }).collect(Collectors.toSet());
+                .getLocalKeySetByPrefix(cacheName + "#")
+                .stream()
+                .map(s -> {
+                    String noPrefix = s.substring(prefixLen);
+                    K key = keysSerializer.deserialize(noPrefix);
+                    return (K) key;
+                }).collect(Collectors.toSet());
         Iterator<K> keysIterator = localKeys.iterator();
         return new EntryIterator(keysIterator, this);
 
