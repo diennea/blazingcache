@@ -56,7 +56,7 @@
         </developer>
     </developers>
     <issueManagement>
-        <url>https://dev.blazingcache.org/jira</url>		
+        <url>https://github.com/diennea/blazingcache</url>		
     </issueManagement>    
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -125,10 +125,15 @@
             </modules>   
             <distributionManagement>        
                 <repository>                            
-                    <id>dev.blazingcache.org</id>
+                    <id>dev.majordodo.org</id>
                     <name>BlazingCache Public Repository</name>
-                    <url>https://dev.blazingcache.org/nexus/content/repositories/releases/</url>
+                    <url>https://dev.majordodo.org/nexus/content/repositories/releases/</url>
                 </repository>        
+                <snapshotRepository>                            
+                    <id>dev.majordodo.org</id>
+                    <name>BlazingCache Public Repository</name>
+                    <url>https://dev.majordodo.org/nexus/content/repositories/snapshots/</url>
+                </snapshotRepository>        
             </distributionManagement>     
             <build>               
                 <plugins>
