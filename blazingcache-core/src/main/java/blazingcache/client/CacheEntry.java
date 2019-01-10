@@ -143,7 +143,7 @@ public final class CacheEntry {
     }
 
     // only for tests
-    void discardInternalCachedObject() {
+    synchronized void discardInternalCachedObject() {
         reference = null;
     }
 
