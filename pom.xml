@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.blazingcache</groupId>
     <artifactId>blazingcache</artifactId>
-    <version>1.14.0</version>
+    <version>1.14.1-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>BlazingCache</name>
     <url>http://blazingcache.org</url>
@@ -19,7 +19,7 @@
         <url>https://github.com/diennea/blazingcache.git</url>        
         <connection>scm:git:https://github.com/diennea/blazingcache.git</connection>        
         <developerConnection>scm:git:https://github.com/diennea/blazingcache.git</developerConnection>        
-      <tag>v1.14.0</tag>
+      <tag>release/1.14</tag>
   </scm>
     <developers>
         <developer>
