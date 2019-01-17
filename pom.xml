@@ -17,8 +17,8 @@
     </licenses>
     <scm>
         <url>https://github.com/diennea/blazingcache.git</url>        
-        <connection>https://github.com/diennea/blazingcache.git</connection>        
-        <developerConnection>https://github.com/diennea/blazingcache.git</developerConnection>        
+        <connection>git:https://github.com/diennea/blazingcache.git</connection>        
+        <developerConnection>git:https://github.com/diennea/blazingcache.git</developerConnection>        
     </scm>
     <developers>
         <developer>
