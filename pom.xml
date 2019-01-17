@@ -19,7 +19,8 @@
         <url>https://github.com/diennea/blazingcache.git</url>        
         <connection>scm:git:https://github.com/diennea/blazingcache.git</connection>        
         <developerConnection>scm:git:https://github.com/diennea/blazingcache.git</developerConnection>        
-    </scm>
+      <tag>release/1.14</tag>
+  </scm>
     <developers>
         <developer>
             <id>eolivelli</id>
