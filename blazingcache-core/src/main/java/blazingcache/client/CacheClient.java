@@ -665,16 +665,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 ByteBuf buffer = cacheByteArray(data);
                 CacheEntry cacheEntry = new CacheEntry(key, System.nanoTime(), buffer, expiretime, null);
 
-                cache.compute(key, (k, previous) -> {
-                    if (previous != null) {
-                        actualMemory.addAndGet(-previous.getSerializedDataLength());
-                        previous.close();
-                    }
-                    return cacheEntry;
-                }
-                );
-
-                actualMemory.addAndGet(data.length);
+                storeEntry(cacheEntry);
+                
                 Channel _channel = channel;
                 if (_channel != null) {
                     _channel.sendReplyMessage(message, Message.ACK(clientId));
