@@ -183,14 +183,19 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
             } catch (CacheException error) {
                 throw new javax.cache.CacheException(error);
             }
-        }
-        CacheEntry result = client.get(serializedKey);
-        if (result != null) {
-            return (V) valuesSerializer.deserialize(
-                    result.getSerializedDataStream()
-            );
         } else {
-            return null;
+            CacheEntry result = client.get(serializedKey);
+            if (result != null) {
+                try {
+                    return (V) valuesSerializer.deserialize(
+                            result.getSerializedDataStream()
+                    );
+                } finally {
+                    result.close();
+                }
+            } else {
+                return null;
+            }
         }
     }
 
@@ -274,8 +279,12 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                     result = client.get(serializedKey);
                 }
                 if (result != null) {
-                    hit = true;
-                    resultObject = (V) valuesSerializer.deserialize(result.getSerializedDataStream());
+                    try {
+                        hit = true;
+                        resultObject = (V) valuesSerializer.deserialize(result.getSerializedDataStream());
+                    } finally {
+                        result.close();
+                    }
                 }
             }
             if (hit) {
@@ -354,8 +363,12 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                         result = client.get(serializedKey);
                     }
                     if (result != null) {
-                        hit = true;
-                        resultObject = (V) valuesSerializer.deserialize(result.getSerializedDataStream());
+                        try {
+                            hit = true;
+                            resultObject = (V) valuesSerializer.deserialize(result.getSerializedDataStream());
+                        } finally {
+                            result.close();
+                        }
                     }
                 }
                 if (hit) {
@@ -418,7 +431,13 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     }
 
     private boolean _containsKey(String serializedKey) {
-        return client.get(serializedKey) != null;
+        CacheEntry entry = client.get(serializedKey);
+        if (entry != null) {
+            entry.close();
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private void _put(String serializedKey, V value, long expireTs, KeyLock lock) throws InterruptedException, CacheException {

@@ -381,17 +381,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      */
     public void disconnect() {
         try {
-            // get a reference to all of the values
-            Collection<CacheEntry> values = new ArrayList<>(this.cache.values());
+            emptyCache();
 
-            this.cache.clear();
-
-            values.forEach(c -> {
-                // we are trying to release memory
-                // we could miss entries which have been added before the scan and the call to
-                // cache.clear
-                c.release();
-            });
             actualMemory.set(0);
             connectionTimestamp = 0;
             Channel c = channel;
@@ -410,14 +401,17 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         List<RawString> keys = new ArrayList<>();
         for (CacheEntry entry : batch) {
             final RawString key = entry.getKey();
-            final CacheEntry removed = cache.remove(key);
-            if (removed != null) {
-                removedEntries.add(removed);
-                this.clientEvictions.incrementAndGet();
-                actualMemory.addAndGet(-removed.getSerializedDataLength());
-                removed.release();
-                keys.add(removed.getKey());
-            }
+            cache.compute(key, (k, removed) -> {
+                if (removed != null) {
+                    removedEntries.add(removed);
+                    this.clientEvictions.incrementAndGet();
+                    actualMemory.addAndGet(-removed.getSerializedDataLength());
+                    removed.close();
+                    keys.add(removed.getKey());
+                }
+                // remove
+                return null;
+            });
         }
         if (removedEntries.isEmpty()) {
             return;
@@ -631,11 +625,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     LOGGER.log(Level.FINEST, "{0} invalidate {1} from {2}", new Object[]{clientId, key, message.clientId});
                 }
                 runningFetches.cancelFetchesForKey(key);
-                CacheEntry removed = cache.remove(key);
-                if (removed != null) {
-                    actualMemory.addAndGet(-removed.getSerializedDataLength());
-                    removed.release();
-                }
+                removeEntryInternal(key);
+
                 Channel _channel = channel;
                 if (_channel != null) {
                     _channel.sendReplyMessage(message, Message.ACK(clientId));
@@ -647,14 +638,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 if (LOGGER.isLoggable(Level.FINEST)) {
                     LOGGER.log(Level.FINEST, "{0} invalidateByPrefix {1} from {2}", new Object[]{clientId, prefix, message.clientId});
                 }
-                Collection<RawString> keys = cache.keySet().stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
+                Collection<RawString> keys = cache.
+                        keySet()
+                        .stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
                 keys.forEach((key) -> {
                     runningFetches.cancelFetchesForKey(key);
-                    CacheEntry removed = cache.remove(key);
-                    if (removed != null) {
-                        actualMemory.addAndGet(-removed.getSerializedDataLength());
-                        removed.release();
-                    }
+                    removeEntryInternal(key);
+
                 });
                 Channel _channel = channel;
                 if (_channel != null) {
@@ -675,12 +665,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 ByteBuf buffer = cacheByteArray(data);
                 CacheEntry cacheEntry = new CacheEntry(key, System.nanoTime(), buffer, expiretime, null);
 
-                CacheEntry previous = cache.put(key, cacheEntry);
-                if (previous != null) {
-                    actualMemory.addAndGet(-previous.getSerializedDataLength());
-                    previous.release();
-                }
-                actualMemory.addAndGet(data.length);
+                storeEntry(cacheEntry);
+                
                 Channel _channel = channel;
                 if (_channel != null) {
                     _channel.sendReplyMessage(message, Message.ACK(clientId));
@@ -690,31 +676,44 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             break;
             case Message.TYPE_FETCH_ENTRY: {
                 RawString key = (RawString) message.parameters.get("key");
-                CacheEntry entry = cache.get(key);
-                if (LOGGER.isLoggable(Level.FINEST)) {
-                    LOGGER.log(Level.FINEST, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
-                }
-                Channel _channel = channel;
-                if (_channel != null) {
+                CacheEntry entry = getAndRetain(key);
+                try {
+                    if (LOGGER.isLoggable(Level.FINEST)) {
+                        LOGGER.log(Level.FINEST, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
+                    }
+                    Channel _channel = channel;
+                    if (_channel != null) {
+                        if (entry != null) {
+                            _channel.sendReplyMessage(message,
+                                    Message.ACK(clientId)
+                                            .setParameter("data", entry.getSerializedData())
+                                            .setParameter("expiretime", entry.getExpiretime())
+                            );
+                        } else {
+                            _channel.sendReplyMessage(message,
+                                    Message.ERROR(clientId, new Exception("entry " + key + " no more here"))
+                            );
+                        }
+                    }
+                } finally {
                     if (entry != null) {
-                        _channel.sendReplyMessage(message,
-                                Message.ACK(clientId)
-                                        .setParameter("data", entry.getSerializedData())
-                                        .setParameter("expiretime", entry.getExpiretime())
-                        );
-                    } else {
-                        _channel.sendReplyMessage(message,
-                                Message.ERROR(clientId, new Exception("entry " + key + " no more here"))
-                        );
+                        entry.close();
                     }
                 }
-
             }
             break;
             default:
                 LOGGER.log(Level.SEVERE, "{0} dropping message {1} from {2} -> {3}", new Object[]{clientId, message.type, message.clientId});
                 break;
         }
+    }
+
+    private CacheEntry getAndRetain(RawString key) {
+        CacheEntry entry = cache.computeIfPresent(key, (k, value) -> {
+            value.retain();
+            return value;
+        });
+        return entry;
     }
 
     private ByteBuf cacheByteArray(byte[] data) {
@@ -731,9 +730,16 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     @Override
     public void channelClosed() {
         LOGGER.log(Level.SEVERE, "channel closed, clearing nearcache");
-        cache.clear();
+        emptyCache();
         runningFetches.clear();
         actualMemory.set(0);
+    }
+
+    private void emptyCache() {
+        Collection<RawString> keys = new ArrayList<>(this.cache.keySet());
+        for (RawString k : keys) {
+            removeEntryInternal(k);
+        }
     }
 
     @Override
@@ -787,7 +793,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * Returns an entry from the local cache, if not found asks the CacheServer
      * to find the entry on other clients. If you need to get the local
      * 'reference' to the object you can use the {@link #fetchObject(java.lang.String, blazingcache.client.KeyLock) )
-     * } function
+     * } function. <br />
+     * The caller MUST explicitly call {@link CacheEntry#close() }
      *
      * @param key
      * @param lock previouly acquired lock with {@link #lock(java.lang.String) }
@@ -805,7 +812,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.log(Level.SEVERE, "fetch failed {0}, not connected", _key);
             return null;
         }
-        CacheEntry entry = cache.get(_key);
+        CacheEntry entry = getAndRetain(_key);
         this.clientFetches.incrementAndGet();
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
@@ -836,11 +843,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
                 ByteBuf buffer = cacheByteArray(data);
-                entry = new CacheEntry(_key, System.nanoTime(), buffer, expiretime, null);
-                storeEntry(entry);
+                CacheEntry newEntry = new CacheEntry(_key, System.nanoTime(), buffer, expiretime, null);
+                storeEntry(newEntry);
                 this.clientMissedGetsToSuccessfulFetches.incrementAndGet();
                 this.clientHits.incrementAndGet();
-                return entry;
+                return newEntry;
             }
         } catch (TimeoutException err) {
             LOGGER.log(Level.SEVERE, "fetch failed " + _key + ": " + err);
@@ -854,11 +861,13 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     private void storeEntry(CacheEntry entry) {
-        CacheEntry prev = cache.put(entry.getKey(), entry);
-        if (prev != null) {
-            actualMemory.addAndGet(-prev.getSerializedDataLength());
-            prev.release();
-        }
+        cache.compute(entry.getKey(), (k, prev) -> {
+            if (prev != null) {
+                actualMemory.addAndGet(-prev.getSerializedDataLength());
+                prev.close();
+            }
+            return entry;
+        });
         actualMemory.addAndGet(entry.getSerializedDataLength());
     }
 
@@ -911,7 +920,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     /**
      * Returns an entry from the local cache. No network operations will be
      * executed. If you need to get the local 'reference' to the object you can
-     * use the {@link #getObject(java.lang.String) } function
+     * use the {@link #getObject(java.lang.String) } function. The caller MUST
+     * explicitly call {@link CacheEntry#close() }
      *
      * @param key
      * @return
@@ -923,7 +933,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.log(Level.SEVERE, "get failed " + key + ", not connected");
             return null;
         }
-        CacheEntry entry = cache.get(RawString.of(key));
+        CacheEntry entry = getAndRetain(RawString.of(key));
         this.clientGets.incrementAndGet();
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
@@ -958,11 +968,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
 
         // subito rimuoviamo dal locale
-        CacheEntry removed = cache.remove(_key);
-        if (removed != null) {
-            actualMemory.addAndGet(-removed.getSerializedDataLength());
-            removed.release();
-        }
+        removeEntryInternal(_key);
 
         while (!stopped) {
             Channel _channel = channel;
@@ -995,6 +1001,17 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     }
 
+    private void removeEntryInternal(RawString key) {
+        cache.compute(key, (k, removed) -> {
+            if (removed != null) {
+                actualMemory.addAndGet(-removed.getSerializedDataLength());
+                removed.close();
+            }
+            // remove
+            return null;
+        });
+    }
+
     /**
      * Same as {@link #invalidate(java.lang.String) } but it applies to every
      * entry whose key 'startsWith' the given prefix.
@@ -1008,11 +1025,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         Collection<RawString> keys = cache.keySet()
                 .stream().filter(s -> s.startsWith(_prefix)).collect(Collectors.toList());
         keys.forEach((key) -> {
-            CacheEntry removed = cache.remove(key);
-            if (removed != null) {
-                actualMemory.addAndGet(-removed.getSerializedDataLength());
-                removed.release();
-            }
+            removeEntryInternal(key);
         });
 
         while (!stopped) {
@@ -1206,12 +1219,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         try {
             ByteBuf buffer = cacheByteArray(data);
             CacheEntry entry = new CacheEntry(_key, System.nanoTime(), buffer, expireTime, reference);
-            CacheEntry prev = cache.put(_key, entry);
-            if (prev != null) {
-                actualMemory.addAndGet(-prev.getSerializedDataLength());
-                prev.release();
-            }
-            actualMemory.addAndGet(data.length);
+            storeEntry(entry);
+
             Message request = Message.LOAD_ENTRY(clientId, RawString.of(key), data, expireTime);
             if (lock != null) {
                 request.setParameter("lockId", lock.getLockId());
@@ -1222,11 +1231,15 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
             // race condition: if two clients perform a put on the same entry maybe after the network trip we get another value, different from the expected one.
             // it is better to invalidate the entry for all
-            CacheEntry afterNetwork = cache.get(_key);
+            CacheEntry afterNetwork = getAndRetain(_key);
             if (afterNetwork != null) {
-                if (!afterNetwork.isSerializedDataEqualTo(data)) {
-                    LOGGER.log(Level.SEVERE, "detected conflict on load of " + key + ", invalidating entry");
-                    invalidate(key);
+                try {
+                    if (!afterNetwork.isSerializedDataEqualTo(data)) {
+                        LOGGER.log(Level.SEVERE, "detected conflict on load of " + key + ", invalidating entry");
+                        invalidate(key);
+                    }
+                } finally {
+                    afterNetwork.close();
                 }
             }
             this.clientLoads.incrementAndGet();
@@ -1249,12 +1262,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         try {
             ByteBuf buffer = cacheByteArray(data);
             CacheEntry entry = new CacheEntry(_key, System.nanoTime(), buffer, expireTime, reference);
-            CacheEntry prev = cache.put(_key, entry);
-            if (prev != null) {
-                actualMemory.addAndGet(-prev.getSerializedDataLength());
-                prev.release();
-            }
-            actualMemory.addAndGet(data.length);
+            storeEntry(entry);
+
             Message request = Message.PUT_ENTRY(clientId, _key, data, expireTime);
             if (lock != null) {
                 request.setParameter("lockId", lock.getLockId());
@@ -1265,11 +1274,15 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
             // race condition: if two clients perform a put on the same entry maybe after the network trip we get another value, different from the expected one.
             // it is better to invalidate the entry for all
-            CacheEntry afterNetwork = cache.get(_key);
+            CacheEntry afterNetwork = getAndRetain(_key);
             if (afterNetwork != null) {
-                if (!afterNetwork.isSerializedDataEqualTo(data)) {
-                    LOGGER.log(Level.SEVERE, "detected conflict on put of " + _key + ", invalidating entry");
-                    invalidate(_key, null);
+                try {
+                    if (!afterNetwork.isSerializedDataEqualTo(data)) {
+                        LOGGER.log(Level.SEVERE, "detected conflict on put of " + _key + ", invalidating entry");
+                        invalidate(_key, null);
+                    }
+                } finally {
+                    afterNetwork.close();
                 }
             }
             this.clientPuts.incrementAndGet();
@@ -1453,7 +1466,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #get(java.lang.String)
      */
     public <T> T getObject(String key) throws CacheException {
-        return resolveObject(get(key));
+        CacheEntry get = get(key);
+        try {
+            return resolveObject(get);
+        } finally {
+            if (get != null) {
+                get.close();
+            }
+        }
     }
 
     /**
@@ -1469,7 +1489,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #fetch(java.lang.String)
      */
     public <T> T fetchObject(String key) throws CacheException, InterruptedException {
-        return resolveObject(fetch(key));
+        CacheEntry fetch = fetch(key);
+        try {
+            return resolveObject(fetch);
+        } finally {
+            if (fetch != null) {
+                fetch.close();
+            }
+        }
     }
 
     /**
@@ -1487,7 +1514,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #fetch(java.lang.String)
      */
     public <T> T fetchObject(String key, KeyLock lock) throws CacheException, InterruptedException {
-        return resolveObject(fetch(key, lock));
+        CacheEntry fetch = fetch(key, lock);
+        try {
+            return resolveObject(fetch);
+        } finally {
+            if (fetch != null) {
+                fetch.close();
+            }
+        }
     }
 
     private <T> T resolveObject(CacheEntry entry) throws CacheException {
