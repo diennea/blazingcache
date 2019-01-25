@@ -38,7 +38,7 @@ import java.util.logging.Logger;
  * @author enrico.olivelli
  */
 @SuppressFBWarnings({"EI_EXPOSE_REP2", "EI_EXPOSE_REP"})
-public final class CacheEntry {
+public final class CacheEntry implements AutoCloseable {
 
     private long lastGetTime;
     private final long putTime;
@@ -68,9 +68,17 @@ public final class CacheEntry {
     }
 
     /**
+     * Increase refcount
+     */
+    public void retain() {
+        this.buf.retain();
+    }
+
+    /**
      * Releases the internal buffer
      */
-    void release() {
+    @Override
+    public void close() {
         try {
             this.buf.release();
         } catch (RuntimeException err) {
@@ -123,6 +131,7 @@ public final class CacheEntry {
     }
 
     public boolean isSerializedDataEqualTo(byte[] other) {
+        // current thread must already have retained the entry
         // let Netty do the best not to copy memory
         return buf.equals(Unpooled.wrappedBuffer(other));
     }

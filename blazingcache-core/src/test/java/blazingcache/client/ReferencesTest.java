@@ -104,6 +104,7 @@ public class ReferencesTest {
 
                 CacheEntry entry = client1.get(key);
                 entry.discardInternalCachedObject();
+                entry.close();
 
                 MyBean reference_to_object1_changed_3b = client1.fetchObject(key);
                 Assert.assertNotSame(reference_to_object1_changed, reference_to_object1_changed_3b);
