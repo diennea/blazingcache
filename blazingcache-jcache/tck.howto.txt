@@ -7,5 +7,6 @@ if you want to test against the latest release of the TCK:
 git clone https://github.com/jsr107/jsr107tck.git
 cd jsr107tck
 git checkout master
-mvn clean install -Dimplementation-version=1.14.0-SNAPSHOT -Dimplementation-groupId=org.blazingcache -Dimplementation-artifactId=blazingcache-jcache -DCacheManagerImpl=blazingcache.jcache.BlazingCacheManager -DCacheImpl=blazingcache.jcache.BlazingCacheCache -DCacheEntryImpl=blazingcache.jcache.BlazingCacheEntry
+CURRENT_VERSION=2.0.0-SNAPSHOT
+mvn clean install -Dimplementation-version=$CURRENT_VERSION -Dimplementation-groupId=org.blazingcache -Dimplementation-artifactId=blazingcache-jcache -DCacheManagerImpl=blazingcache.jcache.BlazingCacheManager -DCacheImpl=blazingcache.jcache.BlazingCacheCache -DCacheEntryImpl=blazingcache.jcache.BlazingCacheEntry
 
