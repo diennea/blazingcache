@@ -663,10 +663,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 }
 
                 ByteBuf buffer = cacheByteArray(data);
-                CacheEntry cacheEntry = new CacheEntry(key, System.nanoTime(), buffer, expiretime, null);
+                CacheEntry entry = new CacheEntry(key, System.nanoTime(), buffer, expiretime, null);
 
-                storeEntry(cacheEntry);
-                
+                storeEntry(entry);
+
                 Channel _channel = channel;
                 if (_channel != null) {
                     _channel.sendReplyMessage(message, Message.ACK(clientId));
@@ -845,6 +845,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 ByteBuf buffer = cacheByteArray(data);
                 CacheEntry newEntry = new CacheEntry(_key, System.nanoTime(), buffer, expiretime, null);
                 storeEntry(newEntry);
+                // client will be responsible of releasing the entry
+                newEntry.retain();
                 this.clientMissedGetsToSuccessfulFetches.incrementAndGet();
                 this.clientHits.incrementAndGet();
                 return newEntry;
@@ -860,6 +862,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return null;
     }
 
+    /**
+     * Stores the entry in the map.
+     *
+     * @param entry
+     */
     private void storeEntry(CacheEntry entry) {
         cache.compute(entry.getKey(), (k, prev) -> {
             if (prev != null) {

@@ -75,15 +75,11 @@ public final class CacheEntry implements AutoCloseable {
     }
 
     /**
-     * Releases the internal buffer
+     * Releases the entry
      */
     @Override
     public void close() {
-        try {
-            this.buf.release();
-        } catch (RuntimeException err) {
-            LOG.log(Level.SEVERE, "Error while releasing entry", err);
-        }
+        this.buf.release();
     }
 
     synchronized Object resolveReference(EntrySerializer serializer) throws CacheException {

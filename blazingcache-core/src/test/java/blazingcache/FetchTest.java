@@ -11,13 +11,11 @@ import blazingcache.client.CacheEntry;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Level;
-import java.util.logging.SimpleFormatter;
 import org.junit.Assert;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
-import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -45,7 +43,6 @@ public class FetchTest {
 //        java.util.logging.Logger.getLogger("").setLevel(level);
 //        java.util.logging.Logger.getLogger("").addHandler(ch);
 //    }
-    
     @Test
     public void basicTest() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
@@ -62,11 +59,20 @@ public class FetchTest {
 
                 client1.put("pippo", data, 0);
 
-                CacheEntry remoteLoad = client2.fetch("pippo");
-                assertTrue(remoteLoad != null);
+                CacheEntry _remoteLoaded;
+                try (CacheEntry remoteLoad = client2.fetch("pippo");) {
+                    assertNotNull(remoteLoad);
+                    Assert.assertArrayEquals(data, remoteLoad.getSerializedData());
+                    _remoteLoaded = remoteLoad;
+                }
+
+                // same fetch, hits local cache
+                try (CacheEntry remoteLoad = client2.fetch("pippo");) {
+                    assertSame(remoteLoad, _remoteLoaded);
+                    Assert.assertArrayEquals(data, remoteLoad.getSerializedData());
+                }
 
                 Assert.assertArrayEquals(data, client1.get("pippo").getSerializedData());
-                Assert.assertArrayEquals(data, remoteLoad.getSerializedData());
                 Assert.assertArrayEquals(data, client2.get("pippo").getSerializedData());
 
                 client1.invalidate("pippo");
