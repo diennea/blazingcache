@@ -64,7 +64,7 @@ public class HammerTest {
                 List<Future> futures = new ArrayList<>();
                 ExecutorService threads = Executors.newFixedThreadPool(4);
                 try {
-                    for (int i = 0; i < 100; i++) {
+                    for (int i = 0; i < 20; i++) {
                         futures.add(threads.submit(() -> {
                             try {
                                 int j = ThreadLocalRandom.current().nextInt(100);
