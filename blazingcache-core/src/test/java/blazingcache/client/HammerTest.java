@@ -62,7 +62,7 @@ public class HammerTest {
                 assertTrue(client2.waitForConnection(10000));
 
                 List<Future> futures = new ArrayList<>();
-                ExecutorService threads = Executors.newFixedThreadPool(4);
+                ExecutorService threads = Executors.newFixedThreadPool(2);
                 try {
                     for (int i = 0; i < 20; i++) {
                         futures.add(threads.submit(() -> {
