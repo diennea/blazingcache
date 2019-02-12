@@ -6,7 +6,7 @@
 package blazingcache.services;
 
 import blazingcache.client.CacheClient;
-import blazingcache.client.CacheEntry;
+import blazingcache.client.EntryHandle;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import java.util.Properties;
 import org.junit.Assert;
@@ -25,9 +25,10 @@ public class SimpleServerTest {
                 client.start();
                 assertTrue(client.waitForConnection(10000));
                 client.put("test", "ciao".getBytes(), -1);
-                CacheEntry entry = client.get("test");
-                Assert.assertNotNull(entry);
-                Assert.assertArrayEquals("ciao".getBytes(), entry.getSerializedData());
+                try (EntryHandle entry = client.get("test");) {
+                    Assert.assertNotNull(entry);
+                    Assert.assertArrayEquals("ciao".getBytes(), entry.getSerializedData());
+                }
             }
 
         }

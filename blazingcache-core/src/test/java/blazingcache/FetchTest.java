@@ -7,7 +7,7 @@ package blazingcache;
 
 import java.nio.charset.StandardCharsets;
 import blazingcache.client.CacheClient;
-import blazingcache.client.CacheEntry;
+import blazingcache.client.EntryHandle;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
@@ -59,15 +59,15 @@ public class FetchTest {
 
                 client1.put("pippo", data, 0);
 
-                CacheEntry _remoteLoaded;
-                try (CacheEntry remoteLoad = client2.fetch("pippo");) {
+                EntryHandle _remoteLoaded;
+                try (EntryHandle remoteLoad = client2.fetch("pippo");) {
                     assertNotNull(remoteLoad);
                     Assert.assertArrayEquals(data, remoteLoad.getSerializedData());
                     _remoteLoaded = remoteLoad;
                 }
 
                 // same fetch, hits local cache
-                try (CacheEntry remoteLoad = client2.fetch("pippo");) {
+                try (EntryHandle remoteLoad = client2.fetch("pippo");) {
                     assertSame(remoteLoad, _remoteLoaded);
                     Assert.assertArrayEquals(data, remoteLoad.getSerializedData());
                 }

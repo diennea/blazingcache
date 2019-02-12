@@ -7,7 +7,7 @@ package blazingcache;
 
 import java.nio.charset.StandardCharsets;
 import blazingcache.client.CacheClient;
-import blazingcache.client.CacheEntry;
+import blazingcache.client.EntryHandle;
 import blazingcache.client.KeyLock;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;

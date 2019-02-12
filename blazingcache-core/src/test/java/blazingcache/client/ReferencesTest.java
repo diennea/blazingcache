@@ -102,7 +102,7 @@ public class ReferencesTest {
                 assertEquals(2, countObjectWrites.get());
                 assertEquals(1, countObjectReads.get());
 
-                CacheEntry entry = client1.get(key);
+                EntryHandle entry = client1.get(key);
                 entry.discardInternalCachedObject();
                 entry.close();
 
