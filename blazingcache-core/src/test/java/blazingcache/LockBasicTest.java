@@ -7,7 +7,7 @@ package blazingcache;
 
 import java.nio.charset.StandardCharsets;
 import blazingcache.client.CacheClient;
-import blazingcache.client.CacheEntry;
+import blazingcache.client.EntryHandle;
 import blazingcache.client.KeyLock;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
@@ -54,7 +54,7 @@ public class LockBasicTest {
                     public void run() {
                         try {
                             waiting.set(true);
-                            CacheEntry remoteLoad = client2.fetch("pippo");
+                            EntryHandle remoteLoad = client2.fetch("pippo");
                             assertTrue(remoteLoad != null);
                             waiting.set(false);
                         } catch (Throwable t) {

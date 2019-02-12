@@ -65,7 +65,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private static final Logger CONNECTION_MANAGER_LOGGER = Logger.getLogger(CacheClient.ConnectionManager.class.getName().replace("$", "."));
 
     private final ByteBufAllocator allocator;
-    private final ConcurrentHashMap<RawString, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<RawString, EntryHandle> cache = new ConcurrentHashMap<>();
     private final ServerLocator brokerLocator;
     private final Thread coreThread;
     private final String clientId;
@@ -395,11 +395,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
-    private void batchEvictEntries(List<CacheEntry> batch) throws InterruptedException {
+    private void batchEvictEntries(List<EntryHandle> batch) throws InterruptedException {
 
-        List<CacheEntry> removedEntries = new ArrayList<>();
+        List<EntryHandle> removedEntries = new ArrayList<>();
         List<RawString> keys = new ArrayList<>();
-        for (CacheEntry entry : batch) {
+        for (EntryHandle entry : batch) {
             final RawString key = entry.getKey();
             cache.compute(key, (k, removed) -> {
                 if (removed != null) {
@@ -552,12 +552,12 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.log(Level.FINER, "evicting local entries before {0}", new Object[]{new java.util.Date(maxAgeTs)});
         }
         long maxAgeTsNanos = System.nanoTime() - maxLocalEntryAge * 1000L * 1000;
-        List<CacheEntry> evictable = new ArrayList<>();
-        java.util.function.Consumer<CacheEntry> accumulator = new java.util.function.Consumer<CacheEntry>() {
+        List<EntryHandle> evictable = new ArrayList<>();
+        java.util.function.Consumer<EntryHandle> accumulator = new java.util.function.Consumer<EntryHandle>() {
             long releasedMemory = 0;
 
             @Override
-            public void accept(CacheEntry t) {
+            public void accept(EntryHandle t) {
                 if ((maxMemory > 0 && releasedMemory < to_release)
                         || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {
                     evictable.add(t);
@@ -567,7 +567,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         };
 
         try {
-            cache.values().stream().sorted((CacheEntry o1, CacheEntry o2) -> {
+            cache.values().stream().sorted((EntryHandle o1, EntryHandle o2) -> {
                 long diff = o1.getLastGetTime() - o2.getLastGetTime();
                 if (diff == 0) {
                     return 0;
@@ -585,9 +585,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             //the oldest one is the first entry in evictable
             this.oldestEvictedKeyAge.getAndSet(System.nanoTime() - evictable.get(0).getPutTime());
 
-            List<CacheEntry> batch = new ArrayList<>();
+            List<EntryHandle> batch = new ArrayList<>();
 
-            for (final CacheEntry entry : evictable) {
+            for (final EntryHandle entry : evictable) {
                 if (LOGGER.isLoggable(Level.FINEST)) {
                     LOGGER.log(Level.FINEST, "evict {0} size {1} bytes lastAccessDate {2}", new Object[]{entry.getKey(), entry.getSerializedDataLength(), entry.getLastGetTime()});
                 }
@@ -663,7 +663,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 }
 
                 ByteBuf buffer = cacheByteArray(data);
-                CacheEntry entry = new CacheEntry(key, System.nanoTime(), buffer, expiretime, null);
+                EntryHandle entry = new EntryHandle(key, System.nanoTime(), buffer, expiretime, null);
 
                 storeEntry(entry);
 
@@ -676,7 +676,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             break;
             case Message.TYPE_FETCH_ENTRY: {
                 RawString key = (RawString) message.parameters.get("key");
-                CacheEntry entry = getAndRetain(key);
+                EntryHandle entry = getAndRetain(key);
                 try {
                     if (LOGGER.isLoggable(Level.FINEST)) {
                         LOGGER.log(Level.FINEST, "{0} fetch {1} from {2} -> {3}", new Object[]{clientId, key, message.clientId, entry});
@@ -708,8 +708,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
-    private CacheEntry getAndRetain(RawString key) {
-        CacheEntry entry = cache.computeIfPresent(key, (k, value) -> {
+    private EntryHandle getAndRetain(RawString key) {
+        EntryHandle entry = cache.computeIfPresent(key, (k, value) -> {
             value.retain();
             return value;
         });
@@ -783,7 +783,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #getObject(java.lang.String)
      * @see #fetchObject(java.lang.String)
      */
-    public CacheEntry fetch(String key) throws InterruptedException {
+    public EntryHandle fetch(String key) throws InterruptedException {
         return fetch(key, null);
     }
 
@@ -793,8 +793,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * Returns an entry from the local cache, if not found asks the CacheServer
      * to find the entry on other clients. If you need to get the local
      * 'reference' to the object you can use the {@link #fetchObject(java.lang.String, blazingcache.client.KeyLock) )
-     * } function. <br />
-     * The caller MUST explicitly call {@link CacheEntry#close() }
+     * } function. <p>
+     * The caller MUST explicitly call {@link EntryHandle#close() }
      *
      * @param key
      * @param lock previouly acquired lock with {@link #lock(java.lang.String) }
@@ -805,14 +805,14 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #getObject(java.lang.String)
      * @see #fetchObject(java.lang.String)
      */
-    public CacheEntry fetch(String key, KeyLock lock) throws InterruptedException {
+    public EntryHandle fetch(String key, KeyLock lock) throws InterruptedException {
         RawString _key = RawString.of(key);
         Channel _channel = channel;
         if (_channel == null) {
             LOGGER.log(Level.SEVERE, "fetch failed {0}, not connected", _key);
             return null;
         }
-        CacheEntry entry = getAndRetain(_key);
+        EntryHandle entry = getAndRetain(_key);
         this.clientFetches.incrementAndGet();
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
@@ -843,7 +843,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
                 ByteBuf buffer = cacheByteArray(data);
-                CacheEntry newEntry = new CacheEntry(_key, System.nanoTime(), buffer, expiretime, null);
+                EntryHandle newEntry = new EntryHandle(_key, System.nanoTime(), buffer, expiretime, null);
                 storeEntry(newEntry);
                 // client will be responsible of releasing the entry
                 newEntry.retain();
@@ -867,7 +867,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      *
      * @param entry
      */
-    private void storeEntry(CacheEntry entry) {
+    private void storeEntry(EntryHandle entry) {
         cache.compute(entry.getKey(), (k, prev) -> {
             if (prev != null) {
                 actualMemory.addAndGet(-prev.getSerializedDataLength());
@@ -928,19 +928,19 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * Returns an entry from the local cache. No network operations will be
      * executed. If you need to get the local 'reference' to the object you can
      * use the {@link #getObject(java.lang.String) } function. The caller MUST
-     * explicitly call {@link CacheEntry#close() }
+     * explicitly call {@link EntryHandle#close() }
      *
      * @param key
      * @return
      * @see #fetch(java.lang.String)
      * @see #getObject(java.lang.String)
      */
-    public CacheEntry get(String key) {
+    public EntryHandle get(String key) {
         if (channel == null) {
             LOGGER.log(Level.SEVERE, "get failed " + key + ", not connected");
             return null;
         }
-        CacheEntry entry = getAndRetain(RawString.of(key));
+        EntryHandle entry = getAndRetain(RawString.of(key));
         this.clientGets.incrementAndGet();
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
@@ -1225,7 +1225,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
         try {
             ByteBuf buffer = cacheByteArray(data);
-            CacheEntry entry = new CacheEntry(_key, System.nanoTime(), buffer, expireTime, reference);
+            EntryHandle entry = new EntryHandle(_key, System.nanoTime(), buffer, expireTime, reference);
             storeEntry(entry);
 
             Message request = Message.LOAD_ENTRY(clientId, RawString.of(key), data, expireTime);
@@ -1238,7 +1238,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
             // race condition: if two clients perform a put on the same entry maybe after the network trip we get another value, different from the expected one.
             // it is better to invalidate the entry for all
-            CacheEntry afterNetwork = getAndRetain(_key);
+            EntryHandle afterNetwork = getAndRetain(_key);
             if (afterNetwork != null) {
                 try {
                     if (!afterNetwork.isSerializedDataEqualTo(data)) {
@@ -1268,7 +1268,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
         try {
             ByteBuf buffer = cacheByteArray(data);
-            CacheEntry entry = new CacheEntry(_key, System.nanoTime(), buffer, expireTime, reference);
+            EntryHandle entry = new EntryHandle(_key, System.nanoTime(), buffer, expireTime, reference);
             storeEntry(entry);
 
             Message request = Message.PUT_ENTRY(clientId, _key, data, expireTime);
@@ -1281,7 +1281,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
             // race condition: if two clients perform a put on the same entry maybe after the network trip we get another value, different from the expected one.
             // it is better to invalidate the entry for all
-            CacheEntry afterNetwork = getAndRetain(_key);
+            EntryHandle afterNetwork = getAndRetain(_key);
             if (afterNetwork != null) {
                 try {
                     if (!afterNetwork.isSerializedDataEqualTo(data)) {
@@ -1473,7 +1473,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #get(java.lang.String)
      */
     public <T> T getObject(String key) throws CacheException {
-        CacheEntry get = get(key);
+        EntryHandle get = get(key);
         try {
             return resolveObject(get);
         } finally {
@@ -1496,7 +1496,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #fetch(java.lang.String)
      */
     public <T> T fetchObject(String key) throws CacheException, InterruptedException {
-        CacheEntry fetch = fetch(key);
+        EntryHandle fetch = fetch(key);
         try {
             return resolveObject(fetch);
         } finally {
@@ -1521,7 +1521,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @see #fetch(java.lang.String)
      */
     public <T> T fetchObject(String key, KeyLock lock) throws CacheException, InterruptedException {
-        CacheEntry fetch = fetch(key, lock);
+        EntryHandle fetch = fetch(key, lock);
         try {
             return resolveObject(fetch);
         } finally {
@@ -1531,7 +1531,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
-    private <T> T resolveObject(CacheEntry entry) throws CacheException {
+    private <T> T resolveObject(EntryHandle entry) throws CacheException {
         if (entry == null) {
             return null;
         }

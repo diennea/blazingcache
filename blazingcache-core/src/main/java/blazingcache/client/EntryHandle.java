@@ -28,17 +28,18 @@ import io.netty.buffer.Unpooled;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.SoftReference;
-import java.util.Arrays;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Una entry nella cache
+ * An handle to an entry.
+ * <p>
+ * Entries are reference counted so you have to call explicitly {@link #close() }
+ * in order to release the resources associated to the entry.
  *
  * @author enrico.olivelli
  */
 @SuppressFBWarnings({"EI_EXPOSE_REP2", "EI_EXPOSE_REP"})
-public final class CacheEntry implements AutoCloseable {
+public final class EntryHandle implements AutoCloseable {
 
     private long lastGetTime;
     private final long putTime;
@@ -57,7 +58,7 @@ public final class CacheEntry implements AutoCloseable {
      * @param expiretime
      * @param deserialized
      */
-    CacheEntry(RawString key, long lastGetTimeNanos, ByteBuf serializedData, long expiretime, Object deserialized) {
+    EntryHandle(RawString key, long lastGetTimeNanos, ByteBuf serializedData, long expiretime, Object deserialized) {
         this.key = key;
         this.lastGetTime = lastGetTimeNanos;
         this.putTime = lastGetTimeNanos;
@@ -136,7 +137,7 @@ public final class CacheEntry implements AutoCloseable {
         // copy data from Direct Memory to Heap
         return ByteBufUtil.getBytes(buf);
     }
-    private static final Logger LOG = Logger.getLogger(CacheEntry.class.getName());
+    private static final Logger LOG = Logger.getLogger(EntryHandle.class.getName());
 
     public long getExpiretime() {
         return expiretime;

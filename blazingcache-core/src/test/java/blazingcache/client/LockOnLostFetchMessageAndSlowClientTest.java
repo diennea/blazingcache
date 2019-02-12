@@ -83,7 +83,7 @@ public class LockOnLostFetchMessageAndSlowClientTest {
                     public void run() {
                         try {
                             latch_before_2.countDown();
-                            CacheEntry remoteLoad = client2.fetch("lost-fetch");
+                            EntryHandle remoteLoad = client2.fetch("lost-fetch");
                             assertTrue(remoteLoad == null);
                             latch_2.countDown();
                         } catch (Throwable t) {
@@ -105,7 +105,7 @@ public class LockOnLostFetchMessageAndSlowClientTest {
                     public void run() {
                         try {
                             latch_before_3.countDown();
-                            CacheEntry remoteLoad = client3.fetch("lost-fetch");
+                            EntryHandle remoteLoad = client3.fetch("lost-fetch");
                             assertTrue(remoteLoad == null);
                             latch_3.countDown();
                         } catch (Throwable t) {

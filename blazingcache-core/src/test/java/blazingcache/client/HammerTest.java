@@ -71,7 +71,7 @@ public class HammerTest {
                                 String _key = "key" + j;
                                 byte[] expectedData = _key.getBytes(StandardCharsets.UTF_8);
 
-                                try (CacheEntry entry = client2.fetch(_key);) {
+                                try (EntryHandle entry = client2.fetch(_key);) {
                                     assertNotNull("key " + _key + " not found?", entry);
                                     assertArrayEquals(entry.getSerializedData(), expectedData);
                                 }

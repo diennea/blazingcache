@@ -93,7 +93,7 @@ public class ConcurrentFetchAndInvalidationTest {
 
                 Thread slow_fetch = new Thread(() -> {
                     try {
-                        CacheEntry entry = client2.fetch("entry");
+                        EntryHandle entry = client2.fetch("entry");
                         System.out.println("FETCH RETURNED " + entry);
                         actions.add("FETCH-RETURNED");
                     } catch (InterruptedException err) {
@@ -123,7 +123,7 @@ public class ConcurrentFetchAndInvalidationTest {
                 System.out.println("key_client2:" + cacheServer.getCacheStatus().getKeysForClient(client2.getClientId()));
 
                 // THIS OPERATION SURELY HAPPENED AFTER THE INVALIDATION, SO IT MUST RETURN null!!
-                CacheEntry now = client2.get("entry");
+                EntryHandle now = client2.get("entry");
                 System.out.println("NOW: " + now);
                 System.out.println("actions:" + actions);
                 int actionIndex = 0;

@@ -85,7 +85,7 @@ public class LostFetchMessageAutoCloseClientTest {
                     public void run() {
                         try {
                             latch_before.countDown();
-                            CacheEntry remoteLoad = client2.fetch("lost-fetch");
+                            EntryHandle remoteLoad = client2.fetch("lost-fetch");
                             assertTrue(remoteLoad == null);
                             latch.countDown();
                         } catch (Throwable t) {

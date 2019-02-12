@@ -72,7 +72,7 @@ public class ErrorOnFetchTest {
 
                 client1.put("lost-fetch", data, 0);
 
-                CacheEntry remoteLoad = client2.fetch("lost-fetch");
+                EntryHandle remoteLoad = client2.fetch("lost-fetch");
                 assertTrue(remoteLoad == null);
 
             }
@@ -111,7 +111,7 @@ public class ErrorOnFetchTest {
 
                 client1.put("lost-fetch", data, 0);
 
-                CacheEntry remoteLoad = client2.fetch("lost-fetch");
+                EntryHandle remoteLoad = client2.fetch("lost-fetch");
                 assertTrue(remoteLoad == null);
 
             }

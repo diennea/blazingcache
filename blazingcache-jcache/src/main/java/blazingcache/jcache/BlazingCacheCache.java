@@ -16,7 +16,7 @@
 package blazingcache.jcache;
 
 import blazingcache.client.CacheClient;
-import blazingcache.client.CacheEntry;
+import blazingcache.client.EntryHandle;
 import blazingcache.client.CacheException;
 import blazingcache.client.KeyLock;
 import java.io.InputStream;
@@ -184,7 +184,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 throw new javax.cache.CacheException(error);
             }
         } else {
-            CacheEntry result = client.get(serializedKey);
+            EntryHandle result = client.get(serializedKey);
             if (result != null) {
                 try {
                     return (V) valuesSerializer.deserialize(
@@ -272,7 +272,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                 }
                 hit = resultObject != null;
             } else {
-                CacheEntry result;
+                EntryHandle result;
                 if (usefetch) {
                     result = client.fetch(serializedKey, lock);
                 } else {
@@ -356,7 +356,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
                         hit = true;
                     }
                 } else {
-                    CacheEntry result;
+                    EntryHandle result;
                     if (usefetch) {
                         result = client.fetch(serializedKey);
                     } else {
@@ -431,7 +431,7 @@ public class BlazingCacheCache<K, V> implements Cache<K, V> {
     }
 
     private boolean _containsKey(String serializedKey) {
-        CacheEntry entry = client.get(serializedKey);
+        EntryHandle entry = client.get(serializedKey);
         if (entry != null) {
             entry.close();
             return true;
