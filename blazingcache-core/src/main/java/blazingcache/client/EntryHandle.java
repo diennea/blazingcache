@@ -28,7 +28,6 @@ import io.netty.buffer.Unpooled;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.SoftReference;
-import java.util.logging.Logger;
 
 /**
  * An handle to an entry.
@@ -137,7 +136,6 @@ public final class EntryHandle implements AutoCloseable {
         // copy data from Direct Memory to Heap
         return ByteBufUtil.getBytes(buf);
     }
-    private static final Logger LOG = Logger.getLogger(EntryHandle.class.getName());
 
     public long getExpiretime() {
         return expiretime;
@@ -145,7 +143,7 @@ public final class EntryHandle implements AutoCloseable {
 
     @Override
     public String toString() {
-        return "CacheEntry{" + "key=" + key + ", lastGetTime=" + lastGetTime + ", expiretime=" + expiretime + '}';
+        return "EntryHandle{" + "key=" + key + ", lastGetTime=" + lastGetTime + ", expiretime=" + expiretime + '}';
     }
 
     // only for tests
