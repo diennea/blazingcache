@@ -305,12 +305,18 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
+    /**
+     * Start creating a new CacheClient.
+     *
+     * @return a builder for a new client.
+     */
     public static Builder newBuilder() {
         return new Builder();
     }
 
     /**
-     * Create a new CacheClient with the safest default
+     * Create a new CacheClient with the safest default.
+     * Use {@link #newBuilder() } in order to have full control.
      *
      * @param clientId
      * @param sharedSecret
@@ -869,7 +875,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     /**
      * Closes the client. It will never try to reconnect again to the server
      *
-     * @throws Exception
      */
     @Override
     public void close() {
