@@ -50,7 +50,7 @@ import blazingcache.utils.RawString;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocator;
-import java.util.Arrays;
+import io.netty.buffer.UnpooledByteBufAllocator;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -220,7 +220,67 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
+    public final static class Builder {
+
+        private Builder() {
+        }
+
+        private boolean offHeap = true;
+        private boolean poolMemoryBuffers = false;
+        private String clientId = "localhost";
+        private String sharedSecret = "changeit";
+        private ServerLocator serverLocator;
+
+        public Builder offHeap(boolean value) {
+            this.offHeap = value;
+            return this;
+        }
+
+        public Builder poolMemoryBuffers(boolean value) {
+            this.poolMemoryBuffers = value;
+            return this;
+        }
+
+        public Builder clientId(String clientId) {
+            this.clientId = clientId;
+            return this;
+        }
+
+        public Builder sharedSecret(String sharedSecret) {
+            this.sharedSecret = sharedSecret;
+            return this;
+        }
+        
+        public Builder serverLocator(ServerLocator serverLocator) {
+            this.serverLocator = serverLocator;
+            return this;
+        }
+
+        public CacheClient build() {
+            if (serverLocator == null) {
+                throw new IllegalArgumentException("serverLocator must be set");
+            }
+            return new CacheClient(clientId, sharedSecret, serverLocator, offHeap, poolMemoryBuffers);
+        }
+    }
+
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
+    /**
+     * Create a new CacheClient with the safest default
+     * @param clientId
+     * @param sharedSecret
+     * @param brokerLocator 
+     */
     public CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator) {
+        this(clientId, sharedSecret, brokerLocator, true, false /* poolMemoryBuffers = false is safer */);
+    }
+
+    private CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator,
+            boolean offHeap, boolean poolMemoryBuffers) {
+        this.offHeap = offHeap;
         this.brokerLocator = brokerLocator;
         this.sharedSecret = sharedSecret;
         this.coreThread = new Thread(new ConnectionManager(), "cache-connection-manager-" + clientId);
@@ -241,7 +301,19 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.clientHits = new AtomicLong();
         this.clientMissedGetsToSuccessfulFetches = new AtomicLong();
         this.clientMissedGetsToMissedFetches = new AtomicLong();
-        this.allocator = PooledByteBufAllocator.DEFAULT;
+
+        if (poolMemoryBuffers) {
+            this.allocator = PooledByteBufAllocator.DEFAULT;
+        } else {
+            // This is the safest default
+            // Netty by default will keep thread local Pools
+            // if the application uses many different threads while accessing the cache (like a WebApplication)
+            // but it does not perform frequent operations (for us those operations will lead to ByteBuffer allocations)
+            // pooling ByteBuffers will lead to a large usage of direct memory
+            // which won't be reclaimed, because by default Netty reclaims memory
+            // per thread and every N allocations
+            this.allocator = UnpooledByteBufAllocator.DEFAULT;
+        }
     }
 
     /**
@@ -259,6 +331,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.clientMissedGetsToSuccessfulFetches.set(0);
         this.clientMissedGetsToMissedFetches.set(0);
     }
+
+    // visible for testing
+    ByteBufAllocator getAllocator() {
+        return allocator;
+    }        
 
     public ServerLocator getBrokerLocator() {
         return brokerLocator;
@@ -753,7 +830,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @throws Exception
      */
     @Override
-    public void close() throws Exception {
+    public void close() {
         stop();
     }
 
@@ -793,7 +870,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * Returns an entry from the local cache, if not found asks the CacheServer
      * to find the entry on other clients. If you need to get the local
      * 'reference' to the object you can use the {@link #fetchObject(java.lang.String, blazingcache.client.KeyLock) )
-     * } function. <p>
+     * } function.
+     * <p>
      * The caller MUST explicitly call {@link EntryHandle#close() }
      *
      * @param key
