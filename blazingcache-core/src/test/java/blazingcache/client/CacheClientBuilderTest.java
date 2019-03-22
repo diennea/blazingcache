@@ -25,8 +25,10 @@ import blazingcache.network.ConnectionRequestInfo;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.ServerNotAvailableException;
 import blazingcache.network.ServerRejectedConnectionException;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
+import io.netty.util.internal.PlatformDependent;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
@@ -92,19 +94,13 @@ public class CacheClientBuilderTest {
 
     @Test
     public void testUsePooledByteBuffers() {
+        ByteBufAllocator alloc = new PooledByteBufAllocator(PlatformDependent.directBufferPreferred());
         try (CacheClient client = CacheClient
                 .newBuilder()
                 .serverLocator(serverLocator)
-                .poolMemoryBuffers(true)
+                .allocator(alloc)
                 .build();) {
-            assertTrue(client.getAllocator() instanceof PooledByteBufAllocator);
-        }
-        try (CacheClient client = CacheClient
-                .newBuilder()
-                .serverLocator(serverLocator)
-                .poolMemoryBuffers(false)
-                .build();) {
-            assertTrue(client.getAllocator() instanceof UnpooledByteBufAllocator);
+            assertSame(alloc, client.getAllocator());
         }
     }
 

@@ -229,10 +229,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
 
         private boolean offHeap = true;
-        private boolean poolMemoryBuffers = false;
         private String clientId = "localhost";
         private String sharedSecret = "changeit";
         private ServerLocator serverLocator;
+        private ByteBufAllocator allocator = UnpooledByteBufAllocator.DEFAULT;
 
         /**
          * Prefer storing data on direct memory. Defaults to 'true'.
@@ -246,13 +246,15 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
 
         /**
-         * Prefer pooling data according to Netty rules. Defaults to 'false'.
+         * Set a shared ByteBufAllocator.
+         * A good choice will be to use a PooledByteBufAllocator with the
+         * useCacheForAllThreads = false option.
          *
-         * @param value
+         * @param allocator
          * @return the builder itself
          */
-        public Builder poolMemoryBuffers(boolean value) {
-            this.poolMemoryBuffers = value;
+        public Builder allocator(ByteBufAllocator allocator) {
+            this.allocator = allocator;
             return this;
         }
 
@@ -301,7 +303,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (serverLocator == null) {
                 throw new IllegalArgumentException("serverLocator must be set");
             }
-            return new CacheClient(clientId, sharedSecret, serverLocator, offHeap, poolMemoryBuffers);
+            return new CacheClient(clientId, sharedSecret, serverLocator, offHeap, allocator);
         }
     }
 
@@ -323,11 +325,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @param brokerLocator
      */
     public CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator) {
-        this(clientId, sharedSecret, brokerLocator, true, false /* poolMemoryBuffers = false is safer */);
+        this(clientId, sharedSecret, brokerLocator, true, UnpooledByteBufAllocator.DEFAULT);
     }
 
     private CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator,
-            boolean offHeap, boolean poolMemoryBuffers) {
+            boolean offHeap, ByteBufAllocator allocator) {
         this.offHeap = offHeap;
         this.brokerLocator = brokerLocator;
         this.sharedSecret = sharedSecret;
@@ -349,19 +351,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.clientHits = new AtomicLong();
         this.clientMissedGetsToSuccessfulFetches = new AtomicLong();
         this.clientMissedGetsToMissedFetches = new AtomicLong();
-
-        if (poolMemoryBuffers) {
-            this.allocator = PooledByteBufAllocator.DEFAULT;
-        } else {
-            // This is the safest default
-            // Netty by default will keep thread local Pools
-            // if the application uses many different threads while accessing the cache (like a WebApplication)
-            // but it does not perform frequent operations (for us those operations will lead to ByteBuffer allocations)
-            // pooling ByteBuffers will lead to a large usage of direct memory
-            // which won't be reclaimed, because by default Netty reclaims memory
-            // per thread and every N allocations
-            this.allocator = UnpooledByteBufAllocator.DEFAULT;
-        }
+        this.allocator = allocator;
     }
 
     /**
