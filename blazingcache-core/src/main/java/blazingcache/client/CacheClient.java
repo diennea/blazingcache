@@ -220,6 +220,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
+    /**
+     * Builds a {@link CacheClient}.
+     */
     public final static class Builder {
 
         private Builder() {
@@ -231,32 +234,70 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         private String sharedSecret = "changeit";
         private ServerLocator serverLocator;
 
+        /**
+         * Prefer storing data on direct memory. Defaults to 'true'.
+         *
+         * @param value
+         * @return the builder itself
+         */
         public Builder offHeap(boolean value) {
             this.offHeap = value;
             return this;
         }
 
+        /**
+         * Prefer pooling data according to Netty rules. Defaults to 'false'.
+         *
+         * @param value
+         * @return the builder itself
+         */
         public Builder poolMemoryBuffers(boolean value) {
             this.poolMemoryBuffers = value;
             return this;
         }
 
+        /**
+         * Set the clientId seed. Defaults to 'localhost'.
+         *
+         * @param clientId
+         * @return the builder itself
+         */
         public Builder clientId(String clientId) {
             this.clientId = clientId;
             return this;
         }
 
+        /**
+         * Set the sharedSecret. Defaults to 'changeit'.
+         * This is a legacy configuration parameter, in order
+         * to implement real security please configure JAAS/Kerberos.
+         *
+         * @param sharedSecret
+         * @return the builder itself
+         */
         public Builder sharedSecret(String sharedSecret) {
             this.sharedSecret = sharedSecret;
             return this;
         }
-        
+
+        /**
+         * Set the callback used to discovery cache servers on the network.
+         * There is no default.
+         *
+         * @param serverLocator
+         * @return the builder itself
+         */
         public Builder serverLocator(ServerLocator serverLocator) {
             this.serverLocator = serverLocator;
             return this;
         }
 
-        public CacheClient build() {
+        /**
+         * Builds the client.
+         * @return a new client, to be disposed with {@link CacheClient#close() }
+         * @throws IllegalArgumentException in case of invalid configuration.
+         */
+        public CacheClient build() throws IllegalArgumentException {
             if (serverLocator == null) {
                 throw new IllegalArgumentException("serverLocator must be set");
             }
@@ -270,9 +311,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     /**
      * Create a new CacheClient with the safest default
+     *
      * @param clientId
      * @param sharedSecret
-     * @param brokerLocator 
+     * @param brokerLocator
      */
     public CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator) {
         this(clientId, sharedSecret, brokerLocator, true, false /* poolMemoryBuffers = false is safer */);
@@ -335,7 +377,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     // visible for testing
     ByteBufAllocator getAllocator() {
         return allocator;
-    }        
+    }
 
     public ServerLocator getBrokerLocator() {
         return brokerLocator;
