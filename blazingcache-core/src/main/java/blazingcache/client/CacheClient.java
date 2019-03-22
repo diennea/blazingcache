@@ -51,6 +51,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -254,6 +255,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
          * @return the builder itself
          */
         public Builder allocator(ByteBufAllocator allocator) {
+            Objects.requireNonNull(allocator);
             this.allocator = allocator;
             return this;
         }
@@ -265,6 +267,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
          * @return the builder itself
          */
         public Builder clientId(String clientId) {
+            Objects.requireNonNull(clientId);
             this.clientId = clientId;
             return this;
         }
@@ -290,6 +293,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
          * @return the builder itself
          */
         public Builder serverLocator(ServerLocator serverLocator) {
+            Objects.requireNonNull(serverLocator);
             this.serverLocator = serverLocator;
             return this;
         }
