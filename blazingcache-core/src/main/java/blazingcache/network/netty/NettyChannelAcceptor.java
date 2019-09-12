@@ -33,16 +33,18 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
-import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import java.io.File;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -234,9 +236,11 @@ public class NettyChannelAcceptor implements AutoCloseable {
 
     }
 
+    @Override
     public void close() {
+        ChannelFuture channelFuture = null;
         if (channel != null) {
-            channel.close();
+            channelFuture = channel.close();
         }
         if (workerGroup != null) {
             workerGroup.shutdownGracefully();
@@ -246,6 +250,19 @@ public class NettyChannelAcceptor implements AutoCloseable {
         }
         if (callbackExecutor != null) {
             callbackExecutor.shutdown();
+        }
+        /*
+         * Attemp to await for real channel close (this should prevents problems like
+         * "bind(..) failed: Address already in use" when fast closing then starting again the cache server)
+         */
+        if (channelFuture != null) {
+            try {
+                channelFuture.get(10, TimeUnit.SECONDS);
+            } catch (InterruptedException | TimeoutException e) {
+                LOGGER.log(Level.INFO, "Failed to wait for channel complete closing", e);
+            } catch (ExecutionException e) {
+                LOGGER.log(Level.WARNING, "Failed to properly close channel", e);
+            }
         }
     }
 
