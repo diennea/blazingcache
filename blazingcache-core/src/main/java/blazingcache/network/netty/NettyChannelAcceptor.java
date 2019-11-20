@@ -222,13 +222,13 @@ public class NettyChannelAcceptor implements AutoCloseable {
 
                     ch.pipeline().addLast("lengthprepender", new LengthFieldPrepender(4));
                     ch.pipeline().addLast("lengthbaseddecoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
-//
                     ch.pipeline().addLast("messageencoder", new DataMessageEncoder());
                     ch.pipeline().addLast("messagedecoder", new DataMessageDecoder());
                     ch.pipeline().addLast(new InboundMessageHandler(session));
                 }
             })
             .option(ChannelOption.SO_BACKLOG, 128)
+            .option(ChannelOption.SO_REUSEADDR, true)
             .childOption(ChannelOption.SO_KEEPALIVE, true);
 
         ChannelFuture f = b.bind(host, port).sync(); // (7)
