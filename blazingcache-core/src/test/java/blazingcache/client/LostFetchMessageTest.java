@@ -111,8 +111,79 @@ public class LostFetchMessageTest {
                 Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get(RawString.of("lost-fetch"));
                 assertEquals(Integer.valueOf(1), locksCountOnKey);
 
-                // shut down the bad client, the pending fetch will be canceled
-                client1.disconnect();
+                
+                // even if we do not shut down the bad client we are able to make progress
+
+                // wait to exit the wait
+                assertTrue(latch.await(20, TimeUnit.SECONDS));
+
+                System.out.println("LockedKeys:" + cacheServer.getLocksManager().getLockedKeys());
+                assertTrue(cacheServer.getLocksManager().getLockedKeys().isEmpty());
+
+                // clean up test
+                thread.join();
+
+                // now the client1 should autoreconnect
+                assertTrue(client1.waitForConnection(10000));
+            }
+
+        }
+
+    }
+    
+    
+    @Test
+    public void basicTestZoombieClient() throws Exception {
+        byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
+
+        ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
+        try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
+            cacheServer.start();
+            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
+                CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                client1.start();
+                client2.start();
+                assertTrue(client1.waitForConnection(10000));
+                assertTrue(client2.waitForConnection(10000));
+                
+                client1.put("lost-fetch", data, 0);   
+                
+                client1.suspendProcessing();
+
+                CountDownLatch latch_before = new CountDownLatch(1);
+                CountDownLatch latch = new CountDownLatch(1);
+                Thread thread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            latch_before.countDown();
+                            EntryHandle remoteLoad = client2.fetch("lost-fetch");
+                            assertTrue(remoteLoad == null);
+                            latch.countDown();
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                            fail(t + "");
+                        }
+                    }
+                });
+                thread.start();
+
+                // wait to enter the wait
+                assertTrue(latch_before.await(10, TimeUnit.SECONDS));
+
+                // wait for fetches to be issued on network and locks to be held
+                for (int i = 0; i < 100; i++) {
+                    Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get(RawString.of("lost-fetch"));
+                    System.out.println("LockedKeys:" + cacheServer.getLocksManager().getLockedKeys());
+                    Thread.sleep(1000);
+                    if (locksCountOnKey != null && locksCountOnKey == 1) {
+                        break;
+                    }
+                }
+                Integer locksCountOnKey = cacheServer.getLocksManager().getLockedKeys().get(RawString.of("lost-fetch"));
+                assertEquals(Integer.valueOf(1), locksCountOnKey);
+                
+                // even if we do not shut down the bad client we are able to make progress
 
                 // wait to exit the wait
                 assertTrue(latch.await(20, TimeUnit.SECONDS));

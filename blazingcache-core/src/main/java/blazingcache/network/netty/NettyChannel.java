@@ -150,6 +150,7 @@ public class NettyChannel extends Channel {
         List<String> messagesWithNoReply = new ArrayList<>();
         long now = System.currentTimeMillis();
         pendingReplyMessagesDeadline.forEach((messageId, deadline) -> {
+            LOGGER.log(Level.INFO, "processPending " + messageId + " deadline " + (deadline - now));
             if (deadline < now) {
                 messagesWithNoReply.add(messageId);
             }
@@ -271,6 +272,14 @@ public class NettyChannel extends Channel {
         }
     }
 
+    @Override
+    public void suspendProcessing() {
+        LOGGER.log(Level.SEVERE, "{0} suspendProcessing", this);
+        this.socket
+                .config()
+                .setAutoRead(false);
+    }
+    
     @Override
     public void channelIdle() {
         LOGGER.log(Level.FINEST, "{0} channelIdle", this);

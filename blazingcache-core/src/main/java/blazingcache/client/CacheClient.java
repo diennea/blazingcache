@@ -221,6 +221,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
     }
 
+    // visible for testing
+    void suspendProcessing() {
+        channel.suspendProcessing();
+    }
+
     /**
      * Builds a {@link CacheClient}.
      */

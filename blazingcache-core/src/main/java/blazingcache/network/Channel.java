@@ -53,6 +53,9 @@ public abstract class Channel implements AutoCloseable {
     public abstract void sendMessageWithAsyncReply(Message message, long timeout, ReplyCallback callback);
 
     public abstract void channelIdle();
+    
+    public void suspendProcessing() {        
+    }
 
     @Override
     public abstract void close();
