@@ -56,13 +56,12 @@ public class SimpleZKSecureTest {
     public void basicTest() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
         ServerHostData hostData = new ServerHostData("localhost", 1234, "ciao", false, null);
-        try (ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
-            CacheServer cacheServer = new CacheServer("ciao", hostData)) {
+        try ( ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());  CacheServer cacheServer = new CacheServer("ciao", hostData)) {
             cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData, true);
             cacheServer.start();
 
-            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
-                CacheClient client2 = new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
+            try ( CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));  CacheClient client2 =
+                    new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
                 client1.start();
                 client2.start();
 
@@ -89,13 +88,12 @@ public class SimpleZKSecureTest {
     public void sessionExpirationTest_SingleCacheServer() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
         ServerHostData hostData = new ServerHostData("localhost", 1234, "ciao", false, null);
-        try (ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
-            CacheServer cacheServer = new CacheServer("ciao", hostData)) {
+        try ( ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());  CacheServer cacheServer = new CacheServer("ciao", hostData)) {
             cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData, true);
             cacheServer.start();
 
-            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
-                CacheClient client2 = new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
+            try ( CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));  CacheClient client2 =
+                    new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
                 client1.start();
                 client2.start();
 
@@ -115,24 +113,14 @@ public class SimpleZKSecureTest {
                 /*
                  * Make's ZooKeeper's session expire:
                  *
-                 * this is the session id and password to use on a second zookeeper
-                 * handle so as to make service monitor's handle to expire
+                 * this is the session id and password to use on a second zookeeper handle so as to make service monitor's handle to expire
                  */
-                final long serviceZKSessionId = cacheServer.getZooKeeper().getSessionId();
-                final byte[] serviceZKpasswd = cacheServer.getZooKeeper().getSessionPasswd();
-
-                CountdownWatcher watch2 = new CountdownWatcher("zkexpire");
-                // make session on cache server's cluster manager zk handle expire
-                final ZooKeeper zk = new ZooKeeper(zkEnv.getAddress(), zkEnv.getTimeout(), watch2,
-                    serviceZKSessionId, serviceZKpasswd);
-                watch2.waitForConnected(10000);
-                zk.close();
+                cacheServer.getZooKeeper().getTestable().injectSessionExpiration();
                 //first things first, make sure leadership is lost: state change ts has changed
                 waitForCondition(() -> {
                     return cacheServer.getStateChangeTimestamp() > lastStateChangeTS;
                 }, 100);
-                //when fake zk handle expires we are sure that origina cache server session is going to expire
-                watch2.waitForExpired(10000);
+
                 //first things first, make sure leadership is acquired again
                 waitForCondition(() -> {
                     return cacheServer.isLeader();
@@ -152,12 +140,11 @@ public class SimpleZKSecureTest {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
         final ServerHostData leaderHostdata = new ServerHostData("localhost", 1234, "leader", false, null);
         final ServerHostData backupHostdata = new ServerHostData("localhost", 1235, "backup", false, null);
-        try (ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
-            CacheServer cacheServer = new CacheServer("ciao", leaderHostdata);
-            CacheServer cacheServerBk = new CacheServer("ciao", backupHostdata)) {
+        try ( ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());  CacheServer cacheServer = new CacheServer("ciao", leaderHostdata);  CacheServer cacheServerBk = new CacheServer("ciao",
+                backupHostdata)) {
 
             cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(),
-                zkEnv.getPath(), leaderHostdata, true);
+                    zkEnv.getPath(), leaderHostdata, true);
             cacheServer.start();
             waitForCondition(() -> {
                 return cacheServer.isLeader();
@@ -165,11 +152,11 @@ public class SimpleZKSecureTest {
 
             //start backupcluster: we are sure this is in backup mode
             cacheServerBk.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(),
-                zkEnv.getPath(), backupHostdata, true);
+                    zkEnv.getPath(), backupHostdata, true);
             cacheServerBk.start();
 
-            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
-                CacheClient client2 = new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
+            try ( CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));  CacheClient client2 =
+                    new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
                 client1.start();
                 client2.start();
 
@@ -186,27 +173,14 @@ public class SimpleZKSecureTest {
                 assertEquals(1, client2.getCacheSize());
 
                 final long lastStateChangeTS = cacheServer.getStateChangeTimestamp();
-                /*
-                 * Make's ZooKeeper's session expire:
-                 *
-                 * this is the session id and password to use on a second zookeeper
-                 * handle so as to make service monitor's handle to expire
-                 */
-                final long serviceZKSessionId = cacheServer.getZooKeeper().getSessionId();
-                final byte[] serviceZKpasswd = cacheServer.getZooKeeper().getSessionPasswd();
 
-                CountdownWatcher watch2 = new CountdownWatcher("zkexpire");
-                // make session on cache server's cluster manager zk handle expire
-                final ZooKeeper zk = new ZooKeeper(zkEnv.getAddress(), zkEnv.getTimeout(), watch2,
-                    serviceZKSessionId, serviceZKpasswd);
-                watch2.waitForConnected(10000);
-                zk.close();
+                cacheServer.getZooKeeper().getTestable().injectSessionExpiration();
+
                 //first things first, make sure leadership is lost: state change ts has changed
                 waitForCondition(() -> {
                     return cacheServer.getStateChangeTimestamp() > lastStateChangeTS;
                 }, 100);
-                //when fake zk handle expires we are sure that original cache server session is going to expire
-                watch2.waitForExpired(10000);
+
                 //first things first, make sure leadership is acquired again
                 waitForCondition(() -> {
                     return client1.getCacheSize() == 0 && client2.getCacheSize() == 0;
@@ -254,117 +228,13 @@ public class SimpleZKSecureTest {
                 Thread.sleep(100);
             }
         } catch (InterruptedException ee) {
-            printStackTrace(ee);
             Assert.fail("test interrupted!");
             return;
         } catch (Exception ee) {
-            printStackTrace(ee);
             Assert.fail("error while evalutaing condition:" + ee);
             return;
         }
         Assert.fail("condition not met in time!");
-    }
-
-    public static void printStackTrace(Throwable t) {
-        t.printStackTrace();
-    }
-
-    private void waitForLeadershipState(final CacheServer server, final boolean leaderState) {
-
-    }
-
-    private static class CountdownWatcher implements Watcher {
-
-        protected static final Logger LOG
-            = Logger.getLogger("" + CountdownWatcher.class);
-
-        private final String name;
-        private CountDownLatch clientConnected;
-        private KeeperState state;
-        private boolean connected;
-        private boolean expired;
-
-        public CountdownWatcher(String name) {
-            this.name = name;
-            reset();
-        }
-
-        private synchronized void reset() {
-            clientConnected = new CountDownLatch(1);
-            state = KeeperState.Disconnected;
-            connected = false;
-            expired = false;
-        }
-
-        public synchronized void process(WatchedEvent event) {
-            LOG.info("Watcher " + name + " got event " + event);
-
-            state = event.getState();
-            if (state == KeeperState.SyncConnected) {
-                connected = true;
-                clientConnected.countDown();
-            } else if (state == KeeperState.SaslAuthenticated) {
-            } else {
-                connected = false;
-            }
-            if (state == KeeperState.Expired) {
-                expired = true;
-            } else if (state == KeeperState.SaslAuthenticated) {
-            } else {
-                expired = false;
-            }
-            notifyAll();
-        }
-
-        public synchronized boolean isConnected() {
-            return connected;
-        }
-
-        public synchronized KeeperState state() {
-            return state;
-        }
-
-        public synchronized void waitForConnected(long timeout)
-            throws InterruptedException, TimeoutException {
-            long expire = System.currentTimeMillis() + timeout;
-            long left = timeout;
-            while (!connected && left > 0) {
-                wait(left);
-                left = expire - System.currentTimeMillis();
-            }
-            if (!connected) {
-                throw new TimeoutException("Did not connect");
-
-            }
-        }
-
-        public synchronized void waitForDisconnected(long timeout)
-            throws InterruptedException, TimeoutException {
-            long expire = System.currentTimeMillis() + timeout;
-            long left = timeout;
-            while (connected && left > 0) {
-                wait(left);
-                left = expire - System.currentTimeMillis();
-            }
-            if (connected) {
-                throw new TimeoutException("Did not disconnect");
-
-            }
-        }
-
-        public synchronized void waitForExpired(long timeout)
-            throws InterruptedException, TimeoutException {
-            long expire = System.currentTimeMillis() + timeout;
-            long left = timeout;
-            while (!expired && left > 0) {
-                wait(left);
-                left = expire - System.currentTimeMillis();
-            }
-            if (!connected) {
-                throw new TimeoutException("Did not disconnect");
-
-            }
-        }
     }
 
 }
