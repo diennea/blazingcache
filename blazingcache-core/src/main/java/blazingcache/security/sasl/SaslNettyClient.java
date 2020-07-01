@@ -130,7 +130,7 @@ public class SaslNettyClient {
         String clientSection = "BlazingCacheClient";
         AppConfigurationEntry[] entries = Configuration.getConfiguration().getAppConfigurationEntry(clientSection);
         if (entries == null) {
-            LOG.log(Level.SEVERE, "No JAAS Configuration found with section BlazingCacheClient");
+            LOG.log(Level.INFO, "No JAAS Configuration found with section BlazingCacheClient");
             return null;
         }
         try {

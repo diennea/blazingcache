@@ -1,17 +1,25 @@
 package blazingcache;
 
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.curator.test.InstanceSpec;
+import org.apache.curator.test.TestingServer;
 
 public class ZKTestEnv implements AutoCloseable {
 
-    TestingZookeeperServerEmbedded zkServer;
-
-    Path path;
+    final TestingServer zkServer;
 
     public ZKTestEnv(final Path path) throws Exception {
-        zkServer = new TestingZookeeperServerEmbedded(1281, path.toFile());
+        Map<String, Object> customProperties = new HashMap<>();
+        customProperties.put("authProvider.1", "org.apache.zookeeper.server.auth.SASLAuthenticationProvider");
+        customProperties.put("kerberos.removeHostFromPrincipal", "true");
+        customProperties.put("kerberos.removeRealmFromPrincipal", "true");
+        customProperties.put("syncEnabled", "false");
+        InstanceSpec spec = new InstanceSpec(path.toFile(), 1111, 2222, 2223, false, 1, 1000, 100,
+                customProperties, "localhost");
+        zkServer = new TestingServer(spec, false);
         zkServer.start();
-        this.path = path;
     }
 
     public String getAddress() {

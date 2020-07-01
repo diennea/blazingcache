@@ -79,7 +79,8 @@
         <libs.jcipi-annotations>1.0</libs.jcipi-annotations> 
         <libs.spotbugsannotations>3.1.0</libs.spotbugsannotations>
         <libs.spotbugsmaven>4.0.4</libs.spotbugsmaven>   
-        <libs.jacoco>0.8.5</libs.jacoco>   
+        <libs.jacoco>0.8.5</libs.jacoco>
+        <libs.slf4j>1.7.30</libs.slf4j>   
     </properties>
     <dependencies>
         <dependency>
