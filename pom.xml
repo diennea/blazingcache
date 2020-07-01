@@ -71,12 +71,16 @@
         <libs.junit>4.12</libs.junit>
         <libs.jackson.mapper>1.9.13</libs.jackson.mapper>
         <libs.zookeeper>3.6.1</libs.zookeeper>
+        <libs.snappy>1.1.7.6</libs.snappy>
+        <libs.metrics>4.1.9</libs.metrics>
+        <libs.commonsio>2.7</libs.commonsio>
+        <libs.minikdc>3.2.1</libs.minikdc>
         <libs.curator>5.0.0</libs.curator>
         <libs.jcipi-annotations>1.0</libs.jcipi-annotations> 
         <libs.spotbugsannotations>3.1.0</libs.spotbugsannotations>
         <libs.spotbugsmaven>4.0.4</libs.spotbugsmaven>   
         <libs.jacoco>0.8.5</libs.jacoco>   
-    </properties>  
+    </properties>
     <dependencies>
         <dependency>
             <groupId>net.jcip</groupId>
