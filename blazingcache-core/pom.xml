@@ -6,14 +6,14 @@
         <artifactId>blazingcache</artifactId>
         <version>2.3.0-SNAPSHOT</version>
     </parent>
-    <artifactId>blazingcache-core</artifactId>    
+    <artifactId>blazingcache-core</artifactId>
     <packaging>jar</packaging>
     <name>BlazingCache :: Core</name>
     <licenses>
         <license>
             <name>Apache License, Version 2.0</name>
             <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-            <distribution>repo</distribution>            
+            <distribution>repo</distribution>
         </license>
     </licenses>
     <properties>
@@ -42,7 +42,7 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
             <version>${libs.netty4.tcnative}</version>
-            <scope>compile</scope>            
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>javax.servlet</groupId>
@@ -50,7 +50,7 @@
             <version>${libs.servletapi}</version>
             <scope>provided</scope>
         </dependency>
-        <dependency>            
+        <dependency>
             <groupId>org.codehaus.jackson</groupId>
             <artifactId>jackson-mapper-asl</artifactId>
             <version>${libs.jackson.mapper}</version>
@@ -102,7 +102,7 @@
             <version>${libs.snappy}</version>
             <scope>test</scope>
         </dependency>
-       
+
 	<dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-minikdc</artifactId>
@@ -130,7 +130,7 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>${libs.slf4j}</version>            
+            <version>${libs.slf4j}</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
