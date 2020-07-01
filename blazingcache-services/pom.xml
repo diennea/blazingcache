@@ -6,14 +6,14 @@
         <artifactId>blazingcache</artifactId>
         <version>2.3.0-SNAPSHOT</version>
     </parent>
-    <artifactId>blazingcache-services</artifactId>    
+    <artifactId>blazingcache-services</artifactId>
     <packaging>jar</packaging>
     <name>BlazingCache :: Services</name>
     <licenses>
         <license>
             <name>Apache License, Version 2.0</name>
             <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-            <distribution>repo</distribution>            
+            <distribution>repo</distribution>
         </license>
     </licenses>
     <properties>
@@ -35,12 +35,12 @@
                             <goal>copy-dependencies</goal>
                         </goals>
                         <configuration>
-           
+
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
-             
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
@@ -48,14 +48,14 @@
                 <configuration>
                     <appendAssemblyId>false</appendAssemblyId>
                     <descriptors>
-                        <descriptor>src/main/assemble/zip-assembly.xml</descriptor>                        
-                    </descriptors>                    
+                        <descriptor>src/main/assemble/zip-assembly.xml</descriptor>
+                    </descriptors>
                     <attach>true</attach>
                     <finalName>blazingcache-${project.version}</finalName>
                 </configuration>
                 <executions>
                     <execution>
-                        <id>make-assembly</id>  
+                        <id>make-assembly</id>
                         <phase>package</phase>
                         <goals>
                             <goal>single</goal>
@@ -63,14 +63,14 @@
                     </execution>
                 </executions>
             </plugin>
-      
+
         </plugins>
     </build>
-    <dependencies>       
+    <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>blazingcache-core</artifactId>
-            <version>${project.version}</version>                        
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.zookeeper</groupId>
@@ -114,13 +114,18 @@
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.12</version>                        
+            <version>4.12</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-jdk14</artifactId>
-            <version>1.7.24</version>            
+            <version>${libs.slf4j}</version>
         </dependency>
-    </dependencies>    
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${libs.slf4j}</version>
+        </dependency>
+    </dependencies>
 </project>
