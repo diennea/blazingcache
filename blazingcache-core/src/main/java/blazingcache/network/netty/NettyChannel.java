@@ -55,7 +55,7 @@ public class NettyChannel extends Channel {
     private final Map<String, Long> pendingReplyMessagesDeadline = new ConcurrentHashMap<>();
     private final ExecutorService callbackexecutor;
     private final NettyConnector connector;
-    private boolean ioErrors = false;
+    private volatile boolean ioErrors = false;
     private final long id = idGenerator.incrementAndGet();
     private final boolean disconnectOnReplyTimeout;
 
@@ -251,7 +251,7 @@ public class NettyChannel extends Channel {
         }
     }
 
-    void exceptionCaught(Throwable cause) {
+    public void exceptionCaught(Throwable cause) {
         LOGGER.log(Level.SEVERE, this + " io-error " + cause, cause);
         ioErrors = true;
     }
@@ -278,10 +278,12 @@ public class NettyChannel extends Channel {
         processPendingReplyMessagesDeadline();
     }
 
+    @Override
     public String getName() {
         return name;
     }
 
+    @Override
     public void setName(String name) {
         this.name = name;
     }
