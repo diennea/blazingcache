@@ -138,5 +138,11 @@
             <version>${libs.slf4j}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.powermock</groupId>
+            <artifactId>powermock-reflect</artifactId>
+            <version>${libs.powermock}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

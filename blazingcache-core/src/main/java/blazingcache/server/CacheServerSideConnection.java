@@ -599,10 +599,14 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         });
     }
 
-    void processIdleConnection() {
+    void processIdleConnection() {        
         Channel _channel = channel;
+        
         if (_channel != null && _channel.isValid()) {
+            LOGGER.log(Level.INFO, "processIdleConnection DONE " + _channel);
             _channel.channelIdle();
+        } else {
+            LOGGER.log(Level.INFO, "processIdleConnection SKIP " + _channel);
         }
     }
 

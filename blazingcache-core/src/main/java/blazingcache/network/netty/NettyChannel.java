@@ -46,7 +46,7 @@ import java.util.logging.Logger;
 public class NettyChannel extends Channel {
 
     private static final boolean DISCONNECT_ON_PENDING_REPLY_TIMEOUT = Boolean.parseBoolean(System.getProperty("blazingcache.nettychannel.disconnectonpendingreplytimeout", "true"));
-    volatile SocketChannel socket;
+    private volatile SocketChannel socket;
     private static final Logger LOGGER = Logger.getLogger(NettyChannel.class.getName());
     private static final AtomicLong idGenerator = new AtomicLong();
 
@@ -209,6 +209,7 @@ public class NettyChannel extends Channel {
     @Override
     public boolean isValid() {
         SocketChannel _socket = socket;
+        System.out.println("isValid "+ioErrors+" "+this);
         return _socket != null && _socket.isOpen() && !ioErrors;
     }
 
