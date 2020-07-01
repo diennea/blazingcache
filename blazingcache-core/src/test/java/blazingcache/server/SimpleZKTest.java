@@ -27,8 +27,8 @@ import org.junit.rules.TemporaryFolder;
 import blazingcache.ZKTestEnv;
 import blazingcache.client.CacheClient;
 import blazingcache.network.ServerHostData;
-import blazingcache.server.CacheServer;
 import blazingcache.zookeeper.ZKCacheServerLocator;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -43,13 +43,12 @@ public class SimpleZKTest {
     public void basicTest() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
         ServerHostData hostData = new ServerHostData("localhost", 1234, "ciao", false, null);
-        try (ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
-                CacheServer cacheServer = new CacheServer("ciao", hostData)) {
+        try ( ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());  CacheServer cacheServer = new CacheServer("ciao", hostData)) {
             cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData, false);
             cacheServer.start();
 
-            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
-                    CacheClient client2 = new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
+            try ( CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));  CacheClient client2 =
+                    new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
                 client1.start();
                 client2.start();
 
@@ -76,13 +75,12 @@ public class SimpleZKTest {
     public void sessionExpirationTest_SingleCacheServer() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
         ServerHostData hostData = new ServerHostData("localhost", 1234, "ciao", false, null);
-        try (ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
-                CacheServer cacheServer = new CacheServer("ciao", hostData)) {
+        try ( ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());  CacheServer cacheServer = new CacheServer("ciao", hostData)) {
             cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath(), hostData, false);
             cacheServer.start();
 
-            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
-                    CacheClient client2 = new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
+            try ( CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));  CacheClient client2 =
+                    new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
                 client1.start();
                 client2.start();
 
@@ -102,8 +100,7 @@ public class SimpleZKTest {
                 /*
                  * Make's ZooKeeper's session expire:
                  *
-                 * this is the session id and password to use on a second zookeeper
-                 * handle so as to make service monitor's handle to expire
+                 * this is the session id and password to use on a second zookeeper handle so as to make service monitor's handle to expire
                  */
                 final long serviceZKSessionId = cacheServer.getZooKeeper().getSessionId();
                 final byte[] serviceZKpasswd = cacheServer.getZooKeeper().getSessionPasswd();
@@ -139,9 +136,8 @@ public class SimpleZKTest {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
         final ServerHostData leaderHostdata = new ServerHostData("localhost", 1234, "leader", false, null);
         final ServerHostData backupHostdata = new ServerHostData("localhost", 1235, "backup", false, null);
-        try (ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());
-                CacheServer cacheServer = new CacheServer("ciao", leaderHostdata);
-                CacheServer cacheServerBk = new CacheServer("ciao", backupHostdata)) {
+        try ( ZKTestEnv zkEnv = new ZKTestEnv(folderZk.getRoot().toPath());  CacheServer cacheServer = new CacheServer("ciao", leaderHostdata);  CacheServer cacheServerBk = new CacheServer("ciao",
+                backupHostdata)) {
 
             cacheServer.setupCluster(zkEnv.getAddress(), zkEnv.getTimeout(),
                     zkEnv.getPath(), leaderHostdata, false);
@@ -155,8 +151,8 @@ public class SimpleZKTest {
                     zkEnv.getPath(), backupHostdata, false);
             cacheServerBk.start();
 
-            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));
-                    CacheClient client2 = new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
+            try ( CacheClient client1 = new CacheClient("theClient1", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()));  CacheClient client2 =
+                    new CacheClient("theClient2", "ciao", new ZKCacheServerLocator(zkEnv.getAddress(), zkEnv.getTimeout(), zkEnv.getPath()))) {
                 client1.start();
                 client2.start();
 
@@ -176,8 +172,7 @@ public class SimpleZKTest {
                 /*
                  * Make's ZooKeeper's session expire:
                  *
-                 * this is the session id and password to use on a second zookeeper
-                 * handle so as to make service monitor's handle to expire
+                 * this is the session id and password to use on a second zookeeper handle so as to make service monitor's handle to expire
                  */
                 final long serviceZKSessionId = cacheServer.getZooKeeper().getSessionId();
                 final byte[] serviceZKpasswd = cacheServer.getZooKeeper().getSessionPasswd();
@@ -254,98 +249,6 @@ public class SimpleZKTest {
 
     public static void printStackTrace(Throwable t) {
         t.printStackTrace();
-    }
-
-    private void waitForLeadershipState(final CacheServer server, final boolean leaderState) {
-
-    }
-
-    private static class CountdownWatcher implements Watcher {
-        protected static final Logger LOG =
-                Logger.getLogger("" + CountdownWatcher.class);
-
-            private final String name;
-            private CountDownLatch clientConnected;
-            private KeeperState state;
-            private boolean connected;
-            private boolean expired;
-
-            public CountdownWatcher(String name) {
-                this.name = name;
-                reset();
-            }
-            private synchronized void reset() {
-                clientConnected = new CountDownLatch(1);
-                state = KeeperState.Disconnected;
-                connected = false;
-                expired = false;
-            }
-            public synchronized void process(WatchedEvent event) {
-                LOG.info("Watcher " + name + " got event " + event);
-
-                state = event.getState();
-                if (state == KeeperState.SyncConnected) {
-                    connected = true;
-                    clientConnected.countDown();
-                } else {
-                    connected = false;
-                }
-                if (state == KeeperState.Expired) {
-                    expired = true;
-                } else {
-                    expired = false;
-                }
-                notifyAll();
-            }
-            public synchronized boolean isConnected() {
-                return connected;
-            }
-            public synchronized KeeperState state() {
-                return state;
-            }
-            public synchronized void waitForConnected(long timeout)
-                throws InterruptedException, TimeoutException
-            {
-                long expire = System.currentTimeMillis() + timeout;
-                long left = timeout;
-                while(!connected && left > 0) {
-                    wait(left);
-                    left = expire - System.currentTimeMillis();
-                }
-                if (!connected) {
-                    throw new TimeoutException("Did not connect");
-
-                }
-            }
-            public synchronized void waitForDisconnected(long timeout)
-                throws InterruptedException, TimeoutException
-            {
-                long expire = System.currentTimeMillis() + timeout;
-                long left = timeout;
-                while(connected && left > 0) {
-                    wait(left);
-                    left = expire - System.currentTimeMillis();
-                }
-                if (connected) {
-                    throw new TimeoutException("Did not disconnect");
-
-                }
-            }
-
-            public synchronized void waitForExpired(long timeout)
-                    throws InterruptedException, TimeoutException
-                {
-                    long expire = System.currentTimeMillis() + timeout;
-                    long left = timeout;
-                    while(!expired && left > 0) {
-                        wait(left);
-                        left = expire - System.currentTimeMillis();
-                    }
-                    if (!connected) {
-                        throw new TimeoutException("Did not disconnect");
-
-                    }
-                }
     }
 
 }

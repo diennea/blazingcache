@@ -1,7 +1,7 @@
 # Basic Environment and Java variables
 
 #JAVA_HOME=
-JAVA_OPTS="-Xmx1g -Xms1g -XX:+UseParallelGC -XX:+AggressiveOpts -XX:+UseFastAccessorMethods -Djava.net.preferIPv4Stack=true -XX:MaxDirectMemorySize=1g "
+JAVA_OPTS="-Xmx1g -Xms1g -Djava.net.preferIPv4Stack=true -XX:MaxDirectMemorySize=1g "
 
 
 if [ -z "$JAVA_HOME" ]; then

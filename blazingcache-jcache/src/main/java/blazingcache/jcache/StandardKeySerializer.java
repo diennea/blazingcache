@@ -21,8 +21,10 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.Map;
+import java.util.WeakHashMap;
 import javax.cache.CacheException;
-import org.jboss.netty.util.internal.ConcurrentWeakKeyHashMap;
 
 /**
  * Standard keys serializer
@@ -31,7 +33,7 @@ import org.jboss.netty.util.internal.ConcurrentWeakKeyHashMap;
  */
 public class StandardKeySerializer implements Serializer<Object, String, String> {
 
-    private final ConcurrentWeakKeyHashMap<Object, String> notSerializableKeys = new ConcurrentWeakKeyHashMap<>();
+    private final Map<Object, String> notSerializableKeys = Collections.synchronizedMap(new WeakHashMap<>());
 
     @Override
     public String serialize(Object value) {

@@ -35,7 +35,7 @@ public class JVMServersRegistry {
     private static String lastRegisteredServer = "";
 
     public static void registerServer(String id, CacheServer broker) {
-        LOGGER.log(Level.SEVERE, "registerServer {0}", id);
+        LOGGER.log(Level.INFO, "registerServer {0}", id);
         servers.put(id, broker);
         lastRegisteredServer = id;
     }
