@@ -32,15 +32,10 @@ import blazingcache.network.netty.NettyChannel;
 import blazingcache.server.CacheServerSideConnection;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Test for loadEntry
- *
- * @author enrico.olivelli
- */
-public class StuckClientMachineTest {
+public class ApparentlyStuckClientDueToServerSideErrorTest {
 
     @Test
-    public void basicTest() throws Exception {
+    public void test() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
 
         ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);

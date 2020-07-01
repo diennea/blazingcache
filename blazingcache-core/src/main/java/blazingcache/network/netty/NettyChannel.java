@@ -209,7 +209,6 @@ public class NettyChannel extends Channel {
     @Override
     public boolean isValid() {
         SocketChannel _socket = socket;
-        System.out.println("isValid "+ioErrors+" "+this);
         return _socket != null && _socket.isOpen() && !ioErrors;
     }
 

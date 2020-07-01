@@ -502,7 +502,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
     void sendKeyInvalidationMessage(String sourceClientId, RawString key, BroadcastRequestStatus invalidation) {
         Channel _channel = channel;
         if (_channel == null || !_channel.isValid()) {
-            // not connected, quindi cache vuota            
+            // not connected, quindi cache vuota
             LOGGER.log(Level.SEVERE, "client " + clientId + " without channel, considering key " + key + " invalidated");
             invalidation.clientDone(clientId);
             return;
@@ -599,7 +599,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         });
     }
 
-    void processIdleConnection() {        
+    void processIdleConnection() {
         Channel _channel = channel;
         if (_channel != null) {
             _channel.channelIdle();

@@ -12,13 +12,13 @@
         <license>
             <name>Apache License, Version 2.0</name>
             <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-            <distribution>repo</distribution>            
+            <distribution>repo</distribution>
         </license>
     </licenses>
     <scm>
-        <url>https://github.com/diennea/blazingcache.git</url>        
-        <connection>scm:git:https://github.com/diennea/blazingcache.git</connection>        
-        <developerConnection>scm:git:https://github.com/diennea/blazingcache.git</developerConnection>        
+        <url>https://github.com/diennea/blazingcache.git</url>
+        <connection>scm:git:https://github.com/diennea/blazingcache.git</connection>
+        <developerConnection>scm:git:https://github.com/diennea/blazingcache.git</developerConnection>
       <tag>HEAD</tag>
   </scm>
     <developers>
@@ -59,12 +59,12 @@
         </developer>
     </developers>
     <issueManagement>
-        <url>https://github.com/diennea/blazingcache</url>		
-    </issueManagement>    
+        <url>https://github.com/diennea/blazingcache</url>
+    </issueManagement>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>        
+        <maven.compiler.target>1.8</maven.compiler.target>
         <libs.netty4>4.1.50.Final</libs.netty4>
         <libs.netty4.tcnative>2.0.31.Final</libs.netty4.tcnative>
         <libs.servletapi>3.1.0</libs.servletapi>
@@ -76,12 +76,11 @@
         <libs.commonsio>2.7</libs.commonsio>
         <libs.minikdc>3.2.1</libs.minikdc>
         <libs.curator>5.0.0</libs.curator>
-        <libs.jcipi-annotations>1.0</libs.jcipi-annotations> 
+        <libs.jcipi-annotations>1.0</libs.jcipi-annotations>
         <libs.spotbugsannotations>3.1.0</libs.spotbugsannotations>
-        <libs.spotbugsmaven>4.0.4</libs.spotbugsmaven>   
+        <libs.spotbugsmaven>4.0.4</libs.spotbugsmaven>
         <libs.jacoco>0.8.5</libs.jacoco>
-        <libs.slf4j>1.7.30</libs.slf4j>   
-        <libs.powermock>2.0.5</libs.powermock>
+        <libs.slf4j>1.7.30</libs.slf4j>
     </properties>
     <dependencies>
         <dependency>
@@ -116,35 +115,35 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${libs.jacoco}</version>
-            </plugin>            
+            </plugin>
         </plugins>
     </build>
     <profiles>
         <profile>
             <id>default</id>
             <activation>
-                <activeByDefault>true</activeByDefault>                
-            </activation> 
+                <activeByDefault>true</activeByDefault>
+            </activation>
             <modules>
                 <module>./blazingcache-core</module>
                 <module>./blazingcache-jcache</module>
                 <module>./blazingcache-services</module>
                 <module>./blazingcache-website</module>
                 <module>./blazingcache-site-skin</module>
-            </modules>   
-            <distributionManagement>        
-                <repository>                            
+            </modules>
+            <distributionManagement>
+                <repository>
                     <id>dev.majordodo.org</id>
                     <name>BlazingCache Public Repository</name>
                     <url>https://dev.majordodo.org/nexus/content/repositories/releases/</url>
-                </repository>        
-                <snapshotRepository>                            
+                </repository>
+                <snapshotRepository>
                     <id>dev.majordodo.org</id>
                     <name>BlazingCache Public Repository</name>
                     <url>https://dev.majordodo.org/nexus/content/repositories/snapshots/</url>
-                </snapshotRepository>        
-            </distributionManagement>     
-            <build>               
+                </snapshotRepository>
+            </distributionManagement>
+            <build>
                 <plugins>
                     <plugin>
                         <groupId>org.jacoco</groupId>
@@ -152,19 +151,19 @@
                         <version>${libs.jacoco}</version>
                         <executions>
                             <execution>
-                                <id>default-prepare-agent</id>                                
+                                <id>default-prepare-agent</id>
                                 <goals>
                                     <goal>prepare-agent</goal>
                                 </goals>
                             </execution>
-                        </executions>                       
+                        </executions>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <version>3.0.0-M3</version>
-                        <configuration>                        
-                            <argLine>@{argLine} -Xmx1024m -Djava.net.preferIpv4Stack=true</argLine>                            
+                        <configuration>
+                            <argLine>@{argLine} -Xmx1024m -Djava.net.preferIpv4Stack=true</argLine>
                             <forkCount>1</forkCount>
                             <reuseForks>false</reuseForks>
                         </configuration>
@@ -198,18 +197,18 @@
                             </dependency>
                         </dependencies>
                     </plugin>
-                </plugins>                
-            </build>     
+                </plugins>
+            </build>
         </profile>
         <profile>
             <id>ossrh</id>
             <activation>
-                <activeByDefault>false</activeByDefault>                
-            </activation>   
+                <activeByDefault>false</activeByDefault>
+            </activation>
             <modules>
                 <module>./blazingcache-core</module>
-                <module>./blazingcache-jcache</module>        
-            </modules>         
+                <module>./blazingcache-jcache</module>
+            </modules>
             <distributionManagement>
                 <snapshotRepository>
                     <id>ossrh</id>
@@ -222,7 +221,7 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <version>3.0.0-M3</version>
-                        <configuration>                        
+                        <configuration>
                             <argLine>-Xmx1024m -Djava.net.preferIpv4Stack=true</argLine>
                             <forkCount>1</forkCount>
                             <reuseForks>false</reuseForks>
@@ -255,7 +254,7 @@
                             <nexusUrl>https://oss.sonatype.org/</nexusUrl>
                             <autoReleaseAfterClose>false</autoReleaseAfterClose>
                         </configuration>
-                    </plugin>                                 
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-source-plugin</artifactId>
@@ -298,14 +297,14 @@
                             </execution>
                         </executions>
                     </plugin>
-                </plugins>              
+                </plugins>
             </build>
         </profile>
         <profile>
-            <id>website</id>            
+            <id>website</id>
             <modules>
                 <module>./blazingcache-site-skin</module>
-                <module>./blazingcache-website</module>                         
+                <module>./blazingcache-website</module>
             </modules>
         </profile>
     </profiles>

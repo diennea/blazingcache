@@ -92,7 +92,6 @@ public class CacheServerEndpoint implements ServerSideConnectionAcceptor<CacheSe
     void processIdleConnections() {
         try {            
             List<CacheServerSideConnection> connections = new ArrayList<>(clientConnections.values());
-            LOGGER.log(Level.INFO, "processIdleConnections " + connections);
             for (CacheServerSideConnection cs : connections) {
                 cs.processIdleConnection();
             }
