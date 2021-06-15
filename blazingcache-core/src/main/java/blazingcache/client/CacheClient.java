@@ -27,6 +27,9 @@ import blazingcache.client.management.BlazingCacheClientStatusMXBean;
 import blazingcache.client.management.CacheClientStatisticsMXBean;
 import blazingcache.client.management.CacheClientStatusMXBean;
 
+import blazingcache.metrics.MetricsProvider;
+import blazingcache.metrics.MonitoredAtomicLong;
+import blazingcache.metrics.NullMetricsProvider;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -49,7 +52,6 @@ import blazingcache.network.ServerRejectedConnectionException;
 import blazingcache.utils.RawString;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import java.util.Objects;
 import java.util.Set;
@@ -84,16 +86,18 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private int evictionBatchSize = 100;
 
     private final AtomicLong oldestEvictedKeyAge;
-    private final AtomicLong clientPuts;
-    private final AtomicLong clientLoads;
-    private final AtomicLong clientTouches;
-    private final AtomicLong clientGets;
-    private final AtomicLong clientFetches;
-    private final AtomicLong clientEvictions;
-    private final AtomicLong clientInvalidations;
-    private final AtomicLong clientHits;
+    private final MonitoredAtomicLong clientPuts;
+    private final MonitoredAtomicLong clientLoads;
+    private final MonitoredAtomicLong clientTouches;
+    private final MonitoredAtomicLong clientGets;
+    private final MonitoredAtomicLong clientFetches;
+    private final MonitoredAtomicLong clientEvictions;
+    private final MonitoredAtomicLong clientInvalidations;
+    private final MonitoredAtomicLong clientHits;
     private final AtomicLong clientMissedGetsToSuccessfulFetches;
     private final AtomicLong clientMissedGetsToMissedFetches;
+
+    private final MetricsProvider metricsProvider;
 
     /**
      * Maximum "local" age of any entry (in millis). Sometimes a client retains
@@ -192,7 +196,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.entrySerializer = entrySerializer;
     }
 
-    private final AtomicLong actualMemory = new AtomicLong();
+    private final MonitoredAtomicLong actualMemory;
 
     private InternalClientListener internalClientListener;
 
@@ -234,6 +238,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         private String sharedSecret = "changeit";
         private ServerLocator serverLocator;
         private ByteBufAllocator allocator = UnpooledByteBufAllocator.DEFAULT;
+        private MetricsProvider metricsProvider;
 
         /**
          * Prefer storing data on direct memory. Defaults to 'true'.
@@ -299,6 +304,17 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
 
         /**
+         * Enable prometheus metrics.
+         *
+         * @param enablePrometheus
+         * @return the builder itself
+         */
+        public Builder metricsProvider(MetricsProvider metricsProvider) {
+            this.metricsProvider = metricsProvider;
+            return this;
+        }
+
+        /**
          * Builds the client.
          * @return a new client, to be disposed with {@link CacheClient#close() }
          * @throws IllegalArgumentException in case of invalid configuration.
@@ -307,7 +323,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (serverLocator == null) {
                 throw new IllegalArgumentException("serverLocator must be set");
             }
-            return new CacheClient(clientId, sharedSecret, serverLocator, offHeap, allocator);
+            return new CacheClient(clientId, sharedSecret, serverLocator, offHeap, allocator, metricsProvider);
         }
     }
 
@@ -329,11 +345,24 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @param brokerLocator
      */
     public CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator) {
-        this(clientId, sharedSecret, brokerLocator, true, UnpooledByteBufAllocator.DEFAULT);
+        this(clientId, sharedSecret, brokerLocator, NullMetricsProvider.INSTANCE);
+    }
+    
+    /**
+     * Create a new CacheClient with the safest default.
+     * Use {@link #newBuilder() } in order to have full control.
+     *
+     * @param clientId
+     * @param sharedSecret
+     * @param brokerLocator
+     * @param metricsProvider
+     */
+    public CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator, MetricsProvider metricsProvider) {
+        this(clientId, sharedSecret, brokerLocator, true, UnpooledByteBufAllocator.DEFAULT, metricsProvider);
     }
 
     private CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator,
-            boolean offHeap, ByteBufAllocator allocator) {
+            boolean offHeap, ByteBufAllocator allocator, MetricsProvider metricsProvider) {
         this.offHeap = offHeap;
         this.brokerLocator = brokerLocator;
         this.sharedSecret = sharedSecret;
@@ -341,35 +370,39 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.coreThread.setDaemon(true);
         this.clientId = clientId + "_" + System.nanoTime();
 
+        this.metricsProvider = metricsProvider == null ? NullMetricsProvider.INSTANCE : metricsProvider;
+
         this.statisticsMXBean = new BlazingCacheClientStatisticsMXBean(this);
         this.statusMXBean = new BlazingCacheClientStatusMXBean(this);
 
         this.oldestEvictedKeyAge = new AtomicLong();
-        this.clientPuts = new AtomicLong();
-        this.clientLoads = new AtomicLong();
-        this.clientTouches = new AtomicLong();
-        this.clientGets = new AtomicLong();
-        this.clientFetches = new AtomicLong();
-        this.clientEvictions = new AtomicLong();
-        this.clientInvalidations = new AtomicLong();
-        this.clientHits = new AtomicLong();
+        this.clientPuts = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.puts"));
+        this.clientLoads = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.loads"));
+        this.clientTouches = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.touches"));
+        this.clientGets = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.gets"));
+        this.clientFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.fetches"));
+        this.clientEvictions = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.evictions"));
+        this.clientInvalidations = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.invalidations"));
+        this.clientHits = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.hits"));
         this.clientMissedGetsToSuccessfulFetches = new AtomicLong();
         this.clientMissedGetsToMissedFetches = new AtomicLong();
         this.allocator = allocator;
+
+        this.actualMemory = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.memory.actualusage"));
     }
 
     /**
      * Resets client cache's statistics.
      */
     public void clearStatistics() {
-        this.clientPuts.set(0);
-        this.clientLoads.set(0);
-        this.clientTouches.set(0);
-        this.clientGets.set(0);
-        this.clientFetches.set(0);
-        this.clientEvictions.set(0);
-        this.clientInvalidations.set(0);
-        this.clientHits.set(0);
+        this.clientPuts.reset();
+        this.clientLoads.reset();
+        this.clientTouches.reset();
+        this.clientGets.reset();
+        this.clientFetches.reset();
+        this.clientEvictions.reset();
+        this.clientInvalidations.reset();
+        this.clientHits.reset();
         this.clientMissedGetsToSuccessfulFetches.set(0);
         this.clientMissedGetsToMissedFetches.set(0);
     }
@@ -502,7 +535,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         try {
             emptyCache();
 
-            actualMemory.set(0);
+            actualMemory.reset();
             connectionTimestamp = 0;
             Channel c = channel;
             if (c != null) {
@@ -851,7 +884,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         LOGGER.log(Level.SEVERE, "channel closed, clearing nearcache");
         emptyCache();
         runningFetches.clear();
-        actualMemory.set(0);
+        actualMemory.reset();
     }
 
     private void emptyCache() {

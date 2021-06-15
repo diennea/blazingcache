@@ -20,6 +20,7 @@
 package blazingcache.client;
 
 import blazingcache.client.impl.JDKEntrySerializer;
+import blazingcache.metrics.MetricsProvider;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.ServerLocator;
 import blazingcache.network.jvm.JVMServerLocator;
@@ -54,6 +55,7 @@ public class CacheClientBuilder {
     private boolean ssl = false;
     private boolean jmx = false;
     private EntrySerializer entrySerializer = new JDKEntrySerializer();
+    private MetricsProvider metricsProvider;
 
     public static enum Mode {
         SINGLESERVER,
@@ -267,6 +269,11 @@ public class CacheClientBuilder {
         this.clientSecret = clientSecret;
         return this;
     }
+    
+    public CacheClientBuilder metricsProvider(MetricsProvider metricsProvider) {
+        this.metricsProvider = metricsProvider;
+        return this;
+    }
 
     /**
      * Builds up the client. in LOCAL mode eventually a local embedded CacheServer will be started too. The returned
@@ -307,7 +314,7 @@ public class CacheClientBuilder {
             default:
                 throw new IllegalArgumentException("invalid mode " + mode);
         }
-        final CacheClient res = new CacheClient(clientId, clientSecret, locator);
+        final CacheClient res = new CacheClient(clientId, clientSecret, locator, metricsProvider);
         res.setMaxMemory(maxMemory);
         res.setMaxLocalEntryAge(maxLocalEntryAge);
         res.setEntrySerializer(entrySerializer);
