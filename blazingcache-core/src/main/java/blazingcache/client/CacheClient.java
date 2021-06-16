@@ -304,9 +304,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
 
         /**
-         * Enable prometheus metrics.
+         * Set the metrics provider. If none is set, a no-op one will be used.
          *
-         * @param enablePrometheus
+         * @param metricsProvider
          * @return the builder itself
          */
         public Builder metricsProvider(MetricsProvider metricsProvider) {
