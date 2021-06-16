@@ -29,22 +29,6 @@ public class NullMetricsProvider implements MetricsProvider {
     public static final NullMetricsProvider INSTANCE = new NullMetricsProvider();
 
     /**
-     * A <i>no-op</i> {@code MetricStat}.
-     */
-    static class NullMetricStatImpl implements MetricStat {
-
-        @Override
-        public void registerEvent(long millis) {
-            // noop
-        }
-
-        @Override
-        public void clear() {
-            // noop
-        }
-    }
-
-    /**
      * A <i>no-op</i> {@code Counter}.
      */
     static class NullGaugeImpl implements Gauge {
@@ -76,16 +60,10 @@ public class NullMetricsProvider implements MetricsProvider {
     }
 
     static Gauge nullGauge = new NullGaugeImpl();
-    static MetricStat nullMetricStat = new NullMetricStatImpl();
 
     @Override
     public Gauge getGauge(String name) {
         return nullGauge;
-    }
-
-    @Override
-    public MetricStat getMetricStat(String name) {
-        return nullMetricStat;
     }
 
     @Override

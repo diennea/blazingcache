@@ -32,13 +32,6 @@ public interface MetricsProvider {
     Gauge getGauge(String name);
 
     /**
-     *
-     * @param name
-     * @return a {@code MetricStat} metric logger
-     */
-    MetricStat getMetricStat(String name);
-
-    /**
      * Provides a {@code MetricsProvider} with the added scope {@code name}
      *
      * @param name

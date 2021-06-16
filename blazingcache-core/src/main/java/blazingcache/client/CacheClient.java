@@ -94,8 +94,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final MonitoredAtomicLong clientEvictions;
     private final MonitoredAtomicLong clientInvalidations;
     private final MonitoredAtomicLong clientHits;
-    private final AtomicLong clientMissedGetsToSuccessfulFetches;
-    private final AtomicLong clientMissedGetsToMissedFetches;
+    private final MonitoredAtomicLong clientMissedGetsToSuccessfulFetches;
+    private final MonitoredAtomicLong clientMissedGetsToMissedFetches;
 
     private final MetricsProvider metricsProvider;
 
@@ -347,7 +347,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator) {
         this(clientId, sharedSecret, brokerLocator, NullMetricsProvider.INSTANCE);
     }
-    
+
     /**
      * Create a new CacheClient with the safest default.
      * Use {@link #newBuilder() } in order to have full control.
@@ -384,8 +384,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.clientEvictions = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.evictions"));
         this.clientInvalidations = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.invalidations"));
         this.clientHits = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.hits"));
-        this.clientMissedGetsToSuccessfulFetches = new AtomicLong();
-        this.clientMissedGetsToMissedFetches = new AtomicLong();
+        this.clientMissedGetsToSuccessfulFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.gets.miss.fetchhit"));
+        this.clientMissedGetsToMissedFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.gets.miss.fetchmiss"));
         this.allocator = allocator;
 
         this.actualMemory = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.memory.actualusage"));
@@ -403,8 +403,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.clientEvictions.reset();
         this.clientInvalidations.reset();
         this.clientHits.reset();
-        this.clientMissedGetsToSuccessfulFetches.set(0);
-        this.clientMissedGetsToMissedFetches.set(0);
+        this.clientMissedGetsToSuccessfulFetches.reset();
+        this.clientMissedGetsToMissedFetches.reset();
     }
 
     // visible for testing
