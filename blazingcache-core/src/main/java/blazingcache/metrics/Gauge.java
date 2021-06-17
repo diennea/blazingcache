@@ -31,14 +31,14 @@ public interface Gauge {
     /**
      * Increment this metric value.
      * 
-     * @param entryKey key of the entry which triggered this event.
+     * @param entryKey key of the entry which triggered this event. Might be {@code null}
      */
     void inc(RawString entryKey);
 
     /**
      * Decrement this metric value.
      * 
-     * @param entryKey key of the entry which triggered this event.
+     * @param entryKey key of the entry which triggered this event. Might be {@code null}
      */
     void dec(RawString entryKey);
 
@@ -46,7 +46,7 @@ public interface Gauge {
      * Add <code>value</code> to this metric value.
      *
      * @param value
-     * @param entryKey key of the entry which triggered this event.
+     * @param entryKey key of the entry which triggered this event. Might be {@code null}
      */
     void add(long value, RawString entryKey);
 
