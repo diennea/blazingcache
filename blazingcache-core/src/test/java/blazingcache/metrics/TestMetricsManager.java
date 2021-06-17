@@ -19,8 +19,10 @@
  */
 package blazingcache.metrics;
 
+import blazingcache.utils.RawString;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
@@ -53,7 +55,7 @@ public class TestMetricsManager {
         @Override
         public Gauge getGauge(String name) {
             TestGauge g = new TestGauge();
-                    gauges.put(getMetricName(name), g);
+            gauges.put(getMetricName(name), g);
             return g;
         }
 
@@ -76,31 +78,54 @@ public class TestMetricsManager {
 
         public class TestGauge implements Gauge {
 
-            private long val;
+            private ConcurrentHashMap<String, Long> subGauges = new ConcurrentHashMap<>();
 
             @Override
             public void clear() {
-                val = 0L;
+                subGauges.clear();
             }
 
             @Override
-            public void inc() {
-                val++;
+            public void inc(RawString key) {
+                String subKey = getSubGaugeKey(key);
+                subGauges.compute(subKey, (k, v) -> {
+                    return v == null
+                            ? 1L
+                            : v + 1;
+                });
             }
 
             @Override
-            public void dec() {
-                val--;
+            public void dec(RawString key) {
+                String subKey = getSubGaugeKey(key);
+                subGauges.compute(subKey, (k, v) -> {
+                    return v == null
+                            ? -1L
+                            : v - 1;
+                });
             }
 
             @Override
-            public void add(long delta) {
-                val += delta;
+            public void add(long delta, RawString key) {
+                String subKey = getSubGaugeKey(key);
+                subGauges.compute(subKey, (k, v) -> {
+                    return v == null
+                            ? delta
+                            : v + delta;
+                });
             }
 
             @Override
             public Long get() {
-                return val;
+                return subGauges.values().stream().mapToLong(Long::longValue).sum();
+            }
+            
+            public Long get(String key) {
+                return subGauges.get(key);
+            }
+
+            private String getSubGaugeKey(RawString key) {
+                return key.toString();
             }
         }
     }

@@ -19,6 +19,8 @@
  */
 package blazingcache.metrics;
 
+import blazingcache.utils.RawString;
+
 /**
  * Simple metric that can be added to or removed from.
  *
@@ -28,20 +30,25 @@ public interface Gauge {
 
     /**
      * Increment this metric value.
+     * 
+     * @param entryKey key of the entry which triggered this event.
      */
-    void inc();
+    void inc(RawString entryKey);
 
     /**
      * Decrement this metric value.
+     * 
+     * @param entryKey key of the entry which triggered this event.
      */
-    void dec();
+    void dec(RawString entryKey);
 
     /**
      * Add <code>value</code> to this metric value.
      *
      * @param value
+     * @param entryKey key of the entry which triggered this event.
      */
-    void add(long value);
+    void add(long value, RawString entryKey);
 
     /**
      * Clear this metric value.
@@ -50,6 +57,8 @@ public interface Gauge {
 
     /**
      * Get this metric current value.
+     * 
+     * @return current value.
      */
     Long get();
 }

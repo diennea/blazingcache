@@ -19,6 +19,7 @@
  */
 package blazingcache.metrics;
 
+import blazingcache.utils.RawString;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -39,18 +40,18 @@ public class MonitoredAtomicLong {
         return inner.get();
     }
 
-    public final long incrementAndGet() {
-        gauge.inc();
+    public final long incrementAndGet(RawString entryKey) {
+        gauge.inc(entryKey);
         return inner.incrementAndGet();
     }
 
-    public final long decrementAndGet() {
-        gauge.dec();
+    public final long decrementAndGet(RawString entryKey) {
+        gauge.dec(entryKey);
         return inner.decrementAndGet();
     }
 
-    public final long addAndGet(long delta) {
-        gauge.add(delta);
+    public final long addAndGet(long delta, RawString entryKey) {
+        gauge.add(delta, entryKey);
         return inner.addAndGet(delta);
     }
 

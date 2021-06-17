@@ -19,6 +19,8 @@
  */
 package blazingcache.metrics;
 
+import blazingcache.utils.RawString;
+
 /**
  * No-op metrics provider.
  *
@@ -34,17 +36,17 @@ public class NullMetricsProvider implements MetricsProvider {
     static class NullGaugeImpl implements Gauge {
 
         @Override
-        public void inc() {
+        public void inc(RawString entryKey) {
             // noop
         }
 
         @Override
-        public void dec() {
+        public void dec(RawString entryKey) {
             // noop
         }
 
         @Override
-        public void add(long value) {
+        public void add(long value, RawString entryKey) {
             // noop
         }
 

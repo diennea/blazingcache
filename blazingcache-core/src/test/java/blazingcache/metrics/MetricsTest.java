@@ -85,6 +85,14 @@ public class MetricsTest {
                 assertThat(metricsMan2.getGauges().get("blazingcache.client.gets").get(), is(1L));
                 assertThat(metricsMan2.getGauges().get("blazingcache.client.fetches").get(), is(1L));
                 assertThat(metricsMan2.getGauges().get("blazingcache.client.memory.actualusage").get(), is((long) data.length));
+                
+                client1.load("bar", data, 0);
+                assertThat(metricsMan1.getGauges().get("blazingcache.client.loads").get(), is(2L));
+                assertThat(metricsMan1.getGauges().get("blazingcache.client.loads").get("foo"), is(1L));
+                assertThat(metricsMan1.getGauges().get("blazingcache.client.loads").get("bar"), is(1L));
+                assertThat(metricsMan1.getGauges().get("blazingcache.client.memory.actualusage").get(), is((long) data.length * 2));
+                assertThat(metricsMan1.getGauges().get("blazingcache.client.memory.actualusage").get("foo"), is((long) data.length));
+                assertThat(metricsMan1.getGauges().get("blazingcache.client.memory.actualusage").get("bar"), is((long) data.length));
             }
         }
     }
