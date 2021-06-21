@@ -27,6 +27,9 @@ import blazingcache.client.management.BlazingCacheClientStatusMXBean;
 import blazingcache.client.management.CacheClientStatisticsMXBean;
 import blazingcache.client.management.CacheClientStatusMXBean;
 
+import blazingcache.metrics.MetricsProvider;
+import blazingcache.metrics.MonitoredAtomicLong;
+import blazingcache.metrics.NullMetricsProvider;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -49,7 +52,6 @@ import blazingcache.network.ServerRejectedConnectionException;
 import blazingcache.utils.RawString;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import java.util.Objects;
 import java.util.Set;
@@ -84,16 +86,18 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private int evictionBatchSize = 100;
 
     private final AtomicLong oldestEvictedKeyAge;
-    private final AtomicLong clientPuts;
-    private final AtomicLong clientLoads;
-    private final AtomicLong clientTouches;
-    private final AtomicLong clientGets;
-    private final AtomicLong clientFetches;
-    private final AtomicLong clientEvictions;
-    private final AtomicLong clientInvalidations;
-    private final AtomicLong clientHits;
-    private final AtomicLong clientMissedGetsToSuccessfulFetches;
-    private final AtomicLong clientMissedGetsToMissedFetches;
+    private final MonitoredAtomicLong clientPuts;
+    private final MonitoredAtomicLong clientLoads;
+    private final MonitoredAtomicLong clientTouches;
+    private final MonitoredAtomicLong clientGets;
+    private final MonitoredAtomicLong clientFetches;
+    private final MonitoredAtomicLong clientEvictions;
+    private final MonitoredAtomicLong clientInvalidations;
+    private final MonitoredAtomicLong clientHits;
+    private final MonitoredAtomicLong clientMissedGetsToSuccessfulFetches;
+    private final MonitoredAtomicLong clientMissedGetsToMissedFetches;
+
+    private final MetricsProvider metricsProvider;
 
     /**
      * Maximum "local" age of any entry (in millis). Sometimes a client retains
@@ -192,7 +196,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.entrySerializer = entrySerializer;
     }
 
-    private final AtomicLong actualMemory = new AtomicLong();
+    private final MonitoredAtomicLong actualMemory;
 
     private InternalClientListener internalClientListener;
 
@@ -234,6 +238,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         private String sharedSecret = "changeit";
         private ServerLocator serverLocator;
         private ByteBufAllocator allocator = UnpooledByteBufAllocator.DEFAULT;
+        private MetricsProvider metricsProvider;
 
         /**
          * Prefer storing data on direct memory. Defaults to 'true'.
@@ -299,6 +304,17 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         }
 
         /**
+         * Set the metrics provider. If none is set, a no-op one will be used.
+         *
+         * @param metricsProvider
+         * @return the builder itself
+         */
+        public Builder metricsProvider(MetricsProvider metricsProvider) {
+            this.metricsProvider = metricsProvider;
+            return this;
+        }
+
+        /**
          * Builds the client.
          * @return a new client, to be disposed with {@link CacheClient#close() }
          * @throws IllegalArgumentException in case of invalid configuration.
@@ -307,7 +323,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (serverLocator == null) {
                 throw new IllegalArgumentException("serverLocator must be set");
             }
-            return new CacheClient(clientId, sharedSecret, serverLocator, offHeap, allocator);
+            return new CacheClient(clientId, sharedSecret, serverLocator, offHeap, allocator, metricsProvider);
         }
     }
 
@@ -329,11 +345,24 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @param brokerLocator
      */
     public CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator) {
-        this(clientId, sharedSecret, brokerLocator, true, UnpooledByteBufAllocator.DEFAULT);
+        this(clientId, sharedSecret, brokerLocator, NullMetricsProvider.INSTANCE);
+    }
+
+    /**
+     * Create a new CacheClient with the safest default.
+     * Use {@link #newBuilder() } in order to have full control.
+     *
+     * @param clientId
+     * @param sharedSecret
+     * @param brokerLocator
+     * @param metricsProvider
+     */
+    public CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator, MetricsProvider metricsProvider) {
+        this(clientId, sharedSecret, brokerLocator, true, UnpooledByteBufAllocator.DEFAULT, metricsProvider);
     }
 
     private CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator,
-            boolean offHeap, ByteBufAllocator allocator) {
+            boolean offHeap, ByteBufAllocator allocator, MetricsProvider metricsProvider) {
         this.offHeap = offHeap;
         this.brokerLocator = brokerLocator;
         this.sharedSecret = sharedSecret;
@@ -341,37 +370,41 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.coreThread.setDaemon(true);
         this.clientId = clientId + "_" + System.nanoTime();
 
+        this.metricsProvider = metricsProvider == null ? NullMetricsProvider.INSTANCE : metricsProvider;
+
         this.statisticsMXBean = new BlazingCacheClientStatisticsMXBean(this);
         this.statusMXBean = new BlazingCacheClientStatusMXBean(this);
 
         this.oldestEvictedKeyAge = new AtomicLong();
-        this.clientPuts = new AtomicLong();
-        this.clientLoads = new AtomicLong();
-        this.clientTouches = new AtomicLong();
-        this.clientGets = new AtomicLong();
-        this.clientFetches = new AtomicLong();
-        this.clientEvictions = new AtomicLong();
-        this.clientInvalidations = new AtomicLong();
-        this.clientHits = new AtomicLong();
-        this.clientMissedGetsToSuccessfulFetches = new AtomicLong();
-        this.clientMissedGetsToMissedFetches = new AtomicLong();
+        this.clientPuts = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.puts"));
+        this.clientLoads = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.loads"));
+        this.clientTouches = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.touches"));
+        this.clientGets = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.gets"));
+        this.clientFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.fetches"));
+        this.clientEvictions = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.evictions"));
+        this.clientInvalidations = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.invalidations"));
+        this.clientHits = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.hits"));
+        this.clientMissedGetsToSuccessfulFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.gets.miss.fetchhit"));
+        this.clientMissedGetsToMissedFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.gets.miss.fetchmiss"));
         this.allocator = allocator;
+
+        this.actualMemory = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.memory.actualusage"));
     }
 
     /**
      * Resets client cache's statistics.
      */
     public void clearStatistics() {
-        this.clientPuts.set(0);
-        this.clientLoads.set(0);
-        this.clientTouches.set(0);
-        this.clientGets.set(0);
-        this.clientFetches.set(0);
-        this.clientEvictions.set(0);
-        this.clientInvalidations.set(0);
-        this.clientHits.set(0);
-        this.clientMissedGetsToSuccessfulFetches.set(0);
-        this.clientMissedGetsToMissedFetches.set(0);
+        this.clientPuts.reset();
+        this.clientLoads.reset();
+        this.clientTouches.reset();
+        this.clientGets.reset();
+        this.clientFetches.reset();
+        this.clientEvictions.reset();
+        this.clientInvalidations.reset();
+        this.clientHits.reset();
+        this.clientMissedGetsToSuccessfulFetches.reset();
+        this.clientMissedGetsToMissedFetches.reset();
     }
 
     // visible for testing
@@ -502,7 +535,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         try {
             emptyCache();
 
-            actualMemory.set(0);
+            actualMemory.reset();
             connectionTimestamp = 0;
             Channel c = channel;
             if (c != null) {
@@ -523,8 +556,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             cache.compute(key, (k, removed) -> {
                 if (removed != null) {
                     removedEntries.add(removed);
-                    this.clientEvictions.incrementAndGet();
-                    actualMemory.addAndGet(-removed.getSerializedDataLength());
+                    this.clientEvictions.incrementAndGet(k);
+                    actualMemory.addAndGet(-removed.getSerializedDataLength(), k);
                     removed.close();
                     keys.add(removed.getKey());
                 }
@@ -851,7 +884,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         LOGGER.log(Level.SEVERE, "channel closed, clearing nearcache");
         emptyCache();
         runningFetches.clear();
-        actualMemory.set(0);
+        actualMemory.reset();
     }
 
     private void emptyCache() {
@@ -932,10 +965,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return null;
         }
         EntryHandle entry = getAndRetain(_key);
-        this.clientFetches.incrementAndGet();
+        this.clientFetches.incrementAndGet(_key);
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
-            this.clientHits.incrementAndGet();
+            this.clientHits.incrementAndGet(_key);
             return entry;
         }
         long fetchId = runningFetches.registerFetchForKey(_key);
@@ -966,8 +999,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 storeEntry(newEntry);
                 // client will be responsible of releasing the entry
                 newEntry.retain();
-                this.clientMissedGetsToSuccessfulFetches.incrementAndGet();
-                this.clientHits.incrementAndGet();
+                this.clientMissedGetsToSuccessfulFetches.incrementAndGet(_key);
+                this.clientHits.incrementAndGet(_key);
                 return newEntry;
             }
         } catch (TimeoutException err) {
@@ -977,7 +1010,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 runningFetches.consumeAndValidateFetchForKey(_key, fetchId);
             }
         }
-        this.clientMissedGetsToMissedFetches.incrementAndGet();
+        this.clientMissedGetsToMissedFetches.incrementAndGet(_key);
         return null;
     }
 
@@ -987,14 +1020,15 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
      * @param entry
      */
     private void storeEntry(EntryHandle entry) {
-        cache.compute(entry.getKey(), (k, prev) -> {
+        RawString _key = entry.getKey();
+        cache.compute(_key, (k, prev) -> {
             if (prev != null) {
-                actualMemory.addAndGet(-prev.getSerializedDataLength());
+                actualMemory.addAndGet(-prev.getSerializedDataLength(), k);
                 prev.close();
             }
             return entry;
         });
-        actualMemory.addAndGet(entry.getSerializedDataLength());
+        actualMemory.addAndGet(entry.getSerializedDataLength(), _key);
     }
 
     /**
@@ -1020,7 +1054,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     public void touchEntry(String key, long expiretime, KeyLock lock) {
         Channel _channel = channel;
         if (_channel != null) {
-            Message request = Message.TOUCH_ENTRY(clientId, RawString.of(key), expiretime);
+            RawString _key = RawString.of(key);
+            Message request = Message.TOUCH_ENTRY(clientId, _key, expiretime);
             if (lock != null) {
                 if (!lock.getKey().equals(key)) {
                     return;
@@ -1036,7 +1071,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                         if (LOGGER.isLoggable(Level.FINEST)) {
                             LOGGER.log(Level.FINEST, "touch " + key);
                         }
-                        clientTouches.incrementAndGet();
+                        clientTouches.incrementAndGet(_key);
                     }
                 }
             });
@@ -1059,11 +1094,12 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             LOGGER.log(Level.SEVERE, "get failed " + key + ", not connected");
             return null;
         }
-        EntryHandle entry = getAndRetain(RawString.of(key));
-        this.clientGets.incrementAndGet();
+        RawString _key = RawString.of(key);
+        EntryHandle entry = getAndRetain(_key);
+        this.clientGets.incrementAndGet(_key);
         if (entry != null) {
             entry.setLastGetTime(System.nanoTime());
-            this.clientHits.incrementAndGet();
+            this.clientHits.incrementAndGet(_key);
             return entry;
         }
         return null;
@@ -1113,7 +1149,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     if (LOGGER.isLoggable(Level.FINEST)) {
                         LOGGER.log(Level.FINEST, "invalidate {0}, -> {1}", new Object[]{_key, response});
                     }
-                    this.clientInvalidations.incrementAndGet();
+                    this.clientInvalidations.incrementAndGet(_key);
                     return;
                 } catch (InterruptedException error) {
                     LOGGER.log(Level.SEVERE, "invalidate " + _key + ", interrupted, " + error);
@@ -1130,7 +1166,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private void removeEntryInternal(RawString key) {
         cache.compute(key, (k, removed) -> {
             if (removed != null) {
-                actualMemory.addAndGet(-removed.getSerializedDataLength());
+                actualMemory.addAndGet(-removed.getSerializedDataLength(), k);
                 removed.close();
             }
             // remove
@@ -1165,7 +1201,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     if (LOGGER.isLoggable(Level.FINEST)) {
                         LOGGER.log(Level.FINEST, "invalidateByPrefix {0}, -> {1}", new Object[]{prefix, response});
                     }
-                    this.clientInvalidations.incrementAndGet();
+                    this.clientInvalidations.incrementAndGet(null);
                     return;
                 } catch (TimeoutException error) {
                     LOGGER.log(Level.SEVERE, "invalidateByPrefix " + prefix + ", timeout " + error);
@@ -1368,7 +1404,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     afterNetwork.close();
                 }
             }
-            this.clientLoads.incrementAndGet();
+            this.clientLoads.incrementAndGet(_key);
             return true;
         } catch (TimeoutException timedOut) {
             throw new CacheException("error while putting for key " + key + ":" + timedOut, timedOut);
@@ -1411,7 +1447,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                     afterNetwork.close();
                 }
             }
-            this.clientPuts.incrementAndGet();
+            this.clientPuts.incrementAndGet(_key);
             return true;
         } catch (TimeoutException timedOut) {
             throw new CacheException("error while putting for key " + _key + ":" + timedOut, timedOut);
