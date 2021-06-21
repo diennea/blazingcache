@@ -29,11 +29,11 @@ import java.util.concurrent.atomic.AtomicLong;
 public class MonitoredAtomicLong {
 
     private final AtomicLong inner;
-    private final Gauge gauge;
+    private final GaugeSet gaugeSet;
 
-    public MonitoredAtomicLong(long initialValue, Gauge gauge) {
+    public MonitoredAtomicLong(long initialValue, GaugeSet gaugeSet) {
         this.inner = new AtomicLong(initialValue);
-        this.gauge = gauge;
+        this.gaugeSet = gaugeSet;
     }
 
     public final long get() {
@@ -41,22 +41,22 @@ public class MonitoredAtomicLong {
     }
 
     public final long incrementAndGet(RawString entryKey) {
-        gauge.inc(entryKey);
+        gaugeSet.inc(entryKey);
         return inner.incrementAndGet();
     }
 
     public final long decrementAndGet(RawString entryKey) {
-        gauge.dec(entryKey);
+        gaugeSet.dec(entryKey);
         return inner.decrementAndGet();
     }
 
     public final long addAndGet(long delta, RawString entryKey) {
-        gauge.add(delta, entryKey);
+        gaugeSet.add(delta, entryKey);
         return inner.addAndGet(delta);
     }
 
     public final void reset() {
-        gauge.clear();
+        gaugeSet.clear();
         inner.set(0L);
     }
     

@@ -53,7 +53,7 @@ public class TestMetricsManager {
         }
 
         @Override
-        public Gauge getGauge(String name) {
+        public GaugeSet getGaugeSet(String name) {
             TestGauge g = new TestGauge();
             gauges.put(getMetricName(name), g);
             return g;
@@ -76,7 +76,7 @@ public class TestMetricsManager {
                     : name;
         }
 
-        public class TestGauge implements Gauge {
+        public class TestGauge implements GaugeSet {
 
             private ConcurrentHashMap<String, Long> subGauges = new ConcurrentHashMap<>();
 

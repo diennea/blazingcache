@@ -26,7 +26,7 @@ import blazingcache.utils.RawString;
  *
  * @author dennis.mercuriali
  */
-public interface Gauge {
+public interface GaugeSet {
 
     /**
      * Increment this metric value.

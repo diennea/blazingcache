@@ -376,19 +376,19 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         this.statusMXBean = new BlazingCacheClientStatusMXBean(this);
 
         this.oldestEvictedKeyAge = new AtomicLong();
-        this.clientPuts = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.puts"));
-        this.clientLoads = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.loads"));
-        this.clientTouches = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.touches"));
-        this.clientGets = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.gets"));
-        this.clientFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.fetches"));
-        this.clientEvictions = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.evictions"));
-        this.clientInvalidations = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.invalidations"));
-        this.clientHits = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.hits"));
-        this.clientMissedGetsToSuccessfulFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.gets.miss.fetchhit"));
-        this.clientMissedGetsToMissedFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.gets.miss.fetchmiss"));
+        this.clientPuts = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.puts"));
+        this.clientLoads = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.loads"));
+        this.clientTouches = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.touches"));
+        this.clientGets = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.gets"));
+        this.clientFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.fetches"));
+        this.clientEvictions = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.evictions"));
+        this.clientInvalidations = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.invalidations"));
+        this.clientHits = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.hits"));
+        this.clientMissedGetsToSuccessfulFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.gets.miss.fetchhit"));
+        this.clientMissedGetsToMissedFetches = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.gets.miss.fetchmiss"));
         this.allocator = allocator;
 
-        this.actualMemory = new MonitoredAtomicLong(0L, this.metricsProvider.getGauge("blazingcache.client.memory.actualusage"));
+        this.actualMemory = new MonitoredAtomicLong(0L, this.metricsProvider.getGaugeSet("blazingcache.client.memory.actualusage"));
     }
 
     /**

@@ -27,9 +27,9 @@ public interface MetricsProvider {
 
     /**
      * @param name
-     * @return a {@code Gauge} metric logger
+     * @return a {@code GaugeSet} metric logger
      */
-    Gauge getGauge(String name);
+    GaugeSet getGaugeSet(String name);
 
     /**
      * Provides a {@code MetricsProvider} with the added scope {@code name}

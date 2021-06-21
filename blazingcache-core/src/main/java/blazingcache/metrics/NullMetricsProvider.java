@@ -31,9 +31,9 @@ public class NullMetricsProvider implements MetricsProvider {
     public static final NullMetricsProvider INSTANCE = new NullMetricsProvider();
 
     /**
-     * A <i>no-op</i> {@code Counter}.
+     * A <i>no-op</i> {@code GaugeSet}.
      */
-    static class NullGaugeImpl implements Gauge {
+    static class NullGaugeSetImpl implements GaugeSet {
 
         @Override
         public void inc(RawString entryKey) {
@@ -61,10 +61,10 @@ public class NullMetricsProvider implements MetricsProvider {
         }
     }
 
-    static Gauge nullGauge = new NullGaugeImpl();
+    static GaugeSet nullGauge = new NullGaugeSetImpl();
 
     @Override
-    public Gauge getGauge(String name) {
+    public GaugeSet getGaugeSet(String name) {
         return nullGauge;
     }
 
