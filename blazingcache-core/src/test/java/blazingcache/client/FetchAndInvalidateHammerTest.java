@@ -23,6 +23,7 @@ import static org.junit.Assert.assertFalse;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -45,21 +46,11 @@ public class FetchAndInvalidateHammerTest {
     private static final class LongDecoder {
 
         public static byte[] serialize(long l) {
-            byte[] result = new byte[Long.BYTES];
-            for (int i = Long.BYTES - 1; i >= 0; i--) {
-                result[i] = (byte) (l & 0xFF);
-                l >>= Byte.SIZE;
-            }
-            return result;
+            return BigInteger.valueOf(l).toByteArray();
         }
 
         public static long deserialize(byte[] b) {
-            long result = 0;
-            for (int i = 0; i < Long.BYTES; i++) {
-                result <<= Byte.SIZE;
-                result |= (b[i] & 0xFF);
-            }
-            return result;
+            return new BigInteger(b).longValue();
         }
 
     }

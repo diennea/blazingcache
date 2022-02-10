@@ -766,11 +766,16 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 }
 
                 try {
-                    locallyLockKey(key);
-                    runningFetches.cancelFetchesForKey(key);
-                    removeEntryInternal(key);
-                } finally {
-                    locallyUnlockKey(key);
+                    locallyLockKeyOrWait(key);
+                    try {
+                        runningFetches.cancelFetchesForKey(key);
+                        removeEntryInternal(key);
+                    } finally {
+                        locallyUnlockKey(key);
+                    }
+                } catch (InterruptedException exc) {
+                    Thread.currentThread().interrupt();
+                    return;
                 }
 
                 Channel _channel = channel;
@@ -982,8 +987,9 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (internalClientListener != null) {
                 internalClientListener.onFetchResponse(_key.toString(), message);
             }
+
+            locallyLockKeyOrWait(_key);
             try {
-                locallyLockKey(_key);
                 boolean fetchStillValid = runningFetches.consumeAndValidateFetchForKey(_key, fetchId);
                 fetchConsumed = true;
                 if (message.type == Message.TYPE_ACK && fetchStillValid) {
@@ -1007,6 +1013,8 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
         } catch (TimeoutException err) {
             LOGGER.log(Level.SEVERE, "fetch failed " + _key + ": " + err);
+        } catch (InterruptedException exc) {
+            Thread.currentThread().interrupt();
         } finally {
             if (!fetchConsumed) {
                 runningFetches.consumeAndValidateFetchForKey(_key, fetchId);
@@ -1695,15 +1703,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return (T) entry.resolveReference(entrySerializer);
     }
 
-    private void locallyLockKey(RawString key) {
+    private void locallyLockKeyOrWait(RawString key) throws InterruptedException {
         synchronized (lockedKeys) {
-            try {
-                while (!lockedKeys.add(key)) {
-                    lockedKeys.wait();
-                }
-            } catch (InterruptedException exc) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(exc);
+            while (!lockedKeys.add(key)) {
+                lockedKeys.wait();
             }
         }
     }
