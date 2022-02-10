@@ -26,34 +26,23 @@ import blazingcache.client.management.BlazingCacheClientStatisticsMXBean;
 import blazingcache.client.management.BlazingCacheClientStatusMXBean;
 import blazingcache.client.management.CacheClientStatisticsMXBean;
 import blazingcache.client.management.CacheClientStatusMXBean;
-
 import blazingcache.metrics.MetricsProvider;
 import blazingcache.metrics.MonitoredAtomicLong;
 import blazingcache.metrics.NullMetricsProvider;
-
+import blazingcache.network.*;
+import blazingcache.utils.RawString;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.UnpooledByteBufAllocator;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import blazingcache.network.Channel;
-import blazingcache.network.ChannelEventListener;
-import blazingcache.network.ConnectionRequestInfo;
-import blazingcache.network.Message;
-import blazingcache.network.ReplyCallback;
-import blazingcache.network.SendResultCallback;
-import blazingcache.network.ServerLocator;
-import blazingcache.network.ServerNotAvailableException;
-import blazingcache.network.ServerRejectedConnectionException;
-import blazingcache.utils.RawString;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.UnpooledByteBufAllocator;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * Client.
@@ -74,6 +63,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final CacheClientStatisticsMXBean statisticsMXBean;
     private final CacheClientStatusMXBean statusMXBean;
     private EntrySerializer entrySerializer = new JDKEntrySerializer();
+    private Set<RawString> lockedKeys = new HashSet<>();
 
     private boolean offHeap = true;
     private volatile boolean stopped = false;
@@ -757,8 +747,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         return maxLocalEntryAge > 0
                 && now - lastPerformedEvictionTimestamp >= maxLocalEntryAge / 2;
     }
-
-    private Set<RawString> lockedKeys = new HashSet<>();
 
     @Override
     public void messageReceived(Message message) {
