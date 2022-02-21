@@ -26,20 +26,9 @@ import blazingcache.client.management.BlazingCacheClientStatisticsMXBean;
 import blazingcache.client.management.BlazingCacheClientStatusMXBean;
 import blazingcache.client.management.CacheClientStatisticsMXBean;
 import blazingcache.client.management.CacheClientStatusMXBean;
-
 import blazingcache.metrics.MetricsProvider;
 import blazingcache.metrics.MonitoredAtomicLong;
 import blazingcache.metrics.NullMetricsProvider;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import blazingcache.network.Channel;
 import blazingcache.network.ChannelEventListener;
 import blazingcache.network.ConnectionRequestInfo;
@@ -53,9 +42,20 @@ import blazingcache.utils.RawString;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 /**
  * Client.
@@ -76,6 +76,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     private final CacheClientStatisticsMXBean statisticsMXBean;
     private final CacheClientStatusMXBean statusMXBean;
     private EntrySerializer entrySerializer = new JDKEntrySerializer();
+    private Set<RawString> lockedKeys = new HashSet<>();
 
     private boolean offHeap = true;
     private volatile boolean stopped = false;
@@ -776,8 +777,19 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 if (LOGGER.isLoggable(Level.FINEST)) {
                     LOGGER.log(Level.FINEST, "{0} invalidate {1} from {2}", new Object[]{clientId, key, message.clientId});
                 }
-                runningFetches.cancelFetchesForKey(key);
-                removeEntryInternal(key);
+
+                try {
+                    locallyLockKeyOrWait(key);
+                    try {
+                        runningFetches.cancelFetchesForKey(key);
+                        removeEntryInternal(key);
+                    } finally {
+                        locallyUnlockKey(key);
+                    }
+                } catch (InterruptedException exc) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
 
                 Channel _channel = channel;
                 if (_channel != null) {
@@ -796,7 +808,6 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 keys.forEach((key) -> {
                     runningFetches.cancelFetchesForKey(key);
                     removeEntryInternal(key);
-
                 });
                 Channel _channel = channel;
                 if (_channel != null) {
@@ -989,22 +1000,34 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             if (internalClientListener != null) {
                 internalClientListener.onFetchResponse(_key.toString(), message);
             }
-            boolean fetchStillValid = runningFetches.consumeAndValidateFetchForKey(_key, fetchId);
-            fetchConsumed = true;
-            if (message.type == Message.TYPE_ACK && fetchStillValid) {
-                byte[] data = (byte[]) message.parameters.get("data");
-                long expiretime = (long) message.parameters.get("expiretime");
-                ByteBuf buffer = cacheByteArray(data);
-                EntryHandle newEntry = new EntryHandle(_key, System.nanoTime(), buffer, expiretime, null);
-                storeEntry(newEntry);
-                // client will be responsible of releasing the entry
-                newEntry.retain();
-                this.clientMissedGetsToSuccessfulFetches.incrementAndGet(_key);
-                this.clientHits.incrementAndGet(_key);
-                return newEntry;
+
+            locallyLockKeyOrWait(_key);
+            try {
+                boolean fetchStillValid = runningFetches.consumeAndValidateFetchForKey(_key, fetchId);
+                fetchConsumed = true;
+                if (message.type == Message.TYPE_ACK && fetchStillValid) {
+                    byte[] data = (byte[]) message.parameters.get("data");
+                    long expiretime = (long) message.parameters.get("expiretime");
+                    ByteBuf buffer = cacheByteArray(data);
+                    EntryHandle newEntry = new EntryHandle(_key, System.nanoTime(), buffer, expiretime, null);
+                    storeEntry(newEntry);
+                    // client will be responsible of releasing the entry
+                    newEntry.retain();
+                    runningFetches.consumeAndValidateFetchForKey(_key, fetchId);
+                    this.clientMissedGetsToSuccessfulFetches.incrementAndGet(_key);
+                    this.clientHits.incrementAndGet(_key);
+
+                    runningFetches.consumeAndValidateFetchForKey(_key, fetchId);
+                    fetchConsumed = true;
+                    return newEntry;
+                }
+            } finally {
+                locallyUnlockKey(_key);
             }
         } catch (TimeoutException err) {
             LOGGER.log(Level.SEVERE, "fetch failed " + _key + ": " + err);
+        } catch (InterruptedException exc) {
+            Thread.currentThread().interrupt();
         } finally {
             if (!fetchConsumed) {
                 runningFetches.consumeAndValidateFetchForKey(_key, fetchId);
@@ -1691,6 +1714,21 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             return null;
         }
         return (T) entry.resolveReference(entrySerializer);
+    }
+
+    private void locallyLockKeyOrWait(RawString key) throws InterruptedException {
+        synchronized (lockedKeys) {
+            while (!lockedKeys.add(key)) {
+                lockedKeys.wait();
+            }
+        }
+    }
+
+    private void locallyUnlockKey(RawString key) {
+        synchronized (lockedKeys) {
+            lockedKeys.remove(key);
+            lockedKeys.notifyAll();
+        }
     }
 
 }

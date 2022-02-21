@@ -38,6 +38,11 @@ public class PendingFetchesManager {
     private final AtomicLong idgenerator = new AtomicLong();
     private final ReentrantLock lock = new ReentrantLock();
 
+    /**
+     * Register a new fetch request for a key
+     * @param key key to fetch
+     * @return fetch id
+     */
     public long registerFetchForKey(RawString key) {
         long id = idgenerator.incrementAndGet();
         lock.lock();
@@ -54,6 +59,12 @@ public class PendingFetchesManager {
         return id;
     }
 
+    /**
+     * Validates that a fetch is still running and removes it from the running list.
+     * @param key
+     * @param fetchId
+     * @return true if the fetch was running and was successfully removed
+     */
     public boolean consumeAndValidateFetchForKey(RawString key, long fetchId) {
         lock.lock();
         try {
@@ -72,6 +83,10 @@ public class PendingFetchesManager {
         }
     }
 
+    /**
+     * Cancels every running fetch for the given key
+     * @param key
+     */
     public void cancelFetchesForKey(RawString key) {
         lock.lock();
         try {
@@ -82,6 +97,9 @@ public class PendingFetchesManager {
 
     }
 
+    /**
+     * Cancels every running fetch
+     */
     public void clear() {
         lock.lock();
         try {
@@ -94,5 +112,4 @@ public class PendingFetchesManager {
     protected Map<RawString, Set<Long>> getPendingFetchesForTest() {
         return pendingFetchesByKey;
     }
-
 }
