@@ -56,7 +56,7 @@ public class NettyChannel extends Channel {
     private final ExecutorService callbackexecutor;
     private final NettyConnector connector;
     private volatile boolean ioErrors = false;
-    private final long id = idGenerator.incrementAndGet();
+    private final String id = UUID.randomUUID().toString();
     private final boolean disconnectOnReplyTimeout;
 
     @Override
@@ -102,7 +102,7 @@ public class NettyChannel extends Channel {
     @Override
     public void sendOneWayMessage(Message message, SendResultCallback callback) {
         if (message.getMessageId() == null) {
-            message.setMessageId(UUID.randomUUID().toString());
+            message.setMessageId(idGenerator.incrementAndGet() + "");
         }
         SocketChannel _socket = this.socket;
         if (_socket == null || !_socket.isOpen()) {
@@ -128,7 +128,7 @@ public class NettyChannel extends Channel {
     @Override
     public void sendReplyMessage(Message inAnswerTo, Message message) {
         if (message.getMessageId() == null) {
-            message.setMessageId(UUID.randomUUID().toString());
+            message.setMessageId(idGenerator.incrementAndGet() + "");
         }
         if (this.socket == null) {
             LOGGER.log(Level.SEVERE, this + " channel not active, discarding reply message " + message);
@@ -181,7 +181,7 @@ public class NettyChannel extends Channel {
     @Override
     public void sendMessageWithAsyncReply(Message message, long timeout, ReplyCallback callback) {
         if (message.getMessageId() == null) {
-            message.setMessageId(UUID.randomUUID().toString());
+            message.setMessageId(idGenerator.incrementAndGet() + "");
         }
         if (!isValid()) {
             submitCallback(() -> {
