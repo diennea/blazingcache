@@ -49,6 +49,7 @@ public class NettyChannel extends Channel {
     private volatile SocketChannel socket;
     private static final Logger LOGGER = Logger.getLogger(NettyChannel.class.getName());
     private static final AtomicLong ID_GENERATOR = new AtomicLong();
+    private static final AtomicLong CHANNEL_ID_GENERATOR = new AtomicLong();
 
     private final Map<String, ReplyCallback> pendingReplyMessages = new ConcurrentHashMap<>();
     private final Map<String, Message> pendingReplyMessagesSource = new ConcurrentHashMap<>();
@@ -56,7 +57,7 @@ public class NettyChannel extends Channel {
     private final ExecutorService callbackexecutor;
     private final NettyConnector connector;
     private volatile boolean ioErrors = false;
-    private final String id = UUID.randomUUID().toString();
+    private final String id = CHANNEL_ID_GENERATOR.incrementAndGet() + "";
     private final boolean disconnectOnReplyTimeout;
 
     @Override

@@ -46,13 +46,14 @@ public class JVMChannel extends Channel {
 
     private static final Logger LOGGER = Logger.getLogger(JVMChannel.class.getName());
     private static final AtomicLong ID_GENERATOR = new AtomicLong();
+    private static final AtomicLong CHANNEL_ID_GENERATOR = new AtomicLong();
     private volatile boolean active = false;
     private final Map<String, ReplyCallback> pendingReplyMessages = new ConcurrentHashMap<>();
     private final Map<String, Message> pendingReplyMessagesSource = new ConcurrentHashMap<>();
     private JVMChannel otherSide;
     private final ExecutorService callbackexecutor = Executors.newCachedThreadPool();
     private final ExecutorService executionserializer = Executors.newFixedThreadPool(1);
-    private String id = UUID.randomUUID().toString();
+    private String id = CHANNEL_ID_GENERATOR.incrementAndGet() + "";
 
     @Override
     public String toString() {
