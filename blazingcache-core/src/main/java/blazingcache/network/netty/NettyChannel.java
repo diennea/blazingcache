@@ -48,7 +48,7 @@ public class NettyChannel extends Channel {
     private static final boolean DISCONNECT_ON_PENDING_REPLY_TIMEOUT = Boolean.parseBoolean(System.getProperty("blazingcache.nettychannel.disconnectonpendingreplytimeout", "true"));
     private volatile SocketChannel socket;
     private static final Logger LOGGER = Logger.getLogger(NettyChannel.class.getName());
-    private static final AtomicLong idGenerator = new AtomicLong();
+    private static final AtomicLong ID_GENERATOR = new AtomicLong();
 
     private final Map<String, ReplyCallback> pendingReplyMessages = new ConcurrentHashMap<>();
     private final Map<String, Message> pendingReplyMessagesSource = new ConcurrentHashMap<>();
@@ -102,7 +102,7 @@ public class NettyChannel extends Channel {
     @Override
     public void sendOneWayMessage(Message message, SendResultCallback callback) {
         if (message.getMessageId() == null) {
-            message.setMessageId(idGenerator.incrementAndGet() + "");
+            message.setMessageId(ID_GENERATOR.incrementAndGet() + "");
         }
         SocketChannel _socket = this.socket;
         if (_socket == null || !_socket.isOpen()) {
@@ -128,7 +128,7 @@ public class NettyChannel extends Channel {
     @Override
     public void sendReplyMessage(Message inAnswerTo, Message message) {
         if (message.getMessageId() == null) {
-            message.setMessageId(idGenerator.incrementAndGet() + "");
+            message.setMessageId(ID_GENERATOR.incrementAndGet() + "");
         }
         if (this.socket == null) {
             LOGGER.log(Level.SEVERE, this + " channel not active, discarding reply message " + message);
@@ -181,7 +181,7 @@ public class NettyChannel extends Channel {
     @Override
     public void sendMessageWithAsyncReply(Message message, long timeout, ReplyCallback callback) {
         if (message.getMessageId() == null) {
-            message.setMessageId(idGenerator.incrementAndGet() + "");
+            message.setMessageId(ID_GENERATOR.incrementAndGet() + "");
         }
         if (!isValid()) {
             submitCallback(() -> {
