@@ -57,7 +57,7 @@ public class NettyChannel extends Channel {
     private final ExecutorService callbackexecutor;
     private final NettyConnector connector;
     private volatile boolean ioErrors = false;
-    private final String id = CHANNEL_ID_GENERATOR.incrementAndGet() + "";
+    private final long id = CHANNEL_ID_GENERATOR.incrementAndGet();
     private final boolean disconnectOnReplyTimeout;
 
     @Override

@@ -53,7 +53,7 @@ public class JVMChannel extends Channel {
     private JVMChannel otherSide;
     private final ExecutorService callbackexecutor = Executors.newCachedThreadPool();
     private final ExecutorService executionserializer = Executors.newFixedThreadPool(1);
-    private String id = CHANNEL_ID_GENERATOR.incrementAndGet() + "";
+    private long id = CHANNEL_ID_GENERATOR.incrementAndGet();
 
     @Override
     public String toString() {
