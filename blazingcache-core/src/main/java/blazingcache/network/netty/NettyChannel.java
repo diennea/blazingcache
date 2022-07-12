@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
@@ -48,9 +47,9 @@ public class NettyChannel extends Channel {
     private static final boolean DISCONNECT_ON_PENDING_REPLY_TIMEOUT = Boolean.parseBoolean(System.getProperty("blazingcache.nettychannel.disconnectonpendingreplytimeout", "true"));
     private volatile SocketChannel socket;
     private static final Logger LOGGER = Logger.getLogger(NettyChannel.class.getName());
-    private static final AtomicLong ID_GENERATOR = new AtomicLong();
     private static final AtomicLong CHANNEL_ID_GENERATOR = new AtomicLong();
 
+    private final AtomicLong messageIdGenerator = new AtomicLong();
     private final Map<String, ReplyCallback> pendingReplyMessages = new ConcurrentHashMap<>();
     private final Map<String, Message> pendingReplyMessagesSource = new ConcurrentHashMap<>();
     private final Map<String, Long> pendingReplyMessagesDeadline = new ConcurrentHashMap<>();
@@ -103,7 +102,7 @@ public class NettyChannel extends Channel {
     @Override
     public void sendOneWayMessage(Message message, SendResultCallback callback) {
         if (message.getMessageId() == null) {
-            message.setMessageId(ID_GENERATOR.incrementAndGet() + "");
+            message.setMessageId(messageIdGenerator.incrementAndGet() + "");
         }
         SocketChannel _socket = this.socket;
         if (_socket == null || !_socket.isOpen()) {
@@ -129,7 +128,7 @@ public class NettyChannel extends Channel {
     @Override
     public void sendReplyMessage(Message inAnswerTo, Message message) {
         if (message.getMessageId() == null) {
-            message.setMessageId(ID_GENERATOR.incrementAndGet() + "");
+            message.setMessageId(messageIdGenerator.incrementAndGet() + "");
         }
         if (this.socket == null) {
             LOGGER.log(Level.SEVERE, this + " channel not active, discarding reply message " + message);
@@ -182,7 +181,7 @@ public class NettyChannel extends Channel {
     @Override
     public void sendMessageWithAsyncReply(Message message, long timeout, ReplyCallback callback) {
         if (message.getMessageId() == null) {
-            message.setMessageId(ID_GENERATOR.incrementAndGet() + "");
+            message.setMessageId(messageIdGenerator.incrementAndGet() + "");
         }
         if (!isValid()) {
             submitCallback(() -> {
