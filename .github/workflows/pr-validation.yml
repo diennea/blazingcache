@@ -37,6 +37,6 @@ jobs:
           key: 'cache'
           restore-keys: 'cache'
       - name: 'Build with Maven'
-        run: mvn -B checkstyle:check apache-rat:check install -DskipTests spotbugs:check -Dmaven.test.redirectTestOutputToFile=true
+        run: mvn -B apache-rat:check install -DskipTests spotbugs:check -Dmaven.test.redirectTestOutputToFile=true
       - name: 'Remove Snapshots Before Caching'
         run: find ~/.m2 -name '*SNAPSHOT' | xargs rm -Rf
