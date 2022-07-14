@@ -116,6 +116,55 @@
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${libs.jacoco}</version>
             </plugin>
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>0.14</version>
+                <configuration>
+                    <excludes>
+                        <!-- IntelliJ -->
+                        <exclude>**/.idea/**</exclude>
+
+                        <!-- Git -->
+                        <exclude>.git/**/*</exclude>
+                        <exclude>.github/**/*</exclude>
+                        <exclude>**/.gitignore</exclude>
+
+                        <!-- Built directory -->
+                        <exclude>**/target/**/*</exclude>
+
+                        <!-- Project files -->
+                        <exclude>**/README.md</exclude>
+                        <exclude>**/README.rst</exclude>
+                        <exclude>**/META-INF/**/*</exclude>
+
+                        <!-- IDE files (eclipse & intelliJ) -->
+                        <exclude>**/.classpath</exclude>
+                        <exclude>**/.project</exclude>
+                        <exclude>**/.checkstyle</exclude>
+                        <exclude>**/.settings/*</exclude>
+                        <exclude>**/*.iml</exclude>
+                        <exclude>**/*.iws</exclude>
+                        <exclude>**/*.ipr</exclude>
+                        <exclude>**/nb-configuration.xml</exclude>
+                        <exclude>**/nbactions.xml</exclude>
+
+                        <!-- logs -->
+                        <exclude>**/*.log</exclude>
+
+                        <!-- json files -->
+                        <exclude>**/*.json</exclude>
+
+                        <exclude>**/index.md</exclude>
+                        <exclude>**/*.xml</exclude>
+                        <exclude>**/*.yml</exclude>
+                        <exclude>**/*.properties</exclude>
+                        <exclude>**/*.sh</exclude>
+                        <exclude>**/*.conf</exclude>
+                        <exclude>**/*.txt</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
     <profiles>
