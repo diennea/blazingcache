@@ -28,11 +28,11 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -44,13 +44,16 @@ import java.util.logging.Logger;
 public class JVMChannel extends Channel {
 
     private static final Logger LOGGER = Logger.getLogger(JVMChannel.class.getName());
+    private static final AtomicLong CHANNEL_ID_GENERATOR = new AtomicLong();
+
     private volatile boolean active = false;
+    private final AtomicLong messageIdGenerator = new AtomicLong();
     private final Map<String, ReplyCallback> pendingReplyMessages = new ConcurrentHashMap<>();
     private final Map<String, Message> pendingReplyMessagesSource = new ConcurrentHashMap<>();
     private JVMChannel otherSide;
     private final ExecutorService callbackexecutor = Executors.newCachedThreadPool();
     private final ExecutorService executionserializer = Executors.newFixedThreadPool(1);
-    private String id = UUID.randomUUID().toString();
+    private long id = CHANNEL_ID_GENERATOR.incrementAndGet();
 
     @Override
     public String toString() {
@@ -89,7 +92,7 @@ public class JVMChannel extends Channel {
 
     @Override
     public void sendOneWayMessage(Message message, SendResultCallback callback) {
-        message.setMessageId(UUID.randomUUID().toString());
+        message.setMessageId(messageIdGenerator.incrementAndGet() + "");
         Message _message = cloneMessage(message);
 //        System.out.println("[JVM] sendOneWayMessage " + message);
         if (!active || executionserializer.isShutdown()) {
@@ -121,7 +124,7 @@ public class JVMChannel extends Channel {
 
     @Override
     public void sendReplyMessage(Message inAnswerTo, Message message) {
-        message.setMessageId(UUID.randomUUID().toString());
+        message.setMessageId(messageIdGenerator.incrementAndGet() + "");
         Message _message = cloneMessage(message);
         if (executionserializer.isShutdown()) {
             LOGGER.log(Level.SEVERE,"channel shutdown, discarding reply message " + _message);
@@ -147,7 +150,7 @@ public class JVMChannel extends Channel {
 
     @Override
     public void sendMessageWithAsyncReply(Message message, long timeout, ReplyCallback callback) {
-        message.setMessageId(UUID.randomUUID().toString());
+        message.setMessageId(messageIdGenerator.incrementAndGet() + "");
         Message _message = cloneMessage(message);
         if (executionserializer.isShutdown()) {
             LOGGER.log(Level.SEVERE,"[JVM] channel shutdown, discarding sendMessageWithAsyncReply");
