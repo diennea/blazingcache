@@ -63,7 +63,7 @@ public final class Message {
         data.put("key", key);
         data.put("data", serializedData);
         data.put("expiretime", expiretime);
-        return new Message(clientId, TYPE_PUT_ENTRY, data);
+        return new Message(clientId, TYPE_LOAD_ENTRY, data);
     }
 
     public static Message UNREGISTER_ENTRY(String clientId, List<RawString> keys) {
