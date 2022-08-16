@@ -336,7 +336,7 @@ public class CacheServer implements AutoCloseable {
             if (sourceClientId != null) {
                 clientsForKey.remove(sourceClientId);
             }
-            LOGGER.log(Level.FINEST, "putEntry from {0}, key={1}, clientsForKey:{2}", new Object[]{sourceClientId, key, clientsForKey});
+            LOGGER.log(Level.FINEST, "loadEntry from {0}, key={1}, clientsForKey:{2}", new Object[]{sourceClientId, key, clientsForKey});
             cacheStatus.registerKeyForClient(key, sourceClientId, expiretime);
             locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
             onFinish.onResult(key, null);
