@@ -1406,7 +1406,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             EntryHandle entry = new EntryHandle(_key, System.nanoTime(), buffer, expireTime, reference);
             storeEntry(entry);
 
-            Message request = Message.LOAD_ENTRY(clientId, RawString.of(key), data, expireTime);
+            Message request = Message.LOAD_ENTRY(clientId, RawString.of(key), expireTime);
             if (lock != null) {
                 request.setParameter("lockId", lock.getLockId());
             }
