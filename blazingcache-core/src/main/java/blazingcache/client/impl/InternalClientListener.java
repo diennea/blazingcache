@@ -39,4 +39,7 @@ public interface InternalClientListener {
     public default void onFetchResponse(String key, Message message) {
     }
 
+    public default void onRequestSent(Message message) {
+    }
+
 }

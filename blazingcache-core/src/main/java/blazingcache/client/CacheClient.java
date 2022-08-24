@@ -1165,6 +1165,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             } else {
                 try {
                     Message request = Message.INVALIDATE(clientId, _key);
+
+                    if (internalClientListener != null) {
+                        internalClientListener.onRequestSent(request);
+                    }
+
                     if (lock != null) {
                         request.setParameter("lockId", lock.getLockId());
                     }
@@ -1407,6 +1412,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             storeEntry(entry);
 
             Message request = Message.LOAD_ENTRY(clientId, RawString.of(key), expireTime);
+
+            if (internalClientListener != null) {
+                internalClientListener.onRequestSent(request);
+            }
+
             if (lock != null) {
                 request.setParameter("lockId", lock.getLockId());
             }
@@ -1450,6 +1460,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             storeEntry(entry);
 
             Message request = Message.PUT_ENTRY(clientId, _key, data, expireTime);
+            if (internalClientListener != null) {
+                internalClientListener.onRequestSent(request);
+            }
+
             if (lock != null) {
                 request.setParameter("lockId", lock.getLockId());
             }
