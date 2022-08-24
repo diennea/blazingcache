@@ -28,8 +28,7 @@ import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class RequestParametersTest {
 
@@ -50,10 +49,12 @@ public class RequestParametersTest {
                 client.setInternalClientListener(new InternalClientListener() {
                     @Override
                     public void onRequestSent(Message message) {
-                        assertTrue(message.type == Message.TYPE_PUT_ENTRY);
-                        assertTrue(message.parameters.get("data") != null);
-                        assertTrue(message.parameters.get("key") != null);
+                        assertEquals(Message.TYPE_PUT_ENTRY, message.type);
+                        assertEquals(data, message.parameters.get("data"));
+                        assertEquals("foo", message.parameters.get("key").toString());
                         assertTrue(message.parameters.get("expiretime") != null);
+                        assertTrue(validateExpireTime(message.parameters.get("expiretime").toString()));
+                        assertEquals(3, message.parameters.size());
                     }
                 });
 
@@ -76,10 +77,12 @@ public class RequestParametersTest {
                 client.setInternalClientListener(new InternalClientListener() {
                     @Override
                     public void onRequestSent(Message message) {
-                        assertTrue(message.type == Message.TYPE_LOAD_ENTRY);
+                        assertEquals(Message.TYPE_LOAD_ENTRY, message.type);
                         assertTrue(message.parameters.get("data") == null);
-                        assertTrue(message.parameters.get("key") != null);
+                        assertEquals("foo", message.parameters.get("key").toString());
                         assertTrue(message.parameters.get("expiretime") != null);
+                        assertTrue(validateExpireTime(message.parameters.get("expiretime").toString()));
+                        assertEquals(2, message.parameters.size());
                     }
                 });
 
@@ -108,10 +111,11 @@ public class RequestParametersTest {
                 client.setInternalClientListener(new InternalClientListener() {
                     @Override
                     public void onRequestSent(Message message) {
-                        assertTrue(message.type == Message.TYPE_INVALIDATE);
+                        assertEquals(Message.TYPE_INVALIDATE, message.type);
                         assertTrue(message.parameters.get("data") == null);
-                        assertTrue(message.parameters.get("key") != null);
+                        assertEquals("foo", message.parameters.get("key").toString());
                         assertTrue(message.parameters.get("expiretime") == null);
+                        assertEquals(1, message.parameters.size());
                     }
                 });
 
@@ -129,21 +133,25 @@ public class RequestParametersTest {
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
             cacheServer.setClientFetchTimeout(1000);
             cacheServer.start();
-            try (CacheClient client = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));) {
+            try (CacheClient client = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
+                 CacheClient client2 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));) {
                 client.start();
+                client2.start();
                 assertTrue(client.waitForConnection(10000));
+                assertTrue(client2.waitForConnection(10000));
                 assertNull(client.get("foo"));
+                assertNull(client2.get("foo"));
 
-                client.put("foo", data, 0);
-
+                client2.put("foo", data, 0);
 
                 client.setInternalClientListener(new InternalClientListener() {
                     @Override
                     public void onRequestSent(Message message) {
-                        assertTrue(message.type == Message.TYPE_FETCH_ENTRY);
+                        assertEquals(Message.TYPE_FETCH_ENTRY, message.type);
                         assertTrue(message.parameters.get("data") == null);
-                        assertTrue(message.parameters.get("key") != null);
+                        assertEquals("foo", message.parameters.get("key").toString());
                         assertTrue(message.parameters.get("expiretime") == null);
+                        assertEquals(1, message.parameters.size());
                     }
                 });
 
@@ -151,4 +159,14 @@ public class RequestParametersTest {
             }
         }
     }
+
+    private Boolean validateExpireTime(String expiretime) {
+        try {
+            Long.parseLong(expiretime);
+            return true;
+        } catch (NumberFormatException ex) {
+            return false;
+        }
+    }
+
 }

@@ -986,6 +986,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         boolean fetchConsumed = false;
         try {
             Message request_message = Message.FETCH_ENTRY(clientId, _key);
+
+            if (internalClientListener != null) {
+                internalClientListener.onRequestSent(request_message);
+            }
+
             if (lock != null) {
                 if (!lock.getKey().equals(key)) {
                     LOGGER.log(Level.SEVERE, "lock {0} is not for key {1}", new Object[]{lock, _key});
