@@ -986,6 +986,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
         boolean fetchConsumed = false;
         try {
             Message request_message = Message.FETCH_ENTRY(clientId, _key);
+
+            if (internalClientListener != null) {
+                internalClientListener.onRequestSent(request_message);
+            }
+
             if (lock != null) {
                 if (!lock.getKey().equals(key)) {
                     LOGGER.log(Level.SEVERE, "lock {0} is not for key {1}", new Object[]{lock, _key});
@@ -1165,6 +1170,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             } else {
                 try {
                     Message request = Message.INVALIDATE(clientId, _key);
+
+                    if (internalClientListener != null) {
+                        internalClientListener.onRequestSent(request);
+                    }
+
                     if (lock != null) {
                         request.setParameter("lockId", lock.getLockId());
                     }
@@ -1406,7 +1416,12 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             EntryHandle entry = new EntryHandle(_key, System.nanoTime(), buffer, expireTime, reference);
             storeEntry(entry);
 
-            Message request = Message.LOAD_ENTRY(clientId, RawString.of(key), data, expireTime);
+            Message request = Message.LOAD_ENTRY(clientId, RawString.of(key), expireTime);
+
+            if (internalClientListener != null) {
+                internalClientListener.onRequestSent(request);
+            }
+
             if (lock != null) {
                 request.setParameter("lockId", lock.getLockId());
             }
@@ -1450,6 +1465,10 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             storeEntry(entry);
 
             Message request = Message.PUT_ENTRY(clientId, _key, data, expireTime);
+            if (internalClientListener != null) {
+                internalClientListener.onRequestSent(request);
+            }
+
             if (lock != null) {
                 request.setParameter("lockId", lock.getLockId());
             }

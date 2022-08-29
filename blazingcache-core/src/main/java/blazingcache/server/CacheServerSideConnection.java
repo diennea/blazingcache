@@ -401,12 +401,11 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                     return;
                 }
                 RawString key = (RawString) message.parameters.get("key");
-                byte[] data = (byte[]) message.parameters.get("data");
                 long expiretime = (long) message.parameters.get("expiretime");
                 RawString _lockId = RawString.of(message.parameters.get("lockId"));
                 String lockId = _lockId != null ? _lockId.toString() : null;
                 server.addPendingOperations(1);
-                server.loadEntry(key, data, expiretime, clientId, lockId, new SimpleCallback<RawString>() {
+                server.loadEntry(key, expiretime, clientId, lockId, new SimpleCallback<RawString>() {
                     @Override
                     public void onResult(RawString result, Throwable error) {
                         server.addPendingOperations(-1);

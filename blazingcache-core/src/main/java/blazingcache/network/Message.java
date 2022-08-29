@@ -58,10 +58,9 @@ public final class Message {
         return new Message(clientId, TYPE_PUT_ENTRY, data);
     }
 
-    public static Message LOAD_ENTRY(String clientId, RawString key, byte[] serializedData, long expiretime) {
+    public static Message LOAD_ENTRY(String clientId, RawString key, long expiretime) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("key", key);
-        data.put("data", serializedData);
         data.put("expiretime", expiretime);
         return new Message(clientId, TYPE_LOAD_ENTRY, data);
     }
