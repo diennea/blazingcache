@@ -56,12 +56,6 @@
             <version>${libs.jackson.databind}</version>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>${libs.junit}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.apache.zookeeper</groupId>
             <artifactId>zookeeper</artifactId>
             <version>${libs.zookeeper}</version>
@@ -89,6 +83,18 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${libs.slf4j}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${libs.junit}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <!-- needed for ZK server -->
             <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-core</artifactId>
@@ -102,19 +108,18 @@
             <version>${libs.snappy}</version>
             <scope>test</scope>
         </dependency>
-
-	<dependency>
-                <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-minikdc</artifactId>
-                <version>${libs.minikdc}</version>
-                <scope>test</scope>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.slf4j</groupId>
-                        <artifactId>slf4j-log4j12</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-minikdc</artifactId>
+            <version>${libs.minikdc}</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
@@ -126,11 +131,6 @@
             <artifactId>curator-test</artifactId>
             <version>${libs.curator}</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>${libs.slf4j}</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

@@ -19,8 +19,8 @@
         <url>https://github.com/diennea/blazingcache.git</url>
         <connection>scm:git:https://github.com/diennea/blazingcache.git</connection>
         <developerConnection>scm:git:https://github.com/diennea/blazingcache.git</developerConnection>
-      <tag>HEAD</tag>
-  </scm>
+        <tag>HEAD</tag>
+    </scm>
     <developers>
         <developer>
             <id>eolivelli</id>

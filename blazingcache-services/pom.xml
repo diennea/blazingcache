@@ -34,9 +34,7 @@
                         <goals>
                             <goal>copy-dependencies</goal>
                         </goals>
-                        <configuration>
-
-                        </configuration>
+                        <configuration></configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -112,12 +110,6 @@
             <version>${libs.snappy}</version>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>${libs.junit}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-jdk14</artifactId>
             <version>${libs.slf4j}</version>
@@ -126,6 +118,12 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>${libs.slf4j}</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${libs.junit}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
