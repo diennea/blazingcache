@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.codehaus.jackson.map.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Implementation of the HTTP API, both for embedded and for standalone installation
@@ -42,6 +42,7 @@ import org.codehaus.jackson.map.ObjectMapper;
 public class HttpAPIImplementation {
 
     private static final Logger LOGGER = Logger.getLogger(HttpAPIImplementation.class.getName());
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         CacheServer broker = (CacheServer) JVMServersRegistry.getDefaultServer();
@@ -140,9 +141,8 @@ public class HttpAPIImplementation {
                 return;
         }
 
-        ObjectMapper mapper = new ObjectMapper();
         LOGGER.log(Level.FINE, "GET  -> " + resultMap);
-        String s = mapper.writeValueAsString(resultMap);
+        String s = MAPPER.writeValueAsString(resultMap);
         byte[] res = s.getBytes(StandardCharsets.UTF_8);
 
         resp.setContentLength(res.length);

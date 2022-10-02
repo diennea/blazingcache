@@ -27,7 +27,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
-import org.codehaus.jackson.map.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Information about a broker
@@ -41,6 +41,8 @@ public class ServerHostData {
     private final String version;
     private final boolean ssl;
     private final Map<String, String> additionalData;
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static final ServerHostData LOCAL() {
         return new ServerHostData("localhost", 0, CacheServer.VERSION(), false, new HashMap<>());
@@ -90,7 +92,7 @@ public class ServerHostData {
                 mdata.putAll(data.additionalData);
             }
             ByteArrayOutputStream oo = new ByteArrayOutputStream();
-            new ObjectMapper().writeValue(oo, mdata);
+            MAPPER.writeValue(oo, mdata);
             return oo.toByteArray();
         } catch (IOException impossible) {
             throw new RuntimeException(impossible);
@@ -103,7 +105,7 @@ public class ServerHostData {
 
     public static ServerHostData parseHostdata(byte[] oo) {
         try {
-            Map<String, Object> data = new ObjectMapper().readValue(new ByteArrayInputStream(oo), Map.class);
+            Map<String, Object> data = MAPPER.readValue(new ByteArrayInputStream(oo), Map.class);
             String host = (String) data.get("host");
             String version = (String) data.get("version");
             int port = Integer.parseInt(data.get("port") + "");

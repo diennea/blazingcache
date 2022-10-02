@@ -8,9 +8,6 @@
     <artifactId>blazingcache-website-skin</artifactId>
     <packaging>jar</packaging>
     <name>BlazingCache :: Site skin</name>
-    <properties>
-        <libs.spotbugsmaven>3.1.8</libs.spotbugsmaven>
-    </properties>
     <build>
         <resources>
             <resource>
@@ -28,9 +25,8 @@
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>${libs.spotbugsmaven}</version>
+                <version>4.7.2.0</version>
             </plugin>
         </plugins>
     </build>
 </project>
-
