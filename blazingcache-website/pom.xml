@@ -16,11 +16,6 @@
                 <artifactId>maven-site-plugin</artifactId>
                 <version>4.0.0-M3</version>
             </plugin>
-            <plugin>
-                <groupId>com.github.spotbugs</groupId>
-                <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>${libs.spotbugsmaven}</version>
-            </plugin>
         </plugins>
     </build>
 </project>

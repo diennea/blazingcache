@@ -21,12 +21,5 @@
                 <filtering>true</filtering>
             </resource>
         </resources>
-        <plugins>
-            <plugin>
-                <groupId>com.github.spotbugs</groupId>
-                <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>${libs.spotbugsmaven}</version>
-            </plugin>
-        </plugins>
     </build>
 </project>
