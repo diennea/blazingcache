@@ -19,8 +19,8 @@
         <url>https://github.com/diennea/blazingcache.git</url>
         <connection>scm:git:https://github.com/diennea/blazingcache.git</connection>
         <developerConnection>scm:git:https://github.com/diennea/blazingcache.git</developerConnection>
-      <tag>HEAD</tag>
-  </scm>
+        <tag>HEAD</tag>
+    </scm>
     <developers>
         <developer>
             <id>eolivelli</id>
@@ -67,32 +67,32 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <libs.netty4>4.1.72.Final</libs.netty4>
         <libs.netty4.tcnative>2.0.46.Final</libs.netty4.tcnative>
-        <libs.servletapi>3.1.0</libs.servletapi>
+        <libs.servletapi>4.0.1</libs.servletapi>
         <libs.junit>4.13.2</libs.junit>
-        <libs.jackson.mapper>1.9.13</libs.jackson.mapper>
+        <libs.jackson.databind>2.13.4</libs.jackson.databind>
         <libs.zookeeper>3.6.3</libs.zookeeper>
         <libs.snappy>1.1.7.6</libs.snappy>
         <libs.metrics>4.1.9</libs.metrics>
         <libs.commonsio>2.7</libs.commonsio>
         <libs.minikdc>3.2.1</libs.minikdc>
         <libs.curator>5.0.0</libs.curator>
-        <libs.jcipi-annotations>1.0</libs.jcipi-annotations>
-        <libs.spotbugsannotations>3.1.0</libs.spotbugsannotations>
-        <libs.spotbugsmaven>4.0.4</libs.spotbugsmaven>
-        <libs.jacoco>0.8.5</libs.jacoco>
-        <libs.slf4j>1.7.30</libs.slf4j>
+        <libs.jcip-annotations>1.0</libs.jcip-annotations>
+        <libs.spotbugsmaven.annotations>4.7.2</libs.spotbugsmaven.annotations>
+        <libs.spotbugsmaven>4.7.2.0</libs.spotbugsmaven>
+        <libs.jacoco>0.8.8</libs.jacoco>
+        <libs.slf4j>2.0.3</libs.slf4j>
     </properties>
     <dependencies>
         <dependency>
             <groupId>net.jcip</groupId>
             <artifactId>jcip-annotations</artifactId>
-            <version>${libs.jcipi-annotations}</version>
+            <version>${libs.jcip-annotations}</version>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.github.spotbugs</groupId>
             <artifactId>spotbugs-annotations</artifactId>
-            <version>${libs.spotbugsannotations}</version>
+            <version>${libs.spotbugsmaven.annotations}</version>
             <optional>true</optional>
         </dependency>
     </dependencies>
@@ -101,7 +101,7 @@
             <plugins>
                 <plugin>
                     <artifactId>maven-site-plugin</artifactId>
-                    <version>3.9.1</version>
+                    <version>4.0.0-M3</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -110,11 +110,14 @@
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <version>${libs.spotbugsmaven}</version>
+                <configuration>
+                    <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>${libs.jacoco}</version>
+                <version>0.8.8</version>
             </plugin>
             <plugin>
                 <groupId>org.apache.rat</groupId>
@@ -210,7 +213,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
-                        <version>3.0.0-M3</version>
+                        <version>3.0.0-M7</version>
                         <configuration>
                             <argLine>@{argLine} -Xmx1024m -Djava.net.preferIpv4Stack=true</argLine>
                             <forkCount>1</forkCount>
@@ -220,7 +223,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-compiler-plugin</artifactId>
-                        <version>3.8.1</version>
+                        <version>3.10.1</version>
                         <configuration>
                             <encoding>${project.build.sourceEncoding}</encoding>
                             <release>8</release>
@@ -229,7 +232,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-resources-plugin</artifactId>
-                        <version>3.1.0</version>
+                        <version>3.3.0</version>
                         <configuration>
                             <encoding>${project.build.sourceEncoding}</encoding>
                         </configuration>
@@ -269,7 +272,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
-                        <version>3.0.0-M3</version>
+                        <version>3.0.0-M7</version>
                         <configuration>
                             <argLine>-Xmx1024m -Djava.net.preferIpv4Stack=true</argLine>
                             <forkCount>1</forkCount>
@@ -279,7 +282,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-compiler-plugin</artifactId>
-                        <version>3.8.1</version>
+                        <version>3.10.1</version>
                         <configuration>
                             <encoding>${project.build.sourceEncoding}</encoding>
                             <release>8</release>
@@ -288,7 +291,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-resources-plugin</artifactId>
-                        <version>3.1.0</version>
+                        <version>3.3.0</version>
                         <configuration>
                             <encoding>${project.build.sourceEncoding}</encoding>
                         </configuration>
@@ -296,7 +299,7 @@
                     <plugin>
                         <groupId>org.sonatype.plugins</groupId>
                         <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <version>1.6.8</version>
+                        <version>1.6.13</version>
                         <extensions>true</extensions>
                         <configuration>
                             <serverId>ossrh</serverId>
@@ -307,7 +310,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-source-plugin</artifactId>
-                        <version>3.2.1</version>
+                        <version>3.4.1</version>
                         <executions>
                             <execution>
                                 <id>attach-sources</id>
@@ -321,7 +324,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>3.2.0</version>
+                        <version>3.4.1</version>
                         <executions>
                             <execution>
                                 <id>attach-javadocs</id>
@@ -335,7 +338,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.6</version>
+                        <version>3.0.1</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>

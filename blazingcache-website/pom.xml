@@ -9,21 +9,13 @@
     <artifactId>blazingcache-website</artifactId>
     <packaging>jar</packaging>
     <name>BlazingCache :: Website</name>
-    <properties>
-        <libs.spotbugsmaven>3.1.8</libs.spotbugsmaven>
-    </properties>
-    <build>              
+    <build>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-site-plugin</artifactId>
-                <version>3.7.1</version>         
-            </plugin>            
-            <plugin>
-                <groupId>com.github.spotbugs</groupId>
-                <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>${libs.spotbugsmaven}</version>
-            </plugin>        
+                <version>4.0.0-M3</version>
+            </plugin>
         </plugins>
     </build>
 </project>
