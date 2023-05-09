@@ -25,12 +25,18 @@ import blazingcache.network.Message;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
+
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+
 import org.junit.Test;
+
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -49,8 +55,8 @@ public class FetchPriorityTest {
             cacheServer.setClientFetchTimeout(1000);
             cacheServer.start();
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
-                    CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
-                    CacheClient client3 = new CacheClient("theClient3", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                 CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
+                 CacheClient client3 = new CacheClient("theClient3", "ciao", new NettyCacheServerLocator(serverHostData));) {
                 client1.setFetchPriority(1);
                 client2.setFetchPriority(5);
                 client3.setFetchPriority(2);
@@ -164,4 +170,108 @@ public class FetchPriorityTest {
         }
 
     }
+
+    @Test
+    public void samePriorityTest() throws Exception {
+        byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
+
+        ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
+        try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
+            cacheServer.setClientFetchTimeout(1000);
+            cacheServer.start();
+            try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
+                 CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
+                 CacheClient client3 = new CacheClient("theClient3", "ciao", new NettyCacheServerLocator(serverHostData));
+                 CacheClient client4 = new CacheClient("theClient4", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                client1.setFetchPriority(1);
+                client2.setFetchPriority(2);
+                client3.setFetchPriority(5);
+                client4.setFetchPriority(5);
+
+                client1.start();
+                client2.start();
+                client3.start();
+                client4.start();
+
+                assertTrue(client1.waitForConnection(10000));
+                assertTrue(client2.waitForConnection(10000));
+                assertTrue(client3.waitForConnection(10000));
+                assertTrue(client4.waitForConnection(10000));
+
+                AtomicInteger fetchesServedByClient1 = new AtomicInteger();
+                AtomicInteger fetchesServedByClient2 = new AtomicInteger();
+                AtomicInteger fetchesServedByClient3 = new AtomicInteger();
+                AtomicInteger fetchesServedByClient4 = new AtomicInteger();
+
+                client1.setInternalClientListener(new InternalClientListener() {
+                    @Override
+                    public boolean messageReceived(Message message, Channel channel) {
+                        if (message.type == Message.TYPE_FETCH_ENTRY) {
+                            fetchesServedByClient1.incrementAndGet();
+                        }
+                        return true;
+                    }
+                });
+
+                client2.setInternalClientListener(new InternalClientListener() {
+                    @Override
+                    public boolean messageReceived(Message message, Channel channel) {
+                        if (message.type == Message.TYPE_FETCH_ENTRY) {
+                            fetchesServedByClient2.incrementAndGet();
+                        }
+                        return true;
+                    }
+                });
+
+                client3.setInternalClientListener(new InternalClientListener() {
+                    @Override
+                    public boolean messageReceived(Message message, Channel channel) {
+                        if (message.type == Message.TYPE_FETCH_ENTRY) {
+                            fetchesServedByClient3.incrementAndGet();
+                        }
+                        return true;
+                    }
+                });
+
+                client4.setInternalClientListener(new InternalClientListener() {
+                    @Override
+                    public boolean messageReceived(Message message, Channel channel) {
+                        if (message.type == Message.TYPE_FETCH_ENTRY) {
+                            fetchesServedByClient4.incrementAndGet();
+                        }
+                        return true;
+                    }
+                });
+
+                assertNull(client1.get("foo"));
+                assertNull(client2.get("foo"));
+                assertNull(client3.get("foo"));
+                assertNull(client3.get("foo"));
+                assertNull(client4.get("foo"));
+
+                client3.put("foo", data, 0);
+                client4.put("foo", data, 0);
+
+                assertNull(client1.get("foo"));
+                assertNull(client2.get("foo"));
+                assertNotNull(client3.get("foo"));
+                assertNotNull(client4.get("foo"));
+
+                int totalFetches = 10;
+
+                for (int i = 0; i < totalFetches; i++) {
+                    client1.fetch("foo");
+                    client1.disconnect();
+                    assertTrue(client1.waitForConnection(10000));
+                }
+
+                assertEquals(totalFetches, fetchesServedByClient3.get() + fetchesServedByClient4.get());
+                assertTrue(fetchesServedByClient1.get() == 0);
+                assertTrue(fetchesServedByClient2.get() == 0);
+                assertTrue(fetchesServedByClient3.get() > 0);
+                assertTrue(fetchesServedByClient4.get() > 0);
+            }
+        }
+    }
+
 }

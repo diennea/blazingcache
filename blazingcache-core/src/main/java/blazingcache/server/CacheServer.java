@@ -31,6 +31,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -453,7 +454,11 @@ public class CacheServer implements AutoCloseable {
                 }
             }
             candidates.sort((a, b) -> {
-                return b.getFetchPriority() - a.getFetchPriority();
+                int priorityComparison = b.getFetchPriority() - a.getFetchPriority();
+                if (priorityComparison == 0) {
+                    return ThreadLocalRandom.current().nextInt();
+                }
+                return priorityComparison;
             });
 
             boolean foundOneGoodClientConnected = false;
