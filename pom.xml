@@ -67,7 +67,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <libs.netty4>4.1.72.Final</libs.netty4>
         <libs.netty4.tcnative>2.0.46.Final</libs.netty4.tcnative>
-        <libs.servletapi>4.0.1</libs.servletapi>
+        <libs.servletapi>6.0.0</libs.servletapi>
         <libs.junit>4.13.2</libs.junit>
         <libs.jackson.databind>2.13.4</libs.jackson.databind>
         <libs.zookeeper>3.6.3</libs.zookeeper>
