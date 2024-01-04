@@ -19,6 +19,10 @@
  */
 package blazingcache.client;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import blazingcache.client.impl.InternalClientListener;
 import blazingcache.network.Channel;
 import blazingcache.network.Message;
@@ -29,10 +33,7 @@ import blazingcache.utils.RawString;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import static org.junit.Assert.assertEquals;
 import org.junit.Test;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /**
  * Test for slow cclients an fetches
@@ -50,8 +51,8 @@ public class LockOnLostFetchMessageAndSlowClientTest {
             cacheServer.setClientFetchTimeout(1000);
             cacheServer.start();
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
-                CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
-                CacheClient client3 = new CacheClient("theClient3", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                 CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
+                 CacheClient client3 = new CacheClient("theClient3", "ciao", new NettyCacheServerLocator(serverHostData));) {
                 client1.start();
                 client2.start();
                 client3.start();
@@ -131,6 +132,199 @@ public class LockOnLostFetchMessageAndSlowClientTest {
             }
 
         }
+    }
 
+    @Test
+    public void slowClientCausesOtherRequestsToWait() throws Exception {
+        byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
+
+        ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
+        try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
+            cacheServer.setClientFetchTimeout(20000);
+            cacheServer.start();
+            try (CacheClient slowClient = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
+                 CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
+                 CacheClient client3 = new CacheClient("theClient3", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                slowClient.start();
+                client2.start();
+                client3.start();
+                assertTrue(slowClient.waitForConnection(10000));
+                assertTrue(client2.waitForConnection(10000));
+                assertTrue(client3.waitForConnection(10000));
+
+                // client1 will respond after some time
+                slowClient.setInternalClientListener(new InternalClientListener() {
+                    @Override
+                    public boolean messageReceived(Message message, Channel channel) {
+                        if (message.type == Message.TYPE_FETCH_ENTRY) {
+                            RawString key = RawString.of(message.parameters.get("key"));
+                            if (key.toString().equals("slow-fetch")) {
+                                try {
+                                    Thread.sleep(10_000);
+                                } catch (InterruptedException exc) {
+                                    throw new RuntimeException(exc);
+                                }
+                            }
+                        }
+                        return true;
+                    }
+                });
+
+                slowClient.put("slow-fetch", data, 0);
+
+                CountDownLatch latch_before_2 = new CountDownLatch(1);
+                CountDownLatch latch_2 = new CountDownLatch(1);
+                Thread thread_2 = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            latch_before_2.countDown();
+                            EntryHandle remoteLoad = client2.fetch("slow-fetch");
+                            assertNotNull(remoteLoad);
+                            latch_2.countDown();
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                            fail(t + "");
+                        }
+                    }
+                });
+                thread_2.start();
+
+                // wait to enter the wait
+                assertTrue(latch_before_2.await(2, TimeUnit.SECONDS));
+
+                // a new client issues the fetch, it MUST wait on the lock on the 'slow-fetch' key
+                CountDownLatch latch_before_3 = new CountDownLatch(1);
+                CountDownLatch latch_3 = new CountDownLatch(1);
+                Thread thread_3 = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            latch_before_3.countDown();
+                            EntryHandle remoteLoad = client3.fetch("slow-fetch");
+                            assertNotNull(remoteLoad);
+                            latch_3.countDown();
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                            fail(t + "");
+                        }
+                    }
+                });
+                thread_3.start();
+
+                // wait to enter the wait
+                assertTrue(latch_before_3.await(10, TimeUnit.SECONDS));
+
+                assertFalse(latch_2.await(2, TimeUnit.SECONDS));
+
+                // wait to exit the wait
+                assertTrue(latch_2.await(10, TimeUnit.SECONDS));
+                assertTrue(latch_3.await(20, TimeUnit.SECONDS));
+
+                assertTrue(cacheServer.getLocksManager().getLockedKeys().isEmpty());
+
+                // clean up test
+                thread_2.join();
+                thread_3.join();
+            }
+
+        }
+    }
+
+    @Test
+    public void testInvalidateAwaitsLoad() throws Exception {
+        byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
+
+        ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
+        try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
+            cacheServer.setClientFetchTimeout(20000);
+            cacheServer.start();
+            try (CacheClient slowClient = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
+                 CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));
+                 CacheClient client3 = new CacheClient("theClient3", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                slowClient.start();
+                client2.start();
+                client3.start();
+                assertTrue(slowClient.waitForConnection(10000));
+                assertTrue(client2.waitForConnection(10000));
+                assertTrue(client3.waitForConnection(10000));
+
+                // client1 will respond after some time
+                slowClient.setInternalClientListener(new InternalClientListener() {
+                    @Override
+                    public boolean messageReceived(Message message, Channel channel) {
+                        if (message.type == Message.TYPE_FETCH_ENTRY) {
+                            RawString key = RawString.of(message.parameters.get("key"));
+                            if (key.toString().equals("slow-fetch")) {
+                                try {
+                                    Thread.sleep(10_000);
+                                } catch (InterruptedException exc) {
+                                    throw new RuntimeException(exc);
+                                }
+                            }
+                        }
+                        return true;
+                    }
+                });
+
+                slowClient.put("slow-fetch", data, 0);
+
+                CountDownLatch latch_before_2 = new CountDownLatch(1);
+                CountDownLatch latch_2 = new CountDownLatch(1);
+                Thread thread_2 = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            latch_before_2.countDown();
+                            EntryHandle remoteLoad = client2.fetch("slow-fetch");
+                            assertNotNull(remoteLoad);
+                            latch_2.countDown();
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                            fail(t + "");
+                        }
+                    }
+                });
+                thread_2.start();
+
+                // wait to enter the wait
+                assertTrue(latch_before_2.await(2, TimeUnit.SECONDS));
+
+                // a new client issues the fetch, it MUST wait on the lock on the 'slow-fetch' key
+                CountDownLatch latch_before_3 = new CountDownLatch(1);
+                CountDownLatch latch_3 = new CountDownLatch(1);
+                Thread thread_3 = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            latch_before_3.countDown();
+                            EntryHandle remoteLoad = client3.fetch("slow-fetch");
+                            assertNotNull(remoteLoad);
+                            latch_3.countDown();
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                            fail(t + "");
+                        }
+                    }
+                });
+                thread_3.start();
+
+                // wait to enter the wait
+                assertTrue(latch_before_3.await(10, TimeUnit.SECONDS));
+
+                assertFalse(latch_2.await(2, TimeUnit.SECONDS));
+
+                // wait to exit the wait
+                assertTrue(latch_2.await(10, TimeUnit.SECONDS));
+                assertTrue(latch_3.await(20, TimeUnit.SECONDS));
+
+                assertTrue(cacheServer.getLocksManager().getLockedKeys().isEmpty());
+
+                // clean up test
+                thread_2.join();
+                thread_3.join();
+            }
+
+        }
     }
 }

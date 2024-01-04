@@ -1179,6 +1179,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                         request.setParameter("lockId", lock.getLockId());
                     }
                     Message response = _channel.sendMessageWithReply(request, invalidateTimeout);
+
+                    if (internalClientListener != null) {
+                        internalClientListener.onInvalidateResponse(_key.toString(), response);
+                    }
+
                     if (LOGGER.isLoggable(Level.FINEST)) {
                         LOGGER.log(Level.FINEST, "invalidate {0}, -> {1}", new Object[]{_key, response});
                     }
@@ -1426,6 +1431,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 request.setParameter("lockId", lock.getLockId());
             }
             Message response = _chanel.sendMessageWithReply(request, invalidateTimeout);
+
+            if (internalClientListener != null) {
+                internalClientListener.onLoadResponse(key, response);
+            }
+
             if (response.type != Message.TYPE_ACK) {
                 throw new CacheException("error while loading key " + key + " (" + response + ")");
             }
@@ -1473,6 +1483,11 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
                 request.setParameter("lockId", lock.getLockId());
             }
             Message response = _chanel.sendMessageWithReply(request, invalidateTimeout);
+
+            if (internalClientListener != null) {
+                internalClientListener.onPutResponse(_key.toString(), response);
+            }
+
             if (response.type != Message.TYPE_ACK) {
                 throw new CacheException("error while putting key " + _key + " (" + response + ")");
             }

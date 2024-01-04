@@ -19,24 +19,6 @@
  */
 package blazingcache.server;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import org.apache.zookeeper.ZooKeeper;
-
 import blazingcache.management.JMXUtils;
 import blazingcache.network.Message;
 import blazingcache.network.ServerHostData;
@@ -46,6 +28,23 @@ import blazingcache.server.management.CacheServerStatusMXBean;
 import blazingcache.utils.RawString;
 import blazingcache.zookeeper.LeaderShipChangeListener;
 import blazingcache.zookeeper.ZKClusterManager;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.zookeeper.ZooKeeper;
 
 /**
  * The CacheServer core.
@@ -447,44 +446,47 @@ public class CacheServer implements AutoCloseable {
             }
 
             List<CacheServerSideConnection> candidates = new ArrayList<>();
+            int maxPriority = 0;
             for (String remoteClientId : clientsForKey) {
                 CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(remoteClientId);
-                if (connection != null && connection.getFetchPriority() > 0) {
+                if (connection != null) {
+                    int fetchPriority = connection.getFetchPriority();
+                    if (fetchPriority == 0 || fetchPriority < maxPriority) {
+                        continue;
+                    }
+
+                    if (fetchPriority > maxPriority) {
+                        candidates.clear();
+                        maxPriority = fetchPriority;
+                    }
                     candidates.add(connection);
                 }
             }
-            candidates.sort((a, b) -> {
-                int priorityComparison = b.getFetchPriority() - a.getFetchPriority();
-                if (priorityComparison == 0) {
-                    return ThreadLocalRandom.current().nextInt();
-                }
-                return priorityComparison;
-            });
 
             boolean foundOneGoodClientConnected = false;
-            for (CacheServerSideConnection connection : candidates) {
-                String remoteClientId = connection.getClientId();
+            if (!candidates.isEmpty()) {
+                Collections.shuffle(candidates, ThreadLocalRandom.current());
+                CacheServerSideConnection connection = candidates.get(0);
 
+                String remoteClientId = connection.getClientId();
                 UnicastRequestStatus unicastRequestStatus = new UnicastRequestStatus(clientId, remoteClientId, "fetch " + key);
                 networkRequestsStatusMonitor.register(unicastRequestStatus);
-                connection.sendFetchKeyMessage(remoteClientId, key, new SimpleCallback<Message>() {
 
-                    @Override
-                    public void onResult(Message result, Throwable error) {
-                        networkRequestsStatusMonitor.unregister(unicastRequestStatus);
-                        LOGGER.log(Level.FINE, "client " + remoteClientId + " answer to fetch :" + result, error);
-                        if (result != null && result.type == Message.TYPE_ACK) {
-                            // da questo momento consideriamo che il client abbia la entry in memoria
-                            // anche se di fatto potrebbe succedere che il messaggio di risposta non arrivi mai
-                            long expiretime = (long) result.parameters.get("expiretime");
-                            cacheStatus.registerKeyForClient(key, clientId, expiretime);
-                        }
-                        finishAndReleaseLock.onResult(result, error);
+                connection.sendFetchKeyMessage(remoteClientId, key, (result, error) -> {
+                    networkRequestsStatusMonitor.unregister(unicastRequestStatus);
+                    LOGGER.log(Level.FINE, "client " + remoteClientId + " answer to fetch :" + result, error);
+                    if (result != null && result.type == Message.TYPE_ACK) {
+                        // da questo momento consideriamo che il client abbia la entry in memoria
+                        // anche se di fatto potrebbe succedere che il messaggio di risposta non arrivi mai
+                        long expiretime = (long) result.parameters.get("expiretime");
+                        cacheStatus.registerKeyForClient(key, clientId, expiretime);
                     }
+                    finishAndReleaseLock.onResult(result, error);
                 });
+
                 foundOneGoodClientConnected = true;
-                break;
             }
+
             if (!foundOneGoodClientConnected) {
                 finishAndReleaseLock.onResult(Message.ERROR(clientId, new Exception("no connected client for key " + key)), null);
             }
