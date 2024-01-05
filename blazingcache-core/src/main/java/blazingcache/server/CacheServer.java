@@ -358,6 +358,7 @@ public class CacheServer implements AutoCloseable {
             SimpleCallback<RawString> finishAndReleaseLock = new SimpleCallback<RawString>() {
                 @Override
                 public void onResult(RawString result, Throwable error) {
+                    cacheStatus.removeKeyForClient(key, sourceClientId);
                     locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
                     onFinish.onResult(result, error);
                 }
@@ -445,8 +446,8 @@ public class CacheServer implements AutoCloseable {
                 return;
             }
 
-            List<CacheServerSideConnection> candidates = new ArrayList<>();
             int maxPriority = 0;
+            List<CacheServerSideConnection> maxPriorityCandidates = new ArrayList<>();
             for (String remoteClientId : clientsForKey) {
                 CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(remoteClientId);
                 if (connection != null) {
@@ -456,17 +457,16 @@ public class CacheServer implements AutoCloseable {
                     }
 
                     if (fetchPriority > maxPriority) {
-                        candidates.clear();
+                        maxPriorityCandidates.clear();
                         maxPriority = fetchPriority;
                     }
-                    candidates.add(connection);
+                    maxPriorityCandidates.add(connection);
                 }
             }
 
             boolean foundOneGoodClientConnected = false;
-            if (!candidates.isEmpty()) {
-                Collections.shuffle(candidates, ThreadLocalRandom.current());
-                CacheServerSideConnection connection = candidates.get(0);
+            if (!maxPriorityCandidates.isEmpty()) {
+                CacheServerSideConnection connection = maxPriorityCandidates.get(ThreadLocalRandom.current().nextInt(maxPriorityCandidates.size()));
 
                 String remoteClientId = connection.getClientId();
                 UnicastRequestStatus unicastRequestStatus = new UnicastRequestStatus(clientId, remoteClientId, "fetch " + key);
