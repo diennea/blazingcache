@@ -63,8 +63,8 @@
     </issueManagement>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <libs.netty4>4.1.72.Final</libs.netty4>
         <libs.netty4.tcnative>2.0.46.Final</libs.netty4.tcnative>
         <libs.servletapi>4.0.1</libs.servletapi>
@@ -81,6 +81,7 @@
         <libs.spotbugsmaven>4.7.2.0</libs.spotbugsmaven>
         <libs.jacoco>0.8.8</libs.jacoco>
         <libs.slf4j>2.0.3</libs.slf4j>
+        <libs.bouncycastle>1.70</libs.bouncycastle>
     </properties>
     <dependencies>
         <dependency>
@@ -223,10 +224,10 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-compiler-plugin</artifactId>
-                        <version>3.10.1</version>
+                        <version>3.11.0</version>
                         <configuration>
                             <encoding>${project.build.sourceEncoding}</encoding>
-                            <release>8</release>
+                            <release>17</release>
                         </configuration>
                     </plugin>
                     <plugin>
@@ -282,10 +283,10 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-compiler-plugin</artifactId>
-                        <version>3.10.1</version>
+                        <version>3.11.0</version>
                         <configuration>
                             <encoding>${project.build.sourceEncoding}</encoding>
-                            <release>8</release>
+                            <release>17</release>
                         </configuration>
                     </plugin>
                     <plugin>
