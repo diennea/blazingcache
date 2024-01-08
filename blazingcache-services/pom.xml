@@ -34,7 +34,7 @@
                         <goals>
                             <goal>copy-dependencies</goal>
                         </goals>
-                        <configuration />
+                        <configuration></configuration>
                     </execution>
                 </executions>
             </plugin>
