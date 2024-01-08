@@ -39,6 +39,15 @@ public interface InternalClientListener {
     public default void onFetchResponse(String key, Message message) {
     }
 
+    public default void onLoadResponse(String key, Message response) {
+    }
+
+    public default void onInvalidateResponse(String key, Message response) {
+    }
+
+    public default void onPutResponse(String key, Message response) {
+    }
+
     public default void onRequestSent(Message message) {
     }
 
