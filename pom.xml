@@ -65,13 +65,13 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <libs.netty4>4.1.72.Final</libs.netty4>
-        <libs.netty4.tcnative>2.0.46.Final</libs.netty4.tcnative>
+        <libs.netty4>4.1.94.Final</libs.netty4>
+        <libs.netty4.tcnative>2.0.62.Final</libs.netty4.tcnative>
         <libs.servletapi>4.0.1</libs.servletapi>
         <libs.junit>4.13.2</libs.junit>
-        <libs.jackson.databind>2.13.4</libs.jackson.databind>
-        <libs.zookeeper>3.6.3</libs.zookeeper>
-        <libs.snappy>1.1.7.6</libs.snappy>
+        <libs.jackson.databind>2.15.2</libs.jackson.databind>
+        <libs.zookeeper>3.8.2</libs.zookeeper>
+        <libs.snappy>1.1.10.5</libs.snappy>
         <libs.metrics>4.1.9</libs.metrics>
         <libs.commonsio>2.7</libs.commonsio>
         <libs.minikdc>3.2.1</libs.minikdc>
@@ -123,7 +123,7 @@
             <plugin>
                 <groupId>org.apache.rat</groupId>
                 <artifactId>apache-rat-plugin</artifactId>
-                <version>0.14</version>
+                <version>0.15</version>
                 <configuration>
                     <excludes>
                         <!-- IntelliJ -->
@@ -167,6 +167,20 @@
                         <exclude>**/*.conf</exclude>
                         <exclude>**/*.txt</exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>5.3.0</version>
+                <configuration>
+                    <failOnError>true</failOnError>
+                    <skipProvidedScope>true</skipProvidedScope>
+                    <skipTestScope>true</skipTestScope>
+                    <versionCheckEnabled>false</versionCheckEnabled>
+                    <suppressionFiles>
+                        <suppressionFile>dependency_check_exclusions.xml</suppressionFile>
+                    </suppressionFiles>
                 </configuration>
             </plugin>
         </plugins>
