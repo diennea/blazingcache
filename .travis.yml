@@ -8,7 +8,7 @@ cache:
 jobs:
   include:
   - stage: test
-    jdk: openjdk17
+    jdk: openjdk11
     script: mvn verify -Dmaven.test.redirectTestOutputToFile=true jacoco:report coveralls:report
 
 branches:
