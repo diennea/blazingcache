@@ -104,7 +104,7 @@ public class CacheServer implements AutoCloseable {
 
     public void setupSsl(File certificateFile, String password, File certificateChain, List<String> sslCiphers) {
         this.server.setSslCertChainFile(certificateChain);
-        this.server.setSslCertChainFile(certificateFile);
+        this.server.setSslCertFile(certificateFile);
         this.server.setSslCertPassword(password);
         this.server.setSslCiphers(sslCiphers);
     }
