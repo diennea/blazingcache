@@ -19,28 +19,40 @@
  */
 package blazingcache;
 
-import java.nio.charset.StandardCharsets;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import blazingcache.client.CacheClient;
 import blazingcache.network.ServerHostData;
 import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
+import io.netty.handler.ssl.util.SelfSignedCertificate;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
 import org.junit.Assert;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public class SimpleSSLTest {
 
     @Test
-    public void basicTestSsl() throws Exception {
+    public void basicTestSslSelfSigned() throws Exception {
+        basicTestSsl(null, null);
+    }
+
+    @Test
+    public void basicTestSslWithCert() throws Exception {
+        SelfSignedCertificate ssc = new SelfSignedCertificate();
+        basicTestSsl(ssc.privateKey(), ssc.certificate());
+    }
+
+    private void basicTestSsl(File certificateFile, File certificateChain) throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
 
         ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", true, null);
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
-            cacheServer.setupSsl(null, null, null, null);
+            cacheServer.setupSsl(certificateFile, null, certificateChain, null);
             cacheServer.start();
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
-                CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
+                 CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
                 client1.start();
                 client2.start();
                 assertTrue(client1.waitForConnection(10000));
