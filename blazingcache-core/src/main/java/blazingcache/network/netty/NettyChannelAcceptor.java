@@ -38,6 +38,8 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import java.io.File;
+import java.io.FileInputStream;
+import java.security.KeyStore;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -48,6 +50,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLException;
 
 /**
  * Accepts connections from workers
@@ -165,21 +169,38 @@ public class NettyChannelAcceptor implements AutoCloseable {
                 SelfSignedCertificate ssc = new SelfSignedCertificate();
                 try {
                     sslCtx = SslContextBuilder
-                        .forServer(ssc.certificate(), ssc.privateKey())
-                        .sslProvider(useOpenSSL ? SslProvider.OPENSSL : SslProvider.JDK)
-                        .ciphers(sslCiphers)
-                        .build();
+                            .forServer(ssc.certificate(), ssc.privateKey())
+                            .sslProvider(useOpenSSL ? SslProvider.OPENSSL : SslProvider.JDK)
+                            .ciphers(sslCiphers)
+                            .build();
                 } finally {
                     ssc.delete();
                 }
             } else {
-                LOGGER.log(Level.SEVERE, "start SSL with certificate " + sslCertFile.getAbsolutePath() + " chain file " + sslCertChainFile.getAbsolutePath() + ", useOpenSSL:" + useOpenSSL);
+                LOGGER.log(Level.SEVERE, "start SSL with certificate " + sslCertFile.getAbsolutePath()
+                                         + " chain file " + (sslCertChainFile == null ? "null" : sslCertChainFile.getAbsolutePath())
+                                         + ", useOpenSSL:" + useOpenSSL);
                 if (sslCiphers != null) {
                     LOGGER.log(Level.SEVERE, "required sslCiphers " + sslCiphers);
                 }
-                sslCtx = SslContextBuilder.forServer(sslCertChainFile, sslCertFile, sslCertPassword)
-                    .sslProvider(useOpenSSL ? SslProvider.OPENSSL : SslProvider.JDK)
-                    .ciphers(sslCiphers).build();
+                SslContextBuilder builder;
+                if (sslCertFile.getName().endsWith(".p12") || sslCertFile.getName().endsWith(".pfx")) {
+                    try (FileInputStream fis = new FileInputStream(sslCertFile)) {
+                        KeyStore ks = KeyStore.getInstance("PKCS12");
+                        ks.load(fis, sslCertPassword.toCharArray());
+
+                        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                        kmf.init(ks, sslCertPassword.toCharArray());
+
+                        builder = SslContextBuilder.forServer(kmf);
+                    } catch (Exception e) {
+                        throw new SSLException("provided certFile looks like a PKCS12 file but could not be loaded", e);
+                    }
+                } else {
+                    builder = SslContextBuilder.forServer(sslCertChainFile, sslCertFile, sslCertPassword);
+                }
+                sslCtx = builder.sslProvider(useOpenSSL ? SslProvider.OPENSSL : SslProvider.JDK)
+                        .ciphers(sslCiphers).build();
             }
 
         }
@@ -205,31 +226,31 @@ public class NettyChannelAcceptor implements AutoCloseable {
         }
         ServerBootstrap b = new ServerBootstrap();
         b.group(bossGroup, workerGroup)
-            .channel(NetworkUtils.isEnableEpollNative() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
-            .childHandler(new ChannelInitializer<SocketChannel>() {
-                @Override
-                public void initChannel(SocketChannel ch) throws Exception {
-                    NettyChannel session = new NettyChannel("unnamed", ch, callbackExecutor, null);
-                    if (acceptor != null) {
-                        acceptor.createConnection(session);
-                    }
+                .channel(NetworkUtils.isEnableEpollNative() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
+                .childHandler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    public void initChannel(SocketChannel ch) throws Exception {
+                        NettyChannel session = new NettyChannel("unnamed", ch, callbackExecutor, null);
+                        if (acceptor != null) {
+                            acceptor.createConnection(session);
+                        }
 
 //                        ch.pipeline().addLast(new LoggingHandler());
-                    // Add SSL handler first to encrypt and decrypt everything.
-                    if (ssl) {
-                        ch.pipeline().addLast(sslCtx.newHandler(ch.alloc()));
-                    }
+                        // Add SSL handler first to encrypt and decrypt everything.
+                        if (ssl) {
+                            ch.pipeline().addLast(sslCtx.newHandler(ch.alloc()));
+                        }
 
-                    ch.pipeline().addLast("lengthprepender", new LengthFieldPrepender(4));
-                    ch.pipeline().addLast("lengthbaseddecoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
-                    ch.pipeline().addLast("messageencoder", new DataMessageEncoder());
-                    ch.pipeline().addLast("messagedecoder", new DataMessageDecoder());
-                    ch.pipeline().addLast(new InboundMessageHandler(session));
-                }
-            })
-            .option(ChannelOption.SO_BACKLOG, 128)
-            .option(ChannelOption.SO_REUSEADDR, true)
-            .childOption(ChannelOption.SO_KEEPALIVE, true);
+                        ch.pipeline().addLast("lengthprepender", new LengthFieldPrepender(4));
+                        ch.pipeline().addLast("lengthbaseddecoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
+                        ch.pipeline().addLast("messageencoder", new DataMessageEncoder());
+                        ch.pipeline().addLast("messagedecoder", new DataMessageDecoder());
+                        ch.pipeline().addLast(new InboundMessageHandler(session));
+                    }
+                })
+                .option(ChannelOption.SO_BACKLOG, 128)
+                .option(ChannelOption.SO_REUSEADDR, true)
+                .childOption(ChannelOption.SO_KEEPALIVE, true);
 
         ChannelFuture f = b.bind(host, port).sync(); // (7)
         this.channel = f.channel();

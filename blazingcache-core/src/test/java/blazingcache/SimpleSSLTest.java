@@ -27,6 +27,7 @@ import blazingcache.network.netty.NettyCacheServerLocator;
 import blazingcache.server.CacheServer;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import java.io.File;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import org.junit.Assert;
 import org.junit.Test;
@@ -35,21 +36,34 @@ public class SimpleSSLTest {
 
     @Test
     public void basicTestSslSelfSigned() throws Exception {
-        basicTestSsl(null, null);
+        basicTestSsl(null, null, null);
     }
 
     @Test
     public void basicTestSslWithCert() throws Exception {
         SelfSignedCertificate ssc = new SelfSignedCertificate();
-        basicTestSsl(ssc.privateKey(), ssc.certificate());
+        basicTestSsl(ssc.privateKey(), ssc.certificate(), null);
     }
 
-    private void basicTestSsl(File certificateFile, File certificateChain) throws Exception {
+    @Test
+    public void basicTestSslWithPwdProtectedCert() throws Exception {
+        File cert = new File(this.getClass().getClassLoader().getResource("cert1.key").getFile());
+        File chain = new File(this.getClass().getClassLoader().getResource("cert1_chain.pem").getFile());
+        basicTestSsl(cert, chain, "blazingcache1");
+    }
+
+    @Test
+    public void basicTestSslWithPKCS12() throws Exception {
+        File cert = new File(this.getClass().getClassLoader().getResource("cert1.p12").getFile());
+        basicTestSsl(cert, null, "blazingcache1");
+    }
+
+    private void basicTestSsl(File certificateFile, File certificateChain, String certificateFilePassword) throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
 
         ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", true, null);
         try (CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
-            cacheServer.setupSsl(certificateFile, null, certificateChain, null);
+            cacheServer.setupSsl(certificateFile, certificateFilePassword, certificateChain, null);
             cacheServer.start();
             try (CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));
                  CacheClient client2 = new CacheClient("theClient2", "ciao", new NettyCacheServerLocator(serverHostData));) {
