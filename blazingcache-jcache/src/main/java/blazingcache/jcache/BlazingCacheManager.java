@@ -110,6 +110,7 @@ public class BlazingCacheManager implements CacheManager {
             String mode = properties_and_params.getProperty("blazingcache.mode", "local");
             int sockettimeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.sockettimeout", "0"));
             int connecttimeout = Integer.parseInt(properties_and_params.getProperty("blazingcache.zookeeper.connecttimeout", "10000"));
+            boolean clientSSLInsecure = Boolean.parseBoolean(properties_and_params.getProperty("blazingcache.locator.client.sslinsecure", "true"));
             switch (mode) {
                 case "clustered": {
                     String connect = properties_and_params.getProperty("blazingcache.zookeeper.connectstring", "localhost:1281");
@@ -118,6 +119,7 @@ public class BlazingCacheManager implements CacheManager {
                     locator = new ZKCacheServerLocator(connect, timeout, path);
                     ((ZKCacheServerLocator) locator).setSocketTimeout(sockettimeout);
                     ((ZKCacheServerLocator) locator).setConnectTimeout(connecttimeout);
+                    ((ZKCacheServerLocator) locator).setSslInsecure(clientSSLInsecure);
                     this.client = new CacheClient(clientId, secret, locator);
                     this.embeddedServer = null;
                 }
@@ -136,6 +138,7 @@ public class BlazingCacheManager implements CacheManager {
                     locator = new ZKCacheServerLocator(connect, timeout, path);
                     ((ZKCacheServerLocator) locator).setSocketTimeout(sockettimeout);
                     ((ZKCacheServerLocator) locator).setConnectTimeout(connecttimeout);
+                    ((ZKCacheServerLocator) locator).setSslInsecure(clientSSLInsecure);
                     this.client = new CacheClient(clientId, secret, locator);
                     ServerHostData hostData = new ServerHostData(host, port, "", ssl, new HashMap<>());
                     this.embeddedServer = new CacheServer(secret, hostData);
@@ -149,6 +152,7 @@ public class BlazingCacheManager implements CacheManager {
                     locator = new NettyCacheServerLocator(host, port, ssl);
                     ((NettyCacheServerLocator) locator).setSocketTimeout(sockettimeout);
                     ((NettyCacheServerLocator) locator).setConnectTimeout(connecttimeout);
+                    ((NettyCacheServerLocator) locator).setSslInsecure(clientSSLInsecure);
                     this.client = new CacheClient(clientId, secret, locator);
                     this.embeddedServer = null;
                     break;

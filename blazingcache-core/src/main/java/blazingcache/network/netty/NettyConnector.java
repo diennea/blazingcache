@@ -40,7 +40,6 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -59,7 +58,7 @@ public class NettyConnector implements AutoCloseable {
     private EventLoopGroup group;
     private SslContext sslCtx;
     private boolean ssl;
-    private boolean sslUnsecure = true;
+    private boolean sslInsecure = true;
     protected int connectTimeout = 60000;
     protected int socketTimeout = 240000;
     private final ExecutorService callbackExecutor = Executors.newCachedThreadPool();
@@ -100,12 +99,12 @@ public class NettyConnector implements AutoCloseable {
         this.ssl = ssl;
     }
 
-    public boolean isSslUnsecure() {
-        return sslUnsecure;
+    public boolean isSslInsecure() {
+        return sslInsecure;
     }
 
-    public void setSslUnsecure(boolean sslUnsecure) {
-        this.sslUnsecure = sslUnsecure;
+    public void setSslInsecure(boolean sslInsecure) {
+        this.sslInsecure = sslInsecure;
     }
 
     private ChannelEventListener receiver;
@@ -117,7 +116,7 @@ public class NettyConnector implements AutoCloseable {
     public NettyChannel connect() throws Exception {
         if (ssl) {
             boolean useOpenSSL = NetworkUtils.isOpenSslAvailable();
-            if (sslUnsecure) {
+            if (sslInsecure) {
                 this.sslCtx = SslContextBuilder
                     .forClient()
                     .sslProvider(useOpenSSL ? SslProvider.OPENSSL : SslProvider.JDK)

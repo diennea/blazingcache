@@ -137,6 +137,9 @@
                         <!-- Built directory -->
                         <exclude>**/target/**/*</exclude>
 
+                        <!-- Test resources -->
+                        <exclude>**/test/resources/*</exclude>
+
                         <!-- Project files -->
                         <exclude>**/README.md</exclude>
                         <exclude>**/README.rst</exclude>

@@ -363,7 +363,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
     }
 
     private CacheClient(String clientId, String sharedSecret, ServerLocator brokerLocator,
-            boolean offHeap, ByteBufAllocator allocator, MetricsProvider metricsProvider) {
+                        boolean offHeap, ByteBufAllocator allocator, MetricsProvider metricsProvider) {
         this.offHeap = offHeap;
         this.brokerLocator = brokerLocator;
         this.sharedSecret = sharedSecret;
@@ -712,7 +712,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             @Override
             public void accept(EntryHandle t) {
                 if ((maxMemory > 0 && releasedMemory < to_release)
-                        || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {
+                    || (maxLocalEntryAge > 0 && t.getLastGetTime() < maxAgeTsNanos)) {
                     evictable.add(t);
                     releasedMemory += t.getSerializedDataLength();
                 }
@@ -758,7 +758,7 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
 
     private boolean checkPerformEvictionForMaxLocalEntryAge(final long now) {
         return maxLocalEntryAge > 0
-                && now - lastPerformedEvictionTimestamp >= maxLocalEntryAge / 2;
+               && now - lastPerformedEvictionTimestamp >= maxLocalEntryAge / 2;
     }
 
     @Override

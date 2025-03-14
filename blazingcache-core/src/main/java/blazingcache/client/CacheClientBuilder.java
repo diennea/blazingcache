@@ -53,6 +53,7 @@ public class CacheClientBuilder {
     private Object cacheServer;
     private int port = 1025;
     private boolean ssl = false;
+    private boolean sslInsecure = true;
     private boolean jmx = false;
     private EntrySerializer entrySerializer = new JDKEntrySerializer();
     private MetricsProvider metricsProvider;
@@ -290,11 +291,13 @@ public class CacheClientBuilder {
                 locator = new NettyCacheServerLocator(host, port, ssl);
                 ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
                 ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
+                ((GenericNettyBrokerLocator) locator).setSslInsecure(sslInsecure);
                 break;
             case CLUSTERED:
                 locator = new ZKCacheServerLocator(zkConnectString, zkSessionTimeout, zkPath);
                 ((GenericNettyBrokerLocator) locator).setConnectTimeout(connectTimeout);
                 ((GenericNettyBrokerLocator) locator).setSocketTimeout(socketTimeout);
+                ((GenericNettyBrokerLocator) locator).setSslInsecure(sslInsecure);
                 break;
             case LOCAL:
                 if (cacheServer == null) {

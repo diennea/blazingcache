@@ -44,6 +44,7 @@ public abstract class GenericNettyBrokerLocator implements ServerLocator {
 
     protected int connectTimeout = 60000;
     protected int socketTimeout = 240000;
+    protected boolean sslInsecure = true;
 
     public int getConnectTimeout() {
         return connectTimeout;
@@ -59,6 +60,14 @@ public abstract class GenericNettyBrokerLocator implements ServerLocator {
 
     public void setSocketTimeout(int socketTimeout) {
         this.socketTimeout = socketTimeout;
+    }
+
+    public boolean isSslInsecure() {
+        return sslInsecure;
+    }
+
+    public void setSslInsecure(boolean sslInsecure) {
+        this.sslInsecure = sslInsecure;
     }
 
     @Override
@@ -82,6 +91,7 @@ public abstract class GenericNettyBrokerLocator implements ServerLocator {
             connector.setConnectTimeout(connectTimeout);
             connector.setSocketTimeout(socketTimeout);
             connector.setSsl(broker.isSsl());
+            connector.setSslInsecure(sslInsecure);
             NettyChannel channel;
             try {
                 channel = connector.connect();
