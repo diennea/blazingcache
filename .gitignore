@@ -11,4 +11,5 @@
 **/.settings/
 **/.DS_Store/
 /.idea/
+**/*.iml
 /.vscode/
