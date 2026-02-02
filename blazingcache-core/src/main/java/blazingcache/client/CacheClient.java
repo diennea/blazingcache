@@ -719,18 +719,15 @@ public class CacheClient implements ChannelEventListener, ConnectionRequestInfo,
             }
         };
 
-        try {
-            cache.values().stream().sorted((EntryHandle o1, EntryHandle o2) -> {
-                long diff = o1.getLastGetTime() - o2.getLastGetTime();
-                if (diff == 0) {
-                    return 0;
-                }
-                return diff > 0 ? 1 : -1;
-            }).forEachOrdered(accumulator);
-        } catch (Exception dataChangedDuringSort) {
-            LOGGER.severe("dataChangedDuringSort: " + dataChangedDuringSort);
-            return;
-        }
+        List<EntryHandle> snapshot = new ArrayList<>(cache.values());
+        snapshot.sort((EntryHandle o1, EntryHandle o2) -> {
+            long diff = o1.getLastGetTime() - o2.getLastGetTime();
+            if (diff == 0) {
+                return 0;
+            }
+            return diff > 0 ? 1 : -1;
+        });
+        snapshot.forEach(accumulator);
 
         if (!evictable.isEmpty()) {
             LOGGER.log(Level.INFO, "found {0} evictable entries", evictable.size());
