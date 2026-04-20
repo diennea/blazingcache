@@ -79,7 +79,7 @@
         <libs.jcip-annotations>1.0</libs.jcip-annotations>
         <libs.spotbugsmaven.annotations>4.7.2</libs.spotbugsmaven.annotations>
         <libs.spotbugsmaven>4.7.2.0</libs.spotbugsmaven>
-        <libs.jacoco>0.8.8</libs.jacoco>
+        <libs.jacoco>0.8.14</libs.jacoco>
         <libs.slf4j>2.0.3</libs.slf4j>
         <libs.bouncycastle>1.70</libs.bouncycastle>
     </properties>
