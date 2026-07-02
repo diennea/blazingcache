@@ -138,7 +138,35 @@ public class KeyedLockManager {
         return result;
     }
 
+    /**
+     * Acquires a shared (read) lock for a key. Read locks are mutually exclusive
+     * with write locks (invalidate/put/load) but NOT with each other, so multiple
+     * concurrent fetches on the same key no longer serialize. See issue #188.
+     */
+    LockID acquireReadLockForKey(RawString key, String clientId, String clientProvidedLockId) {
+        if (clientProvidedLockId != null) {
+            return useClientProvidedLockForKey(key, Long.parseLong(clientProvidedLockId));
+        } else {
+            return acquireReadLockForKey(key, clientId);
+        }
+    }
+
+    LockID acquireReadLockForKey(RawString key, String clientId) {
+        StampedLock lock = makeLockForKey(key);
+        LockID result = new LockID(lock.readLock());
+        return result;
+    }
+
     void releaseWriteLockForKey(RawString key, String clientId, LockID lockStamp) {
+        releaseLockForKey(key, clientId, lockStamp);
+    }
+
+    /**
+     * Releases a lock (read or write) previously acquired for the key.
+     * {@link StampedLock#unlock(long)} releases the correct mode according to the
+     * stamp, so the same method works for both read and write locks.
+     */
+    void releaseLockForKey(RawString key, String clientId, LockID lockStamp) {
         if (lockStamp == LockID.VALIDATED_CLIENT_PROVIDED_LOCK) {
             return;
         }
