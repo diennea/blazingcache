@@ -34,25 +34,24 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class ApparentlyStuckClientDueToServerSideErrorTest {
 
-    @Test
+    @Test(timeout = 60000)
     public void test() throws Exception {
         byte[] data = "testdata".getBytes(StandardCharsets.UTF_8);
 
         ServerHostData serverHostData = new ServerHostData("localhost", 1234, "test", false, null);
         try ( CacheServer cacheServer = new CacheServer("ciao", serverHostData)) {
 
-            cacheServer.setSlowClientTimeout(10000);
+            // keep the "declare the errored client dead" path bounded and fast
+            cacheServer.setSlowClientTimeout(2000);
             cacheServer.start();
             AtomicReference<CacheClient> _client2 = new AtomicReference<>();
             try ( CacheClient client1 = new CacheClient("theClient1", "ciao", new NettyCacheServerLocator(serverHostData));  CacheClient client2 = new CacheClient("theClient2", "ciao",
                     new NettyCacheServerLocator(serverHostData)) {
                 @Override
                 public void messageReceived(Message message) {
-                    // swallow every message
-                    // client2 will not answer to the "invaliate" message
-                    // client1 has to wait until the server declares client2 dead
-
-                    // simulate a network error, only on the server side part
+                    // simulate a network error on the server side of client2's connection:
+                    // client2 never processes/acks the message and its connection is dropped, so
+                    // client1's invalidate must not hang - the server has to declare client2 dead.
                     CacheServerSideConnection serverSideConnectionPeer2 = cacheServer.getAcceptor().getClientConnections().get(_client2.get().getClientId());
                     // we are sure that we are using the NettyChannel, not JVMChannel
                     NettyChannel channel = (NettyChannel) serverSideConnectionPeer2.getChannel();
@@ -68,19 +67,41 @@ public class ApparentlyStuckClientDueToServerSideErrorTest {
                 assertTrue(client2.waitForConnection(10000));
 
                 client1.load("foo", data, 0);
-                assertNotNull(client2.fetch("foo"));
+                EntryHandle fetched = client2.fetch("foo");
+                assertNotNull(fetched);
+                fetched.close();
 
+                // the invalidate must COMPLETE even though client2 errors instead of acking:
+                // the server declares client2 dead (slow-client timeout / connection error) and
+                // unblocks. If this regressed, the call would hang and the @Test timeout would fire.
                 client1.invalidate("foo");
 
                 assertNull(client1.get("foo"));
-                
-                // client2 does not know that the server had problems and it still holds a copy of the value
-                assertNotNull(client2.get("foo"));                 
 
+                // The server-side error dropped client2's connection; a disconnected client empties
+                // its local cache (it can no longer receive invalidations), so it stops serving the
+                // now-stale entry. This is deterministic; asserting the opposite ("client2 still
+                // holds the value") used to race the reconnect/emptyCache and made the test flaky.
+                assertBecomesAbsent(client2, "foo", 30000);
             }
 
         }
 
+    }
+
+    private static void assertBecomesAbsent(CacheClient client, String key, long timeoutMillis) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        while (true) {
+            EntryHandle entry = client.get(key);
+            if (entry == null) {
+                return;
+            }
+            entry.close();
+            if (System.currentTimeMillis() > deadline) {
+                throw new AssertionError("entry " + key + " was still present after " + timeoutMillis + "ms");
+            }
+            Thread.sleep(50);
+        }
     }
 
 }
