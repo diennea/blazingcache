@@ -469,18 +469,36 @@ public class CacheServer implements AutoCloseable {
     public void lockKey(RawString key, String sourceClientId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
-            cacheStatus.clientLockedKey(sourceClientId, key, lockID);
-            onFinish.onResult(lockID.stamp + "", null);
+            try {
+                cacheStatus.clientLockedKey(sourceClientId, key, lockID);
+                onFinish.onResult(lockID.stamp + "", null);
+            } catch (Throwable t) {
+                // release the just-acquired lock so the key is not write-locked forever
+                LOGGER.log(Level.SEVERE, "error in lockKey for key " + key + ", releasing the lock", t);
+                try {
+                    cacheStatus.clientUnlockedKey(sourceClientId, key, lockID);
+                    locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+                } catch (Throwable release) {
+                    LOGGER.log(Level.SEVERE, "error releasing lock after failed lockKey for key " + key, release);
+                }
+                onFinish.onResult(null, t);
+            }
         };
         executeOnHandler("lockKey " + sourceClientId + "," + key, action);
     }
 
     public void unlockKey(RawString key, String sourceClientId, String lockId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
-            LockID lockID = new LockID(Long.parseLong(lockId));
-            locksManager.releaseWriteLockForKey(key, lockId, lockID);
-            cacheStatus.clientUnlockedKey(sourceClientId, key, lockID);
-            onFinish.onResult(lockID.stamp + "", null);
+            try {
+                LockID lockID = new LockID(Long.parseLong(lockId));
+                locksManager.releaseWriteLockForKey(key, lockId, lockID);
+                cacheStatus.clientUnlockedKey(sourceClientId, key, lockID);
+                onFinish.onResult(lockID.stamp + "", null);
+            } catch (Throwable t) {
+                // a malformed lockId or a stale/wrong stamp must not leave the caller hanging
+                LOGGER.log(Level.SEVERE, "error in unlockKey for key " + key + " lockId " + lockId, t);
+                onFinish.onResult(null, t);
+            }
         };
         executeOnHandler("unlockKey " + sourceClientId + "," + key, action);
     }

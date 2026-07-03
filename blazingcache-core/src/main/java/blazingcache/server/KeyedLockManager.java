@@ -126,9 +126,24 @@ public class KeyedLockManager {
 
     LockID acquireWriteLockForKey(RawString key, String clientId, String clientProvidedLockId) {
         if (clientProvidedLockId != null) {
-            return useClientProvidedLockForKey(key, Long.parseLong(clientProvidedLockId));
+            Long stamp = parseLockId(clientProvidedLockId);
+            return stamp == null ? null : useClientProvidedLockForKey(key, stamp);
         } else {
             return acquireWriteLockForKey(key, clientId);
+        }
+    }
+
+    /**
+     * Parses a client-provided lock id, returning {@code null} (treated as an
+     * invalid lock) instead of throwing on a malformed value, so a bad id is
+     * reported to the client rather than left hanging until timeout.
+     */
+    private static Long parseLockId(String clientProvidedLockId) {
+        try {
+            return Long.parseLong(clientProvidedLockId);
+        } catch (NumberFormatException e) {
+            LOGGER.log(Level.SEVERE, "invalid clientProvidedLockId {0}", clientProvidedLockId);
+            return null;
         }
     }
 
@@ -145,7 +160,8 @@ public class KeyedLockManager {
      */
     LockID acquireReadLockForKey(RawString key, String clientId, String clientProvidedLockId) {
         if (clientProvidedLockId != null) {
-            return useClientProvidedLockForKey(key, Long.parseLong(clientProvidedLockId));
+            Long stamp = parseLockId(clientProvidedLockId);
+            return stamp == null ? null : useClientProvidedLockForKey(key, stamp);
         } else {
             return acquireReadLockForKey(key, clientId);
         }
