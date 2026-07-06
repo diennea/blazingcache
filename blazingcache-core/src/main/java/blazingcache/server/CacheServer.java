@@ -40,6 +40,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -60,6 +61,7 @@ public class CacheServer implements AutoCloseable {
     private final CacheServerEndpoint acceptor;
     private final CacheStatus cacheStatus = new CacheStatus();
     private final KeyedLockManager locksManager = new KeyedLockManager();
+    private final PendingInvalidationsManager pendingInvalidations = new PendingInvalidationsManager();
     private final NettyChannelAcceptor server;
     private final CacheServerStatusMXBean statusMXBean;
     private final AtomicLong pendingOperations;
@@ -295,32 +297,44 @@ public class CacheServer implements AutoCloseable {
                 onFinish.onResult(null, new Exception("invalid clientProvidedLockId " + clientProvidedLockId));
                 return;
             }
-            Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
-            if (sourceClientId != null) {
-                clientsForKey.remove(sourceClientId);
-            }
-            LOGGER.log(Level.FINEST, "putEntry from {0}, key={1}, clientsForKey:{2}", new Object[]{sourceClientId, key, clientsForKey});
-            cacheStatus.registerKeyForClient(key, sourceClientId, expiretime);
+            // finishAndReleaseLock is guarded so the lock is released exactly once,
+            // whether the release comes from the broadcast completion or from the
+            // catch block below (StampedLock would throw on a double unlock).
+            AtomicBoolean finished = new AtomicBoolean();
             SimpleCallback<RawString> finishAndReleaseLock = (RawString result, Throwable error) -> {
-                locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
-                onFinish.onResult(result, error);
-            };
-            if (clientsForKey.isEmpty()) {
-                finishAndReleaseLock.onResult(key, null);
-                return;
-            }
-            BroadcastRequestStatus propagation = new BroadcastRequestStatus("putEntry " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, finishAndReleaseLock, null);
-            networkRequestsStatusMonitor.register(propagation);
-
-            clientsForKey.forEach((clientId) -> {
-                CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
-                if (connection == null) {
-                    LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidated");
-                    propagation.clientDone(clientId);
-                } else {
-                    connection.sendPutEntry(sourceClientId, key, data, expiretime, propagation);
+                if (finished.compareAndSet(false, true)) {
+                    locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+                    onFinish.onResult(result, error);
                 }
-            });
+            };
+            try {
+                Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
+                if (sourceClientId != null) {
+                    clientsForKey.remove(sourceClientId);
+                }
+                LOGGER.log(Level.FINEST, "putEntry from {0}, key={1}, clientsForKey:{2}", new Object[]{sourceClientId, key, clientsForKey});
+                cacheStatus.registerKeyForClient(key, sourceClientId, expiretime);
+                if (clientsForKey.isEmpty()) {
+                    finishAndReleaseLock.onResult(key, null);
+                    return;
+                }
+                BroadcastRequestStatus propagation = new BroadcastRequestStatus("putEntry " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, finishAndReleaseLock, null);
+                networkRequestsStatusMonitor.register(propagation);
+
+                clientsForKey.forEach((clientId) -> {
+                    CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
+                    if (connection == null) {
+                        LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidated");
+                        propagation.clientDone(clientId);
+                    } else {
+                        connection.sendPutEntry(sourceClientId, key, data, expiretime, propagation);
+                    }
+                });
+            } catch (Throwable t) {
+                // the body failed before wiring the asynchronous release: free the lock now
+                LOGGER.log(Level.SEVERE, "error in putEntry for key " + key + ", releasing the lock", t);
+                finishAndReleaseLock.onResult(null, t);
+            }
         };
         executeOnHandler("putEntry " + sourceClientId + "," + key, action);
     }
@@ -332,76 +346,159 @@ public class CacheServer implements AutoCloseable {
                 onFinish.onResult(null, new Exception("invalid clientProvidedLockId " + clientProvidedLockId));
                 return;
             }
-            Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
-            if (sourceClientId != null) {
-                clientsForKey.remove(sourceClientId);
+            AtomicBoolean finished = new AtomicBoolean();
+            SimpleCallback<RawString> finishAndReleaseLock = (RawString result, Throwable error) -> {
+                if (finished.compareAndSet(false, true)) {
+                    locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+                    onFinish.onResult(result, error);
+                }
+            };
+            try {
+                LOGGER.log(Level.FINEST, "loadEntry from {0}, key={1}", new Object[]{sourceClientId, key});
+                cacheStatus.registerKeyForClient(key, sourceClientId, expiretime);
+                finishAndReleaseLock.onResult(key, null);
+            } catch (Throwable t) {
+                LOGGER.log(Level.SEVERE, "error in loadEntry for key " + key + ", releasing the lock", t);
+                finishAndReleaseLock.onResult(null, t);
             }
-            LOGGER.log(Level.FINEST, "loadEntry from {0}, key={1}, clientsForKey:{2}", new Object[]{sourceClientId, key, clientsForKey});
-            cacheStatus.registerKeyForClient(key, sourceClientId, expiretime);
-            locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
-            onFinish.onResult(key, null);
         };
         executeOnHandler("loadEntry " + sourceClientId + "," + key, action);
     }
 
     public void invalidateKey(RawString key, String sourceClientId, String clientProvidedLockId, SimpleCallback<RawString> onFinish) {
+        // Invalidations carrying an explicit client-provided lock are not coalesced:
+        // they keep the original per-request semantics tied to that lock.
+        if (clientProvidedLockId != null) {
+            invalidateKeyStandalone(key, sourceClientId, clientProvidedLockId, onFinish);
+            return;
+        }
+        Runnable action = () -> {
+            // Coalesce concurrent invalidations of the same key (issue #188): if an
+            // invalidation of this key is already in flight, attach to it and let it
+            // notify us on completion instead of queueing behind the write lock for
+            // another full broadcast round-trip.
+            boolean owner = pendingInvalidations.register(key, onFinish);
+            if (!owner) {
+                return;
+            }
+            final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
+            AtomicBoolean finished = new AtomicBoolean();
+            SimpleCallback<RawString> finishAndReleaseLock = (RawString result, Throwable error) -> {
+                if (finished.compareAndSet(false, true)) {
+                    cacheStatus.removeKeyForClient(key, sourceClientId);
+                    // Drain the coalesced group BEFORE releasing the lock, so that any
+                    // invalidation arriving during completion (still under the write
+                    // lock, hence still exclusive with fetches) is either captured here
+                    // or starts a fresh broadcast once the lock is released.
+                    List<SimpleCallback<RawString>> waiters = pendingInvalidations.complete(key);
+                    locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+                    for (SimpleCallback<RawString> waiter : waiters) {
+                        waiter.onResult(result, error);
+                    }
+                }
+            };
+            try {
+                broadcastInvalidation(key, sourceClientId, finishAndReleaseLock);
+            } catch (Throwable t) {
+                // release the lock and drain the coalesced group instead of stranding them
+                LOGGER.log(Level.SEVERE, "error in invalidateKey for key " + key + ", releasing the lock", t);
+                finishAndReleaseLock.onResult(null, t);
+            }
+        };
+        executeOnHandler("invalidateKey " + sourceClientId + "," + key, action);
+    }
+
+    private void invalidateKeyStandalone(RawString key, String sourceClientId, String clientProvidedLockId, SimpleCallback<RawString> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId, clientProvidedLockId);
             if (lockID == null) {
                 onFinish.onResult(null, new Exception("invalid clientProvidedLockId " + clientProvidedLockId));
                 return;
             }
-            Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
-            if (sourceClientId != null) {
-                clientsForKey.remove(sourceClientId);
-            }
-            SimpleCallback<RawString> finishAndReleaseLock = new SimpleCallback<RawString>() {
-                @Override
-                public void onResult(RawString result, Throwable error) {
+            AtomicBoolean finished = new AtomicBoolean();
+            SimpleCallback<RawString> finishAndReleaseLock = (RawString result, Throwable error) -> {
+                if (finished.compareAndSet(false, true)) {
                     cacheStatus.removeKeyForClient(key, sourceClientId);
                     locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
                     onFinish.onResult(result, error);
                 }
             };
-            if (clientsForKey.isEmpty()) {
-                finishAndReleaseLock.onResult(key, null);
-                return;
+            try {
+                broadcastInvalidation(key, sourceClientId, finishAndReleaseLock);
+            } catch (Throwable t) {
+                LOGGER.log(Level.SEVERE, "error in invalidateKey for key " + key + ", releasing the lock", t);
+                finishAndReleaseLock.onResult(null, t);
             }
-            LOGGER.log(Level.FINE, "invalidateKey {0} from {1} interested clients {2}", new Object[]{key, sourceClientId, clientsForKey});
-
-            BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateKey " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, finishAndReleaseLock, (clientId, error) -> {
-                cacheStatus.removeKeyForClient(key, clientId);
-            });
-            networkRequestsStatusMonitor.register(invalidation);
-
-            clientsForKey.forEach((clientId) -> {
-                CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
-                if (connection == null) {
-                    LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidated");
-                    invalidation.clientDone(clientId);
-                } else {
-                    connection.sendKeyInvalidationMessage(sourceClientId, key, invalidation);
-                }
-            });
         };
         executeOnHandler("invalidateKey " + sourceClientId + "," + key, action);
+    }
+
+    /**
+     * Snapshots the clients holding the key (excluding the source) and broadcasts
+     * an invalidation to them; {@code onFinish} is invoked once every interested
+     * client has acknowledged (or been considered invalidated). Must be called
+     * while holding the per-key write lock for {@code key}.
+     */
+    private void broadcastInvalidation(RawString key, String sourceClientId, SimpleCallback<RawString> onFinish) {
+        Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
+        if (sourceClientId != null) {
+            clientsForKey.remove(sourceClientId);
+        }
+        if (clientsForKey.isEmpty()) {
+            onFinish.onResult(key, null);
+            return;
+        }
+        LOGGER.log(Level.FINE, "invalidateKey {0} from {1} interested clients {2}", new Object[]{key, sourceClientId, clientsForKey});
+
+        BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateKey " + key + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsForKey, onFinish, (clientId, error) -> {
+            cacheStatus.removeKeyForClient(key, clientId);
+        });
+        networkRequestsStatusMonitor.register(invalidation);
+
+        clientsForKey.forEach((clientId) -> {
+            CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
+            if (connection == null) {
+                LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering key " + key + " invalidated");
+                invalidation.clientDone(clientId);
+            } else {
+                connection.sendKeyInvalidationMessage(sourceClientId, key, invalidation);
+            }
+        });
     }
 
     public void lockKey(RawString key, String sourceClientId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
             final LockID lockID = locksManager.acquireWriteLockForKey(key, sourceClientId);
-            cacheStatus.clientLockedKey(sourceClientId, key, lockID);
-            onFinish.onResult(lockID.stamp + "", null);
+            try {
+                cacheStatus.clientLockedKey(sourceClientId, key, lockID);
+                onFinish.onResult(lockID.stamp + "", null);
+            } catch (Throwable t) {
+                // release the just-acquired lock so the key is not write-locked forever
+                LOGGER.log(Level.SEVERE, "error in lockKey for key " + key + ", releasing the lock", t);
+                try {
+                    cacheStatus.clientUnlockedKey(sourceClientId, key, lockID);
+                    locksManager.releaseWriteLockForKey(key, sourceClientId, lockID);
+                } catch (Throwable release) {
+                    LOGGER.log(Level.SEVERE, "error releasing lock after failed lockKey for key " + key, release);
+                }
+                onFinish.onResult(null, t);
+            }
         };
         executeOnHandler("lockKey " + sourceClientId + "," + key, action);
     }
 
     public void unlockKey(RawString key, String sourceClientId, String lockId, SimpleCallback<String> onFinish) {
         Runnable action = () -> {
-            LockID lockID = new LockID(Long.parseLong(lockId));
-            locksManager.releaseWriteLockForKey(key, lockId, lockID);
-            cacheStatus.clientUnlockedKey(sourceClientId, key, lockID);
-            onFinish.onResult(lockID.stamp + "", null);
+            try {
+                LockID lockID = new LockID(Long.parseLong(lockId));
+                locksManager.releaseWriteLockForKey(key, lockId, lockID);
+                cacheStatus.clientUnlockedKey(sourceClientId, key, lockID);
+                onFinish.onResult(lockID.stamp + "", null);
+            } catch (Throwable t) {
+                // a malformed lockId or a stale/wrong stamp must not leave the caller hanging
+                LOGGER.log(Level.SEVERE, "error in unlockKey for key " + key + " lockId " + lockId, t);
+                onFinish.onResult(null, t);
+            }
         };
         executeOnHandler("unlockKey " + sourceClientId + "," + key, action);
     }
@@ -424,23 +521,28 @@ public class CacheServer implements AutoCloseable {
 
     public void fetchEntry(RawString key, String clientId, String clientProvidedLockId, SimpleCallback<Message> onFinish) {
         Runnable action = () -> {
-            final LockID lockID = locksManager.acquireWriteLockForKey(key, clientId, clientProvidedLockId);
+            // A fetch takes a SHARED (read) lock: concurrent fetches on the same
+            // key run in parallel, while still being mutually exclusive with
+            // invalidate/put/load (write lock), preserving the ordering invariant
+            // that the fetch client-registration must not race an invalidate.
+            final LockID lockID = locksManager.acquireReadLockForKey(key, clientId, clientProvidedLockId);
             if (lockID == null) {
                 onFinish.onResult(null, new Exception("invalid clientProvidedLockId " + clientProvidedLockId));
                 return;
             }
+            AtomicBoolean finished = new AtomicBoolean();
+            SimpleCallback<Message> finishAndReleaseLock = (Message result, Throwable error) -> {
+                if (finished.compareAndSet(false, true)) {
+                    locksManager.releaseLockForKey(key, clientId, lockID);
+                    onFinish.onResult(result, error);
+                }
+            };
+            try {
             Set<String> clientsForKey = cacheStatus.getClientsForKey(key);
             if (clientId != null) {
                 clientsForKey.remove(clientId);
             }
             LOGGER.log(Level.FINE, "client {0} fetchEntry {1} ask to {2}", new Object[]{clientId, key, clientsForKey});
-            SimpleCallback<Message> finishAndReleaseLock = new SimpleCallback<Message>() {
-                @Override
-                public void onResult(Message result, Throwable error) {
-                    locksManager.releaseWriteLockForKey(key, clientId, lockID);
-                    onFinish.onResult(result, error);
-                }
-            };
             if (clientsForKey.isEmpty()) {
                 finishAndReleaseLock.onResult(Message.ERROR(clientId, new Exception("no client for key " + key)), null);
                 return;
@@ -489,6 +591,11 @@ public class CacheServer implements AutoCloseable {
 
             if (!foundOneGoodClientConnected) {
                 finishAndReleaseLock.onResult(Message.ERROR(clientId, new Exception("no connected client for key " + key)), null);
+            }
+            } catch (Throwable t) {
+                // the body failed before wiring the asynchronous release: free the lock now
+                LOGGER.log(Level.SEVERE, "error in fetchEntry for key " + key + ", releasing the lock", t);
+                finishAndReleaseLock.onResult(Message.ERROR(clientId, t), null);
             }
         };
         executeOnHandler("fetchEntry " + clientId + "," + key, action);

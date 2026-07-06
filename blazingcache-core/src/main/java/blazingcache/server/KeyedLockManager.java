@@ -126,9 +126,24 @@ public class KeyedLockManager {
 
     LockID acquireWriteLockForKey(RawString key, String clientId, String clientProvidedLockId) {
         if (clientProvidedLockId != null) {
-            return useClientProvidedLockForKey(key, Long.parseLong(clientProvidedLockId));
+            Long stamp = parseLockId(clientProvidedLockId);
+            return stamp == null ? null : useClientProvidedLockForKey(key, stamp);
         } else {
             return acquireWriteLockForKey(key, clientId);
+        }
+    }
+
+    /**
+     * Parses a client-provided lock id, returning {@code null} (treated as an
+     * invalid lock) instead of throwing on a malformed value, so a bad id is
+     * reported to the client rather than left hanging until timeout.
+     */
+    private static Long parseLockId(String clientProvidedLockId) {
+        try {
+            return Long.parseLong(clientProvidedLockId);
+        } catch (NumberFormatException e) {
+            LOGGER.log(Level.SEVERE, "invalid clientProvidedLockId {0}", clientProvidedLockId);
+            return null;
         }
     }
 
@@ -138,7 +153,36 @@ public class KeyedLockManager {
         return result;
     }
 
+    /**
+     * Acquires a shared (read) lock for a key. Read locks are mutually exclusive
+     * with write locks (invalidate/put/load) but NOT with each other, so multiple
+     * concurrent fetches on the same key no longer serialize. See issue #188.
+     */
+    LockID acquireReadLockForKey(RawString key, String clientId, String clientProvidedLockId) {
+        if (clientProvidedLockId != null) {
+            Long stamp = parseLockId(clientProvidedLockId);
+            return stamp == null ? null : useClientProvidedLockForKey(key, stamp);
+        } else {
+            return acquireReadLockForKey(key, clientId);
+        }
+    }
+
+    LockID acquireReadLockForKey(RawString key, String clientId) {
+        StampedLock lock = makeLockForKey(key);
+        LockID result = new LockID(lock.readLock());
+        return result;
+    }
+
     void releaseWriteLockForKey(RawString key, String clientId, LockID lockStamp) {
+        releaseLockForKey(key, clientId, lockStamp);
+    }
+
+    /**
+     * Releases a lock (read or write) previously acquired for the key.
+     * {@link StampedLock#unlock(long)} releases the correct mode according to the
+     * stamp, so the same method works for both read and write locks.
+     */
+    void releaseLockForKey(RawString key, String clientId, LockID lockStamp) {
         if (lockStamp == LockID.VALIDATED_CLIENT_PROVIDED_LOCK) {
             return;
         }
