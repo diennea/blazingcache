@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -47,8 +46,6 @@ public class CacheStatus {
     private final Map<String, Set<RawString>> keysForClient = new HashMap<>();
     private final Map<RawString, Long> entryExpireTime = new HashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
-    private final Map<String, Map<RawString, List<LockID>>> remoteLocks = new HashMap<>();
-    private final ReentrantLock remoteLocksLock = new ReentrantLock(true);
 
     @Override
     public String toString() {
@@ -190,27 +187,13 @@ public class CacheStatus {
         }
     }
 
-    public static final class ClientRemovalResult {
-
-        private final int listenersCount;
-        private final Map<RawString, List<LockID>> locks;
-
-        public ClientRemovalResult(int listenersCount, Map<RawString, List<LockID>> locks) {
-            this.listenersCount = listenersCount;
-            this.locks = locks;
-        }
-
-        public int getListenersCount() {
-            return listenersCount;
-        }
-
-        public Map<RawString, List<LockID>> getLocks() {
-            return locks;
-        }
-
-    }
-
-    ClientRemovalResult removeClientListeners(String clientId) {
+    /**
+     * Removes all the key listeners of a disconnected client.
+     *
+     * @return the number of listeners removed. Application locks held by the client are
+     * released separately by the {@link KeyedScheduler}, which owns the lock lifecycle.
+     */
+    int removeClientListeners(String clientId) {
         AtomicInteger count = new AtomicInteger();
         lock.writeLock().lock();
         try {
@@ -232,14 +215,7 @@ public class CacheStatus {
         } finally {
             lock.writeLock().unlock();
         }
-        Map<RawString, List<LockID>> locksForClient;
-        remoteLocksLock.lock();
-        try {
-            locksForClient = remoteLocks.remove(clientId);
-        } finally {
-            remoteLocksLock.unlock();
-        }
-        return new ClientRemovalResult(count.get(), locksForClient);
+        return count.get();
     }
 
     Set<String> getAllClientsWithListener() {
@@ -275,48 +251,6 @@ public class CacheStatus {
             }
         } finally {
             lock.writeLock().unlock();
-        }
-    }
-
-    void clientLockedKey(String sourceClientId, RawString key, LockID lockID) {
-        remoteLocksLock.lock();
-        try {
-            Map<RawString, List<LockID>> locksForClient = remoteLocks.get(sourceClientId);
-            if (locksForClient == null) {
-                locksForClient = new HashMap<>();
-                remoteLocks.put(sourceClientId, locksForClient);
-            }
-            List<LockID> listForKey = locksForClient.get(key);
-            if (listForKey == null) {
-                listForKey = new ArrayList<>();
-                locksForClient.put(key, listForKey);
-            }
-            listForKey.add(lockID);
-        } finally {
-            remoteLocksLock.unlock();
-        }
-    }
-
-    void clientUnlockedKey(String sourceClientId, RawString key, LockID lockID) {
-        remoteLocksLock.lock();
-        try {
-            Map<RawString, List<LockID>> locksForClient = remoteLocks.get(sourceClientId);
-            if (locksForClient == null) {
-                return;
-            }
-            List<LockID> listForKey = locksForClient.get(key);
-            if (listForKey == null) {
-                return;
-            }
-            listForKey.remove(lockID);
-            if (listForKey.isEmpty()) {
-                locksForClient.remove(key);
-                if (locksForClient.isEmpty()) {
-                    remoteLocks.remove(sourceClientId);
-                }
-            }
-        } finally {
-            remoteLocksLock.unlock();
         }
     }
 }
