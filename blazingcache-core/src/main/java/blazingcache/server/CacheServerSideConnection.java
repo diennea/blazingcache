@@ -244,7 +244,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 }
                 RawString key = (RawString) message.parameters.get("key");
                 server.addPendingOperations(1);
-                server.lockKey(key, clientId, new SimpleCallback<String>() {
+                server.lockKey(key, clientId, this, new SimpleCallback<String>() {
                     @Override
                     public void onResult(String result, Throwable error) {
                         server.addPendingOperations(-1);
@@ -552,27 +552,6 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
             }
         });
 
-    }
-
-    void sendPrefixInvalidationMessage(String sourceClientId, RawString prefix, BroadcastRequestStatus invalidation) {
-        Channel _channel = channel;
-        if (_channel == null || !_channel.isValid()) {
-            // not connected, quindi cache vuota
-            invalidation.clientDone(clientId);
-            return;
-        }
-        _channel.sendMessageWithAsyncReply(Message.INVALIDATE_BY_PREFIX(sourceClientId, prefix), server.getSlowClientTimeout(), new ReplyCallback() {
-
-            @Override
-            public void replyReceived(Message originalMessage, Message message, Throwable error) {
-                LOGGER.log(Level.FINEST, clientId + " answered to invalidateByPrefix " + prefix + ": " + message + ", " + error);
-                if (error != null) {
-                    error.printStackTrace();
-                }
-                // in ogni caso il client ha finito
-                invalidation.clientDone(clientId);
-            }
-        });
     }
 
     void sendFetchKeyMessage(String remoteClientId, RawString key, SimpleCallback<Message> onFinish) {

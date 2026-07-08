@@ -372,12 +372,15 @@ public class CacheServer implements AutoCloseable {
         });
     }
 
-    public void lockKey(RawString key, String sourceClientId, SimpleCallback<String> onFinish) {
-        // The scheduler owns the lock lifecycle. It checks, at grant time, that the
-        // owning client is still connected, so a LOCK request that raced ahead of the
-        // client's disconnect cleanup is not granted a lock that would never be released.
+    public void lockKey(RawString key, String sourceClientId, CacheServerSideConnection connection, SimpleCallback<String> onFinish) {
+        // The scheduler owns the lock lifecycle. At grant time it verifies the lock is
+        // still owned by the SAME connection that requested it, not merely that the
+        // client id is still connected: a LOCK that raced ahead of its connection's
+        // disconnect cleanup must not be granted to a *new* connection of the same
+        // client that reconnected in the meantime — the grant reply would be sent on the
+        // original (dead) channel and silently dropped, stalling the key forever.
         scheduler.submitLock(key, sourceClientId,
-                () -> acceptor.getActualConnectionFromClient(sourceClientId) != null,
+                () -> acceptor.getActualConnectionFromClient(sourceClientId) == connection,
                 onFinish);
     }
 
@@ -493,29 +496,33 @@ public class CacheServer implements AutoCloseable {
 
     public void invalidateByPrefix(RawString prefix, String sourceClientId, SimpleCallback<RawString> onFinish) {
         Runnable action = () -> {
-            // LOCKS ??
-            Set<String> clients = cacheStatus.getAllClientsWithListener();
-            if (sourceClientId != null) {
-                clients.remove(sourceClientId);
+            // Enumerate the keys matching the prefix and run a per-key invalidation
+            // through the scheduler, so each one is serialized (on its own key slot) with
+            // any concurrent put/load/fetch on that key. A single bulk prefix removal
+            // (the previous approach) did not go through the scheduler and could
+            // interleave with an in-flight putEntry on a matching key: the client would
+            // re-store the entry after dropping it while the server had already removed
+            // its registration, leaving the client holding stale data the server no
+            // longer knows about.
+            List<RawString> keys = new ArrayList<>();
+            for (RawString key : cacheStatus.getKeys()) {
+                if (key.startsWith(prefix)) {
+                    keys.add(key);
+                }
             }
-            if (clients.isEmpty()) {
+            if (keys.isEmpty()) {
                 onFinish.onResult(prefix, null);
                 return;
             }
-            BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateByPrefix " + prefix + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clients, onFinish, (clientId, error) -> {
-                cacheStatus.removeKeyByPrefixForClient(prefix, clientId);
-            });
-
-            networkRequestsStatusMonitor.register(invalidation);
-            clients.forEach((clientId) -> {
-                CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
-                if (connection == null) {
-                    LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering prefix " + prefix + " invalidated");
-                    invalidation.clientDone(clientId);
-                } else {
-                    connection.sendPrefixInvalidationMessage(sourceClientId, prefix, invalidation);
+            AtomicInteger remaining = new AtomicInteger(keys.size());
+            SimpleCallback<RawString> perKey = (result, error) -> {
+                if (remaining.decrementAndGet() == 0) {
+                    onFinish.onResult(prefix, null);
                 }
-            });
+            };
+            for (RawString key : keys) {
+                invalidateKey(key, sourceClientId, null, perKey);
+            }
         };
         executeOnHandler("invalidateByPrefix " + prefix, action);
     }

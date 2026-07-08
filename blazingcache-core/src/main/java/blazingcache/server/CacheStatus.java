@@ -156,37 +156,6 @@ public class CacheStatus {
         LOGGER.log(Level.FINEST, "removeKeyForClient key={0} client={1} -> keysForClient {2}", new Object[]{key, client, keysForClient});
     }
 
-    public void removeKeyByPrefixForClient(RawString prefix, String client) {
-        LOGGER.log(Level.FINEST, "removeKeyByPrefixForClient prefix={0} client={1}", new Object[]{prefix, client});
-        lock.writeLock().lock();
-        try {
-
-            Set<RawString> keys = keysForClient.get(client);
-            Set<RawString> selectedKeys;
-            if (keys != null) {
-                selectedKeys = keys.stream().filter(key -> key.startsWith(prefix)).collect(Collectors.toSet());
-                keys.removeAll(selectedKeys);
-                if (keys.isEmpty()) {
-                    keysForClient.remove(client);
-                }
-            } else {
-                selectedKeys = Collections.emptySet();
-            }
-            for (RawString key : selectedKeys) {
-                Set<String> clients = clientsForKey.get(key);
-                if (clients != null) {
-                    clients.remove(client);
-                    if (clients.isEmpty()) {
-                        clientsForKey.remove(key);
-                        entryExpireTime.remove(key);
-                    }
-                }
-            }
-        } finally {
-            lock.writeLock().unlock();
-        }
-    }
-
     /**
      * Removes all the key listeners of a disconnected client.
      *
