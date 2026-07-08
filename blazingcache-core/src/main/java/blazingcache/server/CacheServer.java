@@ -496,14 +496,44 @@ public class CacheServer implements AutoCloseable {
 
     public void invalidateByPrefix(RawString prefix, String sourceClientId, SimpleCallback<RawString> onFinish) {
         Runnable action = () -> {
-            // Enumerate the keys matching the prefix and run a per-key invalidation
-            // through the scheduler, so each one is serialized (on its own key slot) with
-            // any concurrent put/load/fetch on that key. A single bulk prefix removal
-            // (the previous approach) did not go through the scheduler and could
-            // interleave with an in-flight putEntry on a matching key: the client would
-            // re-store the entry after dropping it while the server had already removed
-            // its registration, leaving the client holding stale data the server no
-            // longer knows about.
+            // Capture the clients to notify BEFORE phase 1: the per-key removals clear the
+            // holder registrations, so computing this set afterwards would miss the very
+            // clients that held the matching keys.
+            Set<String> clientsToNotify = cacheStatus.getAllClientsWithListener();
+            if (sourceClientId != null) {
+                clientsToNotify.remove(sourceClientId);
+            }
+            // Phase 2: notify every client with a SINGLE prefix broadcast (as before), so
+            // the message fan-out stays O(clients), not O(matching keys). Runs only after
+            // the server-side removals of phase 1 have completed, so that any PUT_ENTRY a
+            // concurrent put sent to a client is ordered before this invalidation on that
+            // client's channel.
+            Runnable broadcastPrefixToClients = () -> {
+                if (clientsToNotify.isEmpty()) {
+                    onFinish.onResult(prefix, null);
+                    return;
+                }
+                // holder registrations were already cleared per key in phase 1, so this
+                // broadcast only tells the clients to drop the matching keys locally
+                BroadcastRequestStatus invalidation = new BroadcastRequestStatus("invalidateByPrefix " + prefix + " from " + sourceClientId + " started at " + new java.sql.Timestamp(System.currentTimeMillis()), clientsToNotify, onFinish, null);
+                networkRequestsStatusMonitor.register(invalidation);
+                clientsToNotify.forEach((clientId) -> {
+                    CacheServerSideConnection connection = acceptor.getActualConnectionFromClient(clientId);
+                    if (connection == null) {
+                        LOGGER.log(Level.SEVERE, "client " + clientId + " not connected, considering prefix " + prefix + " invalidated");
+                        invalidation.clientDone(clientId);
+                    } else {
+                        connection.sendPrefixInvalidationMessage(sourceClientId, prefix, invalidation);
+                    }
+                });
+            };
+
+            // Phase 1: clear each matching key on its own scheduler slot (no network), so
+            // the server-side removal is serialized with any concurrent put/load/fetch on
+            // that key. A single bulk prefix removal (the previous approach) did not go
+            // through the scheduler and could interleave with an in-flight putEntry on a
+            // matching key, leaving the client holding an entry the server no longer knows
+            // about (stale forever).
             List<RawString> keys = new ArrayList<>();
             for (RawString key : cacheStatus.getKeys()) {
                 if (key.startsWith(prefix)) {
@@ -511,17 +541,18 @@ public class CacheServer implements AutoCloseable {
                 }
             }
             if (keys.isEmpty()) {
-                onFinish.onResult(prefix, null);
+                broadcastPrefixToClients.run();
                 return;
             }
             AtomicInteger remaining = new AtomicInteger(keys.size());
-            SimpleCallback<RawString> perKey = (result, error) -> {
+            SimpleCallback<RawString> perKeyRemoved = (result, error) -> {
                 if (remaining.decrementAndGet() == 0) {
-                    onFinish.onResult(prefix, null);
+                    broadcastPrefixToClients.run();
                 }
             };
             for (RawString key : keys) {
-                invalidateKey(key, sourceClientId, null, perKey);
+                scheduler.submitExclusive(key, KeyedScheduler.Verb.INVALIDATE, null,
+                        () -> cacheStatus.removeKey(key), null, key, perKeyRemoved);
             }
         };
         executeOnHandler("invalidateByPrefix " + prefix, action);

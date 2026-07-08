@@ -157,6 +157,34 @@ public class CacheStatus {
     }
 
     /**
+     * Removes a key entirely, dropping the registration of every client that held it.
+     * Used by prefix invalidation, which clears each matching key on its own scheduler
+     * slot (serialized with concurrent per-key operations) before the clients are
+     * notified with a single prefix broadcast.
+     */
+    void removeKey(RawString key) {
+        LOGGER.log(Level.FINEST, "removeKey key={0}", key);
+        lock.writeLock().lock();
+        try {
+            Set<String> clients = clientsForKey.remove(key);
+            entryExpireTime.remove(key);
+            if (clients != null) {
+                for (String client : clients) {
+                    Set<RawString> keys = keysForClient.get(client);
+                    if (keys != null) {
+                        keys.remove(key);
+                        if (keys.isEmpty()) {
+                            keysForClient.remove(client);
+                        }
+                    }
+                }
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    /**
      * Removes all the key listeners of a disconnected client.
      *
      * @return the number of listeners removed. Application locks held by the client are
