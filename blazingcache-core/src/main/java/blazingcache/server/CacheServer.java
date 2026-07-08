@@ -534,6 +534,20 @@ public class CacheServer implements AutoCloseable {
             // through the scheduler and could interleave with an in-flight putEntry on a
             // matching key, leaving the client holding an entry the server no longer knows
             // about (stale forever).
+            //
+            // Concurrency note - a put/load on a matching key that arrives AFTER its phase-1
+            // removal but before the phase-2 broadcast re-registers that client, which then
+            // drops the key on the phase-2 broadcast: the server is left transiently
+            // believing the client still holds a key it dropped. This divergence is benign
+            // and self-healing (never the reverse "client holds it, server does not know"
+            // that would serve stale data): the next invalidate/put on the key, or the
+            // client disconnect, reconciles it, and a fetch routed to that client simply
+            // misses. The dangerous direction is prevented by the per-key serialization
+            // above plus running phase 2 only after phase 1, which orders any PUT_ENTRY a
+            // concurrent put sent to a client before this invalidation on its channel.
+            // Removing even the benign residual would require either a per-client bulk
+            // removal (reintroducing the race) or a per-key client broadcast (the O(keys)
+            // fan-out this design avoids), so it is accepted on purpose.
             List<RawString> keys = new ArrayList<>();
             for (RawString key : cacheStatus.getKeys()) {
                 if (key.startsWith(prefix)) {
