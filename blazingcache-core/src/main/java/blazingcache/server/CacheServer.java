@@ -589,8 +589,23 @@ public class CacheServer implements AutoCloseable {
     }
 
     void clientDisconnected(String clientId, long connectionId) {
-        int count = cacheStatus.removeClientListeners(clientId);
-        LOGGER.log(Level.SEVERE, "client " + clientId + " (connection " + connectionId + ") disconnected, removed " + count + " key listeners");
+        // Remove this client's key listeners only if no NEWER connection has already
+        // taken over the same client id (a reconnect). Otherwise the late cleanup of the
+        // dead connection would wipe the registrations the new connection just made,
+        // leaving it holding entries the server no longer knows about (stale). This
+        // mirrors the connection-identity handling of the application locks. When
+        // skipped, the dead connection's now-stale registrations are left as benign,
+        // self-healing phantoms for the new connection instead of being wrongly wiped.
+        CacheServerSideConnection current = acceptor.getActualConnectionFromClient(clientId);
+        boolean supersededByNewerConnection = current != null && current.getConnectionId() != connectionId;
+        if (supersededByNewerConnection) {
+            LOGGER.log(Level.SEVERE, "client " + clientId + " (connection " + connectionId
+                    + ") disconnected, but connection " + current.getConnectionId()
+                    + " already took over; leaving its key listeners in place");
+        } else {
+            int count = cacheStatus.removeClientListeners(clientId);
+            LOGGER.log(Level.SEVERE, "client " + clientId + " (connection " + connectionId + ") disconnected, removed " + count + " key listeners");
+        }
         // Release every application lock held or queued by THIS connection. Keying the
         // release on the connection id (not the client id) means a late cleanup of a dead
         // connection cannot release a lock that a new connection of the same client
