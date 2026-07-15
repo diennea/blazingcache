@@ -45,6 +45,11 @@ public class CacheStatus {
     private final Map<RawString, Set<String>> clientsForKey = new HashMap<>();
     private final Map<String, Set<RawString>> keysForClient = new HashMap<>();
     private final Map<RawString, Long> entryExpireTime = new HashMap<>();
+    // clientId -> id of the connection that last registered a key for it. Used to make
+    // the disconnect cleanup connection-identity aware: a late cleanup of a dead
+    // connection must not wipe the registrations a new connection of the same client made
+    // after reconnecting. Guarded by {@link #lock}.
+    private final Map<String, Long> connectionForClient = new HashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
 
     @Override
@@ -57,8 +62,8 @@ public class CacheStatus {
         }
     }
 
-    public void registerKeyForClient(RawString key, String client, long expiretime) {
-        LOGGER.log(Level.FINEST, "registerKeyForClient key={0} client={1}", new Object[]{key, client});
+    public void registerKeyForClient(RawString key, String client, long connectionId, long expiretime) {
+        LOGGER.log(Level.FINEST, "registerKeyForClient key={0} client={1} connection={2}", new Object[]{key, client, connectionId});
         lock.writeLock().lock();
         try {
             Set<String> clients = clientsForKey.get(key);
@@ -74,6 +79,13 @@ public class CacheStatus {
                 keysForClient.put(client, keys);
             }
             keys.add(key);
+            // record which connection owns this client's registrations now; a later
+            // disconnect of an older connection will not wipe them (see removeClientListeners).
+            // Advance the owner FORWARD-ONLY: connection ids are monotonic, so a late
+            // registration arriving from an older (already-superseded) connection - e.g. a
+            // delayed fetch reply, or a put/load that was queued behind a held lock - must
+            // not move ownership back to that dead connection and defeat the guard.
+            connectionForClient.merge(client, connectionId, Math::max);
             if (expiretime > 0) {
                 entryExpireTime.put(key, expiretime);
             } else {
@@ -148,6 +160,7 @@ public class CacheStatus {
                 keys.remove(key);
                 if (keys.isEmpty()) {
                     keysForClient.remove(client);
+                    connectionForClient.remove(client);
                 }
             }
         } finally {
@@ -157,43 +170,26 @@ public class CacheStatus {
     }
 
     /**
-     * Removes a key entirely, dropping the registration of every client that held it.
-     * Used by prefix invalidation, which clears each matching key on its own scheduler
-     * slot (serialized with concurrent per-key operations) before the clients are
-     * notified with a single prefix broadcast.
-     */
-    void removeKey(RawString key) {
-        LOGGER.log(Level.FINEST, "removeKey key={0}", key);
-        lock.writeLock().lock();
-        try {
-            Set<String> clients = clientsForKey.remove(key);
-            entryExpireTime.remove(key);
-            if (clients != null) {
-                for (String client : clients) {
-                    Set<RawString> keys = keysForClient.get(client);
-                    if (keys != null) {
-                        keys.remove(key);
-                        if (keys.isEmpty()) {
-                            keysForClient.remove(client);
-                        }
-                    }
-                }
-            }
-        } finally {
-            lock.writeLock().unlock();
-        }
-    }
-
-    /**
-     * Removes all the key listeners of a disconnected client.
+     * Removes the key listeners of a disconnected connection, but ONLY if that connection
+     * is still the one that owns the client's registrations. If a newer connection of the
+     * same client (a reconnect) has registered in the meantime, this is a no-op so its
+     * fresh registrations are not wiped — the check and the removal happen atomically
+     * under the write lock, together with the concurrent registerKeyForClient, so there
+     * is no time-of-check/time-of-use gap. The dead connection's now-stale registrations
+     * are then left as benign, self-healing phantoms.
      *
-     * @return the number of listeners removed. Application locks held by the client are
-     * released separately by the {@link KeyedScheduler}, which owns the lock lifecycle.
+     * @return the number of listeners removed. Application locks are released separately
+     * by the {@link KeyedScheduler}, which owns the lock lifecycle.
      */
-    int removeClientListeners(String clientId) {
+    int removeClientListeners(String clientId, long connectionId) {
         AtomicInteger count = new AtomicInteger();
         lock.writeLock().lock();
         try {
+            Long owner = connectionForClient.get(clientId);
+            if (owner != null && owner != connectionId) {
+                // a newer connection of this client already took over its registrations
+                return 0;
+            }
             Set<RawString> keys = keysForClient.get(clientId);
             if (keys != null) {
                 keys.forEach((key) -> {
@@ -209,6 +205,7 @@ public class CacheStatus {
                 });
             }
             keysForClient.remove(clientId);
+            connectionForClient.remove(clientId);
         } finally {
             lock.writeLock().unlock();
         }

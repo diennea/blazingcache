@@ -561,8 +561,17 @@ public final class KeyedScheduler {
         // Evaluate liveness outside the slot lock (it calls into the acceptor); the tiny
         // window between this check and the grant is backstopped by
         // releaseLocksForConnection, which runs after the connection is removed and finds
-        // the published heldToken.
-        boolean ownerConnected = op.ownerStillConnected == null || op.ownerStillConnected.getAsBoolean();
+        // the published heldToken. Guard the call: heldToken is already published, so a
+        // throw escaping here would leave the key locked forever AND wedge drain() with
+        // draining left true. Treat any failure as "owner not connected" -> the lock is
+        // released below instead of leaked.
+        boolean ownerConnected;
+        try {
+            ownerConnected = op.ownerStillConnected == null || op.ownerStillConnected.getAsBoolean();
+        } catch (Throwable t) {
+            LOGGER.log(Level.SEVERE, "error checking lock owner liveness for key " + slot.key + ", not granting the lock", t);
+            ownerConnected = false;
+        }
         boolean granted = false;
         slot.lock.lock();
         try {

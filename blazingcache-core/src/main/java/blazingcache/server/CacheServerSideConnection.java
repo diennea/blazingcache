@@ -325,7 +325,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 RawString _lockId = RawString.of(message.parameters.get("lockId"));
                 String lockId = _lockId != null ? _lockId.toString() : null;
                 server.addPendingOperations(1);
-                server.fetchEntry(key, clientId, lockId, new SimpleCallback<Message>() {
+                server.fetchEntry(key, clientId, connectionId, lockId, new SimpleCallback<Message>() {
                     @Override
                     public void onResult(Message result, Throwable error) {
                         server.addPendingOperations(-1);
@@ -385,7 +385,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 RawString _lockId = RawString.of(message.parameters.get("lockId"));
                 String lockId = _lockId != null ? _lockId.toString() : null;
                 server.addPendingOperations(1);
-                server.putEntry(key, data, expiretime, clientId, lockId, new SimpleCallback<RawString>() {
+                server.putEntry(key, data, expiretime, clientId, connectionId, lockId, new SimpleCallback<RawString>() {
                     @Override
                     public void onResult(RawString result, Throwable error) {
                         server.addPendingOperations(-1);
@@ -405,7 +405,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
                 RawString _lockId = RawString.of(message.parameters.get("lockId"));
                 String lockId = _lockId != null ? _lockId.toString() : null;
                 server.addPendingOperations(1);
-                server.loadEntry(key, expiretime, clientId, lockId, new SimpleCallback<RawString>() {
+                server.loadEntry(key, expiretime, clientId, connectionId, lockId, new SimpleCallback<RawString>() {
                     @Override
                     public void onResult(RawString result, Throwable error) {
                         server.addPendingOperations(-1);

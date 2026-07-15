@@ -381,6 +381,32 @@ public class KeyedSchedulerTest {
     }
 
     /**
+     * If the lock-owner liveness check itself throws, the lock (whose token is already
+     * published at dequeue) must not be left held and the key's drain must not be wedged:
+     * the failure is treated as "owner not connected", the lock is released, and queued
+     * work resumes.
+     */
+    @Test
+    public void lockOwnerLivenessCheckThrowingReleasesAndDoesNotWedge() {
+        KeyedScheduler s = new KeyedScheduler();
+        final boolean[] aborted = {false};
+        s.submitLock(K, 1L, () -> {
+            throw new RuntimeException("liveness check boom");
+        }, (result, error) -> {
+            if (error != null) {
+                aborted[0] = true;
+            }
+        });
+        assertTrue("a throwing liveness check must abort the grant", aborted[0]);
+        assertEquals(0, s.getNumberOfLockedKeys());
+
+        put(s, "AFTER", null);
+        assertTrue("the key must not be wedged", events.contains("bcast:AFTER"));
+        fire("AFTER");
+        assertTrue(s.getLockedKeys().isEmpty());
+    }
+
+    /**
      * Unlocking with token 0 (the "no lock held" sentinel) on an existing-but-unlocked
      * slot must NOT produce a false success.
      */
