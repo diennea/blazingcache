@@ -85,7 +85,10 @@ public class CacheServerEndpoint implements ServerSideConnectionAcceptor<CacheSe
         LOGGER.log(Level.SEVERE, "connectionClosed {0}", con);
         connections.remove(con.getConnectionId());
         if (con.getClientId() != null) {
-            clientConnections.remove(con.getClientId()); // to be remove only if the connection is the current connection
+            // remove the client mapping only if it still points to THIS connection: a
+            // newer connection of the same client (a reconnect) must not be unmapped by
+            // the late cleanup of the old, dead connection
+            clientConnections.remove(con.getClientId(), con);
         }
     }
 

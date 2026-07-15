@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -46,9 +45,12 @@ public class CacheStatus {
     private final Map<RawString, Set<String>> clientsForKey = new HashMap<>();
     private final Map<String, Set<RawString>> keysForClient = new HashMap<>();
     private final Map<RawString, Long> entryExpireTime = new HashMap<>();
+    // clientId -> id of the connection that last registered a key for it. Used to make
+    // the disconnect cleanup connection-identity aware: a late cleanup of a dead
+    // connection must not wipe the registrations a new connection of the same client made
+    // after reconnecting. Guarded by {@link #lock}.
+    private final Map<String, Long> connectionForClient = new HashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
-    private final Map<String, Map<RawString, List<LockID>>> remoteLocks = new HashMap<>();
-    private final ReentrantLock remoteLocksLock = new ReentrantLock(true);
 
     @Override
     public String toString() {
@@ -60,8 +62,8 @@ public class CacheStatus {
         }
     }
 
-    public void registerKeyForClient(RawString key, String client, long expiretime) {
-        LOGGER.log(Level.FINEST, "registerKeyForClient key={0} client={1}", new Object[]{key, client});
+    public void registerKeyForClient(RawString key, String client, long connectionId, long expiretime) {
+        LOGGER.log(Level.FINEST, "registerKeyForClient key={0} client={1} connection={2}", new Object[]{key, client, connectionId});
         lock.writeLock().lock();
         try {
             Set<String> clients = clientsForKey.get(key);
@@ -77,6 +79,13 @@ public class CacheStatus {
                 keysForClient.put(client, keys);
             }
             keys.add(key);
+            // record which connection owns this client's registrations now; a later
+            // disconnect of an older connection will not wipe them (see removeClientListeners).
+            // Advance the owner FORWARD-ONLY: connection ids are monotonic, so a late
+            // registration arriving from an older (already-superseded) connection - e.g. a
+            // delayed fetch reply, or a put/load that was queued behind a held lock - must
+            // not move ownership back to that dead connection and defeat the guard.
+            connectionForClient.merge(client, connectionId, Math::max);
             if (expiretime > 0) {
                 entryExpireTime.put(key, expiretime);
             } else {
@@ -151,6 +160,7 @@ public class CacheStatus {
                 keys.remove(key);
                 if (keys.isEmpty()) {
                     keysForClient.remove(client);
+                    connectionForClient.remove(client);
                 }
             }
         } finally {
@@ -159,61 +169,27 @@ public class CacheStatus {
         LOGGER.log(Level.FINEST, "removeKeyForClient key={0} client={1} -> keysForClient {2}", new Object[]{key, client, keysForClient});
     }
 
-    public void removeKeyByPrefixForClient(RawString prefix, String client) {
-        LOGGER.log(Level.FINEST, "removeKeyByPrefixForClient prefix={0} client={1}", new Object[]{prefix, client});
-        lock.writeLock().lock();
-        try {
-
-            Set<RawString> keys = keysForClient.get(client);
-            Set<RawString> selectedKeys;
-            if (keys != null) {
-                selectedKeys = keys.stream().filter(key -> key.startsWith(prefix)).collect(Collectors.toSet());
-                keys.removeAll(selectedKeys);
-                if (keys.isEmpty()) {
-                    keysForClient.remove(client);
-                }
-            } else {
-                selectedKeys = Collections.emptySet();
-            }
-            for (RawString key : selectedKeys) {
-                Set<String> clients = clientsForKey.get(key);
-                if (clients != null) {
-                    clients.remove(client);
-                    if (clients.isEmpty()) {
-                        clientsForKey.remove(key);
-                        entryExpireTime.remove(key);
-                    }
-                }
-            }
-        } finally {
-            lock.writeLock().unlock();
-        }
-    }
-
-    public static final class ClientRemovalResult {
-
-        private final int listenersCount;
-        private final Map<RawString, List<LockID>> locks;
-
-        public ClientRemovalResult(int listenersCount, Map<RawString, List<LockID>> locks) {
-            this.listenersCount = listenersCount;
-            this.locks = locks;
-        }
-
-        public int getListenersCount() {
-            return listenersCount;
-        }
-
-        public Map<RawString, List<LockID>> getLocks() {
-            return locks;
-        }
-
-    }
-
-    ClientRemovalResult removeClientListeners(String clientId) {
+    /**
+     * Removes the key listeners of a disconnected connection, but ONLY if that connection
+     * is still the one that owns the client's registrations. If a newer connection of the
+     * same client (a reconnect) has registered in the meantime, this is a no-op so its
+     * fresh registrations are not wiped — the check and the removal happen atomically
+     * under the write lock, together with the concurrent registerKeyForClient, so there
+     * is no time-of-check/time-of-use gap. The dead connection's now-stale registrations
+     * are then left as benign, self-healing phantoms.
+     *
+     * @return the number of listeners removed. Application locks are released separately
+     * by the {@link KeyedScheduler}, which owns the lock lifecycle.
+     */
+    int removeClientListeners(String clientId, long connectionId) {
         AtomicInteger count = new AtomicInteger();
         lock.writeLock().lock();
         try {
+            Long owner = connectionForClient.get(clientId);
+            if (owner != null && owner != connectionId) {
+                // a newer connection of this client already took over its registrations
+                return 0;
+            }
             Set<RawString> keys = keysForClient.get(clientId);
             if (keys != null) {
                 keys.forEach((key) -> {
@@ -229,17 +205,11 @@ public class CacheStatus {
                 });
             }
             keysForClient.remove(clientId);
+            connectionForClient.remove(clientId);
         } finally {
             lock.writeLock().unlock();
         }
-        Map<RawString, List<LockID>> locksForClient;
-        remoteLocksLock.lock();
-        try {
-            locksForClient = remoteLocks.remove(clientId);
-        } finally {
-            remoteLocksLock.unlock();
-        }
-        return new ClientRemovalResult(count.get(), locksForClient);
+        return count.get();
     }
 
     Set<String> getAllClientsWithListener() {
@@ -275,48 +245,6 @@ public class CacheStatus {
             }
         } finally {
             lock.writeLock().unlock();
-        }
-    }
-
-    void clientLockedKey(String sourceClientId, RawString key, LockID lockID) {
-        remoteLocksLock.lock();
-        try {
-            Map<RawString, List<LockID>> locksForClient = remoteLocks.get(sourceClientId);
-            if (locksForClient == null) {
-                locksForClient = new HashMap<>();
-                remoteLocks.put(sourceClientId, locksForClient);
-            }
-            List<LockID> listForKey = locksForClient.get(key);
-            if (listForKey == null) {
-                listForKey = new ArrayList<>();
-                locksForClient.put(key, listForKey);
-            }
-            listForKey.add(lockID);
-        } finally {
-            remoteLocksLock.unlock();
-        }
-    }
-
-    void clientUnlockedKey(String sourceClientId, RawString key, LockID lockID) {
-        remoteLocksLock.lock();
-        try {
-            Map<RawString, List<LockID>> locksForClient = remoteLocks.get(sourceClientId);
-            if (locksForClient == null) {
-                return;
-            }
-            List<LockID> listForKey = locksForClient.get(key);
-            if (listForKey == null) {
-                return;
-            }
-            listForKey.remove(lockID);
-            if (listForKey.isEmpty()) {
-                locksForClient.remove(key);
-                if (locksForClient.isEmpty()) {
-                    remoteLocks.remove(sourceClientId);
-                }
-            }
-        } finally {
-            remoteLocksLock.unlock();
         }
     }
 }

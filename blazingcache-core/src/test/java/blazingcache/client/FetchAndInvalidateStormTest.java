@@ -38,12 +38,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Test;
 
 /**
- * Reproducer for issue #188: under a storm of concurrent fetch and invalidate
- * operations on a single hot key, the server keeps a per-key WRITE lock held for
- * the whole duration of the network round-trip (see
- * {@code CacheServer.fetchEntry / invalidateKey} which acquire
- * {@code KeyedLockManager.acquireWriteLockForKey} and release it only in the
- * async reply callback).
+ * Reproducer for issue #188: historically, under a storm of concurrent fetch and
+ * invalidate operations on a single hot key, the server kept a per-key WRITE lock
+ * held for the whole duration of the network round-trip, tying up a pool thread per
+ * waiting operation. Coordination is now handled by {@code KeyedScheduler} (a
+ * non-blocking per-key event queue), so no thread ever blocks on a lock across the
+ * network round-trip.
  * <p>
  * As a consequence every operation on that key is fully serialized and each one
  * holds the lock for a full RTT. When many clients hit the same key at once the
