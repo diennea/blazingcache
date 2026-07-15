@@ -442,7 +442,7 @@ public class CacheServerSideConnection implements ChannelEventListener, ServerSi
         }
         channel = null;
         server.getAcceptor().connectionClosed(this);
-        server.clientDisconnected(clientId);
+        server.clientDisconnected(clientId, connectionId);
     }
 
     void answerConnectionNotAcceptedAndClose(Message connectionRequestMessage, Throwable ex

@@ -373,13 +373,14 @@ public class CacheServer implements AutoCloseable {
     }
 
     public void lockKey(RawString key, String sourceClientId, CacheServerSideConnection connection, SimpleCallback<String> onFinish) {
-        // The scheduler owns the lock lifecycle. At grant time it verifies the lock is
-        // still owned by the SAME connection that requested it, not merely that the
-        // client id is still connected: a LOCK that raced ahead of its connection's
-        // disconnect cleanup must not be granted to a *new* connection of the same
-        // client that reconnected in the meantime — the grant reply would be sent on the
-        // original (dead) channel and silently dropped, stalling the key forever.
-        scheduler.submitLock(key, sourceClientId,
+        // The scheduler owns the lock lifecycle and ties it to this exact connection (by
+        // id), not just to the client id. At grant time it verifies the lock is still
+        // owned by the SAME connection that requested it, and on disconnect it releases
+        // only the locks of that connection. This closes the acquire-vs-disconnect race
+        // in both directions when a client dies and reconnects with the same id on a new
+        // connection: the orphaned grant is not handed to the new connection, and a late
+        // cleanup of the dead connection does not release the new connection's lock.
+        scheduler.submitLock(key, connection.getConnectionId(),
                 () -> acceptor.getActualConnectionFromClient(sourceClientId) == connection,
                 onFinish);
     }
@@ -548,6 +549,13 @@ public class CacheServer implements AutoCloseable {
             // Removing even the benign residual would require either a per-client bulk
             // removal (reintroducing the race) or a per-key client broadcast (the O(keys)
             // fan-out this design avoids), so it is accepted on purpose.
+            //
+            // Behavioural change vs. the legacy prefix invalidation (which ignored locks
+            // and per-key coordination entirely): because phase 1 goes through the
+            // scheduler, a matching key that is currently held by an application lock
+            // (which has NO timeout) or has an invalidate/put broadcast in flight makes
+            // this prefix invalidation WAIT until that lock is released / that broadcast
+            // completes, before its clients are notified.
             List<RawString> keys = new ArrayList<>();
             for (RawString key : cacheStatus.getKeys()) {
                 if (key.startsWith(prefix)) {
@@ -580,13 +588,14 @@ public class CacheServer implements AutoCloseable {
         }
     }
 
-    void clientDisconnected(String clientId) {
+    void clientDisconnected(String clientId, long connectionId) {
         int count = cacheStatus.removeClientListeners(clientId);
-        LOGGER.log(Level.SEVERE, "client " + clientId + " disconnected, removed " + count + " key listeners");
-        // Release every application lock the client held or was queued for. This is
-        // driven entirely by the scheduler (which owns the lock ownership), so a lock
-        // being acquired or still queued when the client dropped is not left dangling.
-        scheduler.releaseLocksForClient(clientId);
+        LOGGER.log(Level.SEVERE, "client " + clientId + " (connection " + connectionId + ") disconnected, removed " + count + " key listeners");
+        // Release every application lock held or queued by THIS connection. Keying the
+        // release on the connection id (not the client id) means a late cleanup of a dead
+        // connection cannot release a lock that a new connection of the same client
+        // acquired after reconnecting.
+        scheduler.releaseLocksForConnection(connectionId);
     }
 
     public long getCurrentTimestamp() {

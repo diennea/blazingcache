@@ -113,6 +113,7 @@ public final class KeyedScheduler {
             Consumer<Runnable> body, Runnable onInvalidLock) {
         Op op = new Op(Verb.FETCH, Mode.SHARED);
         op.sharedBody = body;
+        op.resultKey = key; // only used for diagnostics (e.g. error logging)
         submit(key, op, providedLockId, onInvalidLock);
     }
 
@@ -146,19 +147,21 @@ public final class KeyedScheduler {
      * Acquires an application lock on the key. When the lock op reaches the head of the
      * queue a fresh monotonic token is published atomically as the held token; the slot
      * then stays "held" (no further queued op is drained) until {@link #submitUnlock}
-     * (or {@link #releaseLocksForClient} on disconnect) releases it. Operations carrying
-     * the matching token bypass the queue in the meantime.
+     * (or {@link #releaseLocksForConnection} on disconnect) releases it. Operations
+     * carrying the matching token bypass the queue in the meantime.
      * <p>
-     * {@code ownerStillConnected} is checked at grant time: if the owning client has
-     * disconnected by then (its LOCK request having raced ahead of the disconnect
-     * cleanup), the lock is immediately released instead of being granted to a gone
-     * client, closing the acquire-vs-disconnect window.
+     * The lock is owned by a specific connection ({@code ownerConnectionId}), not merely
+     * by a client id, so both the grant-time liveness check ({@code ownerStillConnected})
+     * and the disconnect release ({@link #releaseLocksForConnection}) are tied to the
+     * exact connection that acquired it. This closes the acquire-vs-disconnect race in
+     * both directions when a client dies and reconnects with the same id on a new
+     * connection.
      */
-    public void submitLock(RawString key, String clientId,
+    public void submitLock(RawString key, long ownerConnectionId,
             BooleanSupplier ownerStillConnected, SimpleCallback<String> onFinish) {
         long token = tokenGenerator.incrementAndGet();
         Op op = new Op(Verb.LOCK, Mode.EXCLUSIVE);
-        op.sourceClientId = clientId;
+        op.ownerConnectionId = ownerConnectionId;
         op.lockToken = token;
         op.ownerStillConnected = ownerStillConnected;
         op.lockOnFinish = onFinish;
@@ -193,7 +196,7 @@ public final class KeyedScheduler {
                 // unlocked key does not produce a false success
                 if (token != 0 && slot.heldToken == token) {
                     slot.heldToken = 0;
-                    slot.lockOwnerClientId = null;
+                    slot.lockOwnerConnectionId = 0;
                     released = true;
                 }
             } finally {
@@ -217,28 +220,31 @@ public final class KeyedScheduler {
     }
 
     /**
-     * Releases every application lock owned by a disconnected client and cancels its
-     * still-queued lock requests, then resumes the drain of the affected keys. This is
-     * the single, scheduler-driven release path used on disconnect: because the lock
-     * ownership ({@code heldToken} + {@code lockOwnerClientId}) is published atomically
-     * at dequeue, there is no window in which a held or being-acquired lock is invisible
-     * here, and queued lock requests that never ran are cancelled rather than later
-     * granted to the gone client.
+     * Releases every application lock owned by a disconnected CONNECTION and cancels the
+     * lock requests it still had queued, then resumes the drain of the affected keys.
+     * <p>
+     * Ownership is tracked by connection identity ({@code ownerConnectionId}), not by
+     * client id, so a late cleanup of a dead connection cannot release a lock that a new
+     * connection of the same client legitimately acquired after reconnecting. This is the
+     * single, scheduler-driven release path used on disconnect: because the lock
+     * ownership is published atomically at dequeue, there is no window in which a held or
+     * being-acquired lock is invisible here, and queued lock requests that never ran are
+     * cancelled rather than later granted to the gone connection.
      */
-    public void releaseLocksForClient(String clientId) {
+    public void releaseLocksForConnection(long connectionId) {
         slots.forEach((key, slot) -> {
             List<SimpleCallback<String>> cancelledLocks = null;
             boolean changed = false;
             slot.lock.lock();
             try {
-                if (slot.heldToken != 0 && clientId.equals(slot.lockOwnerClientId)) {
+                if (slot.heldToken != 0 && slot.lockOwnerConnectionId == connectionId) {
                     slot.heldToken = 0;
-                    slot.lockOwnerClientId = null;
+                    slot.lockOwnerConnectionId = 0;
                     changed = true;
                 }
                 for (Iterator<Op> it = slot.queue.iterator(); it.hasNext();) {
                     Op queued = it.next();
-                    if (queued.verb == Verb.LOCK && clientId.equals(queued.sourceClientId)) {
+                    if (queued.verb == Verb.LOCK && queued.ownerConnectionId == connectionId) {
                         it.remove();
                         if (cancelledLocks == null) {
                             cancelledLocks = new ArrayList<>();
@@ -253,7 +259,7 @@ public final class KeyedScheduler {
             if (cancelledLocks != null) {
                 for (SimpleCallback<String> cancelled : cancelledLocks) {
                     try {
-                        cancelled.onResult(null, new Exception("client " + clientId
+                        cancelled.onResult(null, new Exception("connection " + connectionId
                                 + " disconnected while waiting for the lock on " + key));
                     } catch (Throwable t) {
                         LOGGER.log(Level.SEVERE, "error cancelling queued lock for key " + key, t);
@@ -486,7 +492,7 @@ public final class KeyedScheduler {
                     // race ahead of the acquisition. No activeWriter is taken, so the
                     // key is not double-counted while runLock records it.
                     slot.heldToken = head.lockToken;
-                    slot.lockOwnerClientId = head.sourceClientId;
+                    slot.lockOwnerConnectionId = head.ownerConnectionId;
                 } else {
                     slot.activeWriter = true;
                     if (head.verb == Verb.INVALIDATE && head.coalescible) {
@@ -547,14 +553,15 @@ public final class KeyedScheduler {
     }
 
     private void runLock(KeySlot slot, Op op) {
-        // heldToken + lockOwnerClientId were published at dequeue (selectRunnable). Only
-        // keep the lock if we still hold it AND the owning client is still connected: a
-        // concurrent disconnect may already have released it, or the LOCK request may
-        // have raced ahead of the disconnect cleanup (which runs after the connection is
-        // removed), in which case the owner is already gone.
-        // evaluate liveness outside the slot lock (it calls into the acceptor); the tiny
-        // window between this check and the grant is backstopped by releaseLocksForClient,
-        // which runs after the connection is removed and finds the published heldToken.
+        // heldToken + lockOwnerConnectionId were published at dequeue (selectRunnable).
+        // Only keep the lock if we still hold it AND the owning connection is still the
+        // current one for the client: a concurrent disconnect may already have released
+        // it, or the LOCK request may have raced ahead of the disconnect cleanup (which
+        // runs after the connection is removed), in which case the owner is already gone.
+        // Evaluate liveness outside the slot lock (it calls into the acceptor); the tiny
+        // window between this check and the grant is backstopped by
+        // releaseLocksForConnection, which runs after the connection is removed and finds
+        // the published heldToken.
         boolean ownerConnected = op.ownerStillConnected == null || op.ownerStillConnected.getAsBoolean();
         boolean granted = false;
         slot.lock.lock();
@@ -565,7 +572,7 @@ public final class KeyedScheduler {
                 } else {
                     // release the lock we just published: the owner disconnected
                     slot.heldToken = 0;
-                    slot.lockOwnerClientId = null;
+                    slot.lockOwnerConnectionId = 0;
                 }
             }
         } finally {
@@ -583,16 +590,19 @@ public final class KeyedScheduler {
         } catch (Throwable t) {
             LOGGER.log(Level.SEVERE, "error replying to lockKey for key " + slot.key, t);
         } finally {
-            // If the grant reply failed to reach the client, release the just-acquired
-            // lock: the client does not know it holds it, so leaving heldToken set would
-            // stall the key forever (the client stays connected, so releaseLocksForClient
-            // would never fire).
+            // This guard only covers the case where the reply callback itself THROWS
+            // (e.g. an encoder failure): then the owner cannot know it holds the lock, so
+            // we release it to avoid stalling the key. The other failure mode - the reply
+            // being silently dropped on an already-dead channel (NettyChannel discards it
+            // without throwing) - does NOT reach here; that case is handled by the
+            // connection-identity liveness check above plus releaseLocksForConnection on
+            // the disconnect.
             if (granted && !replied) {
                 slot.lock.lock();
                 try {
                     if (slot.heldToken == op.lockToken) {
                         slot.heldToken = 0;
-                        slot.lockOwnerClientId = null;
+                        slot.lockOwnerConnectionId = 0;
                     }
                 } finally {
                     slot.lock.unlock();
@@ -754,7 +764,7 @@ public final class KeyedScheduler {
         private int activeReaders;
         private boolean activeWriter;
         private long heldToken;
-        private String lockOwnerClientId;
+        private long lockOwnerConnectionId;
         private int activeBypass;
         private Op inflightInvalidate;
         private boolean draining;
@@ -773,8 +783,10 @@ public final class KeyedScheduler {
 
         private final Verb verb;
         private final Mode mode;
-        // set for LOCK ops: the owning client, so a disconnect can cancel a queued lock
-        private String sourceClientId;
+        // set for LOCK ops: the id of the owning connection, so the lock is tied to that
+        // exact connection (a disconnect releases/cancels only its own locks, even if the
+        // client reconnected with the same id on a new connection)
+        private long ownerConnectionId;
         // completed at most once, even if the reply callback fires more than once
         private final AtomicBoolean completed = new AtomicBoolean();
 

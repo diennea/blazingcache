@@ -226,7 +226,7 @@ public class KeyedSchedulerTest {
     public void applicationLockBypassAndQueueing() {
         KeyedScheduler s = new KeyedScheduler();
         final String[] token = new String[1];
-        s.submitLock(K, "owner", () -> true,
+        s.submitLock(K, 1L, () -> true,
                 (result, error) -> {
                     token[0] = result;
                     events.add("lockFinish:" + result);
@@ -261,14 +261,37 @@ public class KeyedSchedulerTest {
     }
 
     @Test
-    public void releaseLocksForClientReleasesHeldLockAndResumesDrain() {
+    public void releaseLocksForConnectionReleasesHeldLockAndResumesDrain() {
         KeyedScheduler s = new KeyedScheduler();
-        s.submitLock(K, "owner", () -> true, (result, error) -> {
+        s.submitLock(K, 1L, () -> true, (result, error) -> {
         });
         put(s, "WAIT", null); // queued behind the lock
         assertFalse(events.contains("bcast:WAIT"));
 
-        s.releaseLocksForClient("owner");
+        s.releaseLocksForConnection(1L);
+        assertTrue(events.contains("bcast:WAIT"));
+        fire("WAIT");
+        assertTrue(s.getLockedKeys().isEmpty());
+    }
+
+    /**
+     * The lock is owned by a connection, not just a client id: a disconnect of a
+     * DIFFERENT connection (e.g. the client's old, dead connection after it reconnected)
+     * must not release the lock the current connection legitimately holds.
+     */
+    @Test
+    public void releaseLocksForConnectionIgnoresOtherConnections() {
+        KeyedScheduler s = new KeyedScheduler();
+        s.submitLock(K, 1L, () -> true, (result, error) -> {
+        }); // held by connection 1
+        put(s, "WAIT", null); // queued behind the lock
+        assertFalse(events.contains("bcast:WAIT"));
+
+        s.releaseLocksForConnection(2L); // a different (old/dead) connection disconnects
+        assertFalse("another connection's disconnect must not release the lock",
+                events.contains("bcast:WAIT"));
+
+        s.releaseLocksForConnection(1L); // the owning connection disconnects
         assertTrue(events.contains("bcast:WAIT"));
         fire("WAIT");
         assertTrue(s.getLockedKeys().isEmpty());
@@ -279,14 +302,14 @@ public class KeyedSchedulerTest {
      * later granted to the gone client (leaving the key locked forever).
      */
     @Test
-    public void releaseLocksForClientCancelsQueuedLock() {
+    public void releaseLocksForConnectionCancelsQueuedLock() {
         KeyedScheduler s = new KeyedScheduler();
         final long[] owner1Token = new long[1];
-        s.submitLock(K, "owner1", () -> true,
+        s.submitLock(K, 1L, () -> true,
                 (result, error) -> owner1Token[0] = Long.parseLong(result));
 
         final boolean[] cancelled = {false};
-        s.submitLock(K, "owner2", () -> true,
+        s.submitLock(K, 2L, () -> true,
                 (result, error) -> {
                     if (error != null) {
                         cancelled[0] = true;
@@ -295,7 +318,7 @@ public class KeyedSchedulerTest {
                     }
                 });
 
-        s.releaseLocksForClient("owner2"); // owner2 disconnects while queued
+        s.releaseLocksForConnection(2L); // owner2 disconnects while queued
         assertTrue("queued lock must be cancelled", cancelled[0]);
 
         // owner1 unlocks: owner2's lock must NOT be granted (it was cancelled)
@@ -315,7 +338,7 @@ public class KeyedSchedulerTest {
     public void bypassOpHoldsBarrierUntilItCompletesAfterUnlock() {
         KeyedScheduler s = new KeyedScheduler();
         final long[] token = new long[1];
-        s.submitLock(K, "owner", () -> true, (result, error) -> token[0] = Long.parseLong(result));
+        s.submitLock(K, 1L, () -> true, (result, error) -> token[0] = Long.parseLong(result));
         // owner issues a token-carrying fetch (bypass) that stays in flight
         s.submitFetch(K, Long.toString(token[0]), fetchBody("BF"), () -> events.add("invalidLock:BF"));
         assertTrue(events.contains("fetch:BF"));
@@ -345,7 +368,7 @@ public class KeyedSchedulerTest {
         KeyedScheduler s = new KeyedScheduler();
         final String[] outcome = {null};
         // ownerStillConnected returns false: the client disconnected before the grant
-        s.submitLock(K, "gone", () -> false,
+        s.submitLock(K, 1L, () -> false,
                 (result, error) -> outcome[0] = error != null ? "aborted" : "granted");
         assertEquals("aborted", outcome[0]);
         assertEquals(0, s.getNumberOfLockedKeys());
@@ -379,7 +402,7 @@ public class KeyedSchedulerTest {
     @Test
     public void lockGrantReplyFailureReleasesLock() {
         KeyedScheduler s = new KeyedScheduler();
-        s.submitLock(K, "owner", () -> true, (result, error) -> {
+        s.submitLock(K, 1L, () -> true, (result, error) -> {
             if (error == null) {
                 throw new RuntimeException("reply delivery failed");
             }
@@ -439,7 +462,7 @@ public class KeyedSchedulerTest {
     @Test
     public void tokenIsValidWhenLockReplyFires() {
         KeyedScheduler s = new KeyedScheduler();
-        s.submitLock(K, "owner", () -> true, (result, error) -> put(s, "OWNED", result));
+        s.submitLock(K, 1L, () -> true, (result, error) -> put(s, "OWNED", result));
         assertTrue(events.contains("bcast:OWNED"));
         assertFalse(events.contains("error:OWNED"));
     }
@@ -448,7 +471,7 @@ public class KeyedSchedulerTest {
     public void doubleFiredBypassCompletionIsIdempotent() {
         KeyedScheduler s = new KeyedScheduler();
         final String[] token = new String[1];
-        s.submitLock(K, "owner", () -> true, (result, error) -> token[0] = result);
+        s.submitLock(K, 1L, () -> true, (result, error) -> token[0] = result);
 
         put(s, "OWNED", token[0]); // bypasses the queue, broadcast pending
         Runnable owned = completions.get("OWNED");
