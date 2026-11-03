@@ -172,11 +172,21 @@ public class NettyConnector implements AutoCloseable {
 
     @Override
     public void close() {
+        close(true);
+    }
+
+    /**
+     * @param awaitSocketClose whether to wait (bounded) for the socket to be
+     * closed; {@code false} when the close has already been requested and awaited
+     * by the {@link NettyChannel}, to avoid waiting twice.
+     */
+    void close(boolean awaitSocketClose) {
         if (socketchannel != null) {
             try {
-                socketchannel.close().await();
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
+                ChannelFuture closeFuture = socketchannel.close();
+                if (awaitSocketClose) {
+                    NettyChannel.awaitClose(closeFuture, this);
+                }
             } finally {
                 socketchannel = null;
             }

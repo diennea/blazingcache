@@ -23,6 +23,7 @@ import blazingcache.network.Channel;
 import blazingcache.network.Message;
 import blazingcache.network.ReplyCallback;
 import blazingcache.network.SendResultCallback;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -33,6 +34,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -45,6 +48,12 @@ import java.util.logging.Logger;
 public class NettyChannel extends Channel {
 
     private static final boolean DISCONNECT_ON_PENDING_REPLY_TIMEOUT = Boolean.parseBoolean(System.getProperty("blazingcache.nettychannel.disconnectonpendingreplytimeout", "true"));
+    /**
+     * Max time to wait for a socket to be closed. Netty close is idempotent and
+     * already scheduled on the event loop: if it does not complete in time we stop
+     * waiting (it will complete later) instead of blocking the caller forever.
+     */
+    private static final long CLOSE_TIMEOUT = Long.getLong("blazingcache.nettychannel.closetimeout", 10000L);
     private volatile SocketChannel socket;
     private static final Logger LOGGER = Logger.getLogger(NettyChannel.class.getName());
     private static final AtomicLong CHANNEL_ID_GENERATOR = new AtomicLong();
@@ -212,41 +221,73 @@ public class NettyChannel extends Channel {
         return _socket != null && _socket.isOpen() && !ioErrors;
     }
 
-    private volatile boolean closed = false;
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     @Override
     public void close() {
-        if (closed) {
+        // only one thread can perform the close
+        if (!closed.compareAndSet(false, true)) {
             return;
         }
-        closed = true;
         LOGGER.log(Level.SEVERE, this + ": closing");
-        String socketDescription = socket + "";
-        if (socket != null) {
-            try {
-                socket.close().await();
-            } catch (InterruptedException err) {
-                Thread.currentThread().interrupt();
-            } finally {
-                socket = null;
+        SocketChannel _socket = socket;
+        String socketDescription = _socket + "";
+        try {
+            if (_socket != null) {
+                try {
+                    awaitClose(_socket.close(), this);
+                } finally {
+                    socket = null;
+                }
+            }
+        } finally {
+            // pending messages must always be failed, whatever happened while closing
+            // the socket: nobody else would ever complete them
+            pendingReplyMessages.forEach((key, callback) -> {
+                Message original = pendingReplyMessagesSource.remove(key);
+                LOGGER.log(Level.SEVERE, this + " message " + key + " was not replied (" + original + ") callback:" + callback);
+                if (original != null) {
+                    submitCallback(() -> {
+                        callback.replyReceived(original, null, new IOException("comunication channel is closed. Cannot wait for pending messages, socket=" + socketDescription));
+                    });
+                }
+            });
+            pendingReplyMessages.clear();
+            pendingReplyMessagesSource.clear();
+            pendingReplyMessagesDeadline.clear();
+
+            if (connector != null) {
+                // the socket close has already been requested and awaited above
+                connector.close(false);
             }
         }
+    }
 
-        pendingReplyMessages.forEach((key, callback) -> {
-            Message original = pendingReplyMessagesSource.remove(key);
-            LOGGER.log(Level.SEVERE, this + " message " + key + " was not replied (" + original + ") callback:" + callback);
-            if (original != null) {
-                submitCallback(() -> {
-                    callback.replyReceived(original, null, new IOException("comunication channel is closed. Cannot wait for pending messages, socket=" + socketDescription));
-                });
+    /**
+     * Waits (at most {@link #CLOSE_TIMEOUT} ms) for a Netty close operation to
+     * complete. On timeout the wait is abandoned: the close has already been
+     * requested and Netty will complete it as soon as possible, retrying would
+     * just return the same close future.
+     * <p>
+     * When invoked from the channel event loop (e.g. from a write listener) it does
+     * not wait at all: the close could be completed only by the event loop itself
+     * (e.g. SSL close_notify) and Netty forbids blocking on it.
+     */
+    static void awaitClose(ChannelFuture closeFuture, Object owner) {
+        if (closeFuture.isDone()) {
+            return;
+        }
+        io.netty.channel.Channel channel = closeFuture.channel();
+        if (channel.isRegistered() && channel.eventLoop().inEventLoop()) {
+            LOGGER.log(Level.FINE, "{0}: close requested from the event loop, not waiting", owner);
+            return;
+        }
+        try {
+            if (!closeFuture.await(CLOSE_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                LOGGER.log(Level.SEVERE, owner + ": socket not closed within " + CLOSE_TIMEOUT + " ms, not waiting anymore");
             }
-        });
-        pendingReplyMessages.clear();
-        pendingReplyMessagesSource.clear();
-        pendingReplyMessagesDeadline.clear();
-
-        if (connector != null) {
-            connector.close();
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
         }
     }
 

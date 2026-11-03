@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -222,11 +223,15 @@ public class CacheStatus {
         }
     }
 
-    List<RawString> selectExpiredEntries(long now, int max) {
+    /**
+     * Selects up to {@code max} expired entries, skipping the ones matching
+     * {@code exclude} (i.e. whose expiration is already in progress).
+     */
+    List<RawString> selectExpiredEntries(long now, int max, Predicate<RawString> exclude) {
         lock.readLock().lock();
         try {
             return entryExpireTime.entrySet().stream().filter(entry -> entry.getValue() < now)
-                .map(entry -> entry.getKey()).limit(max).collect(Collectors.toList());
+                .map(entry -> entry.getKey()).filter(exclude.negate()).limit(max).collect(Collectors.toList());
         } finally {
             lock.readLock().unlock();
         }
