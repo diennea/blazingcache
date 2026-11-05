@@ -32,7 +32,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -70,6 +70,7 @@ public class CacheServer implements AutoCloseable {
     private volatile boolean stopped;
     private ZKClusterManager clusterManager;
     private Thread expireManager;
+    private Thread idleConnectionsManager;
     private ExecutorService channelsHandlers;
     private int channelHandlersThreads = 64;
     private long stateChangeTimestamp;
@@ -187,6 +188,12 @@ public class CacheServer implements AutoCloseable {
         this.expireManager = new Thread(new Expirer(), "cache-server-expire-thread");
         this.expireManager.setDaemon(true);
         this.expireManager.start();
+        // Broadcast reply deadlines (slow client detection) MUST be checked by a
+        // dedicated thread, never delayed by other work: it is the only mechanism
+        // unblocking operations waiting for a slow client (see #207)
+        this.idleConnectionsManager = new Thread(new IdleConnectionsChecker(), "cache-server-idle-connections-thread");
+        this.idleConnectionsManager.setDaemon(true);
+        this.idleConnectionsManager.start();
         if (this.server.getPort() > 0) {
             this.server.start();
         }
@@ -199,44 +206,51 @@ public class CacheServer implements AutoCloseable {
     }
 
     public void setExpirerPeriod(int expirerPeriod) {
+        if (expirerPeriod < 1) {
+            throw new IllegalArgumentException("expirerPeriod must be greater than 0, was " + expirerPeriod);
+        }
         this.expirerPeriod = expirerPeriod;
     }
 
+    private int idleConnectionsCheckPeriod = 1000;
+
+    public int getIdleConnectionsCheckPeriod() {
+        return idleConnectionsCheckPeriod;
+    }
+
+    public void setIdleConnectionsCheckPeriod(int idleConnectionsCheckPeriod) {
+        if (idleConnectionsCheckPeriod < 1) {
+            throw new IllegalArgumentException("idleConnectionsCheckPeriod must be greater than 0, was " + idleConnectionsCheckPeriod);
+        }
+        this.idleConnectionsCheckPeriod = idleConnectionsCheckPeriod;
+    }
+
+    /**
+     * Max number of new expiration invalidations started on each expirer run.
+     */
+    private static final int MAX_EXPIRATIONS_PER_RUN = 1000;
+
     private class Expirer implements Runnable {
+
+        /**
+         * Keys whose expiration invalidation is in progress. The expirer never waits
+         * for them: an invalidation can be stuck for a long time (behind an application
+         * lock, which has no timeout, or waiting for a slow client) and it must not
+         * delay the expiration of the other entries.
+         */
+        private final Set<RawString> expiringKeys = ConcurrentHashMap.newKeySet();
 
         @Override
         public void run() {
             while (!stopped) {
                 if (isLeader()) {
-                    long now = System.currentTimeMillis();
-                    List<RawString> entries = cacheStatus.selectExpiredEntries(now, 1000);
-                    if (!entries.isEmpty()) {
-
-                        CountDownLatch latch = new CountDownLatch(entries.size());
-                        for (RawString key : entries) {
-                            LOGGER.log(Level.FINER, "expiring entry {0}", key);
-                            invalidateKey(key, "expire-timer", null, new SimpleCallback<RawString>() {
-
-                                @Override
-                                public void onResult(RawString result, Throwable error) {
-                                    if (error != null) {
-                                        LOGGER.log(Level.SEVERE, "expired entry {0} {1}", new Object[]{key, error});
-                                    } else {
-                                        LOGGER.log(Level.FINER, " OK" + "expired entry {0}", key);
-                                    }
-                                    latch.countDown();
-                                }
-                            });
-                        }
-                        try {
-                            latch.await();
-                        } catch (InterruptedException exit) {
-                            break;
-                        }
+                    try {
+                        expireEntries();
+                    } catch (Throwable t) {
+                        // this thread must never die: it is the only one expiring entries
+                        LOGGER.log(Level.SEVERE, "unexpected error while expiring entries", t);
                     }
                 }
-
-                acceptor.processIdleConnections();
 
                 try {
                     Thread.sleep(expirerPeriod);
@@ -245,6 +259,56 @@ public class CacheServer implements AutoCloseable {
                 }
             }
             LOGGER.log(Level.FINE, "expirer thread stopped");
+        }
+
+        private void expireEntries() {
+            long now = System.currentTimeMillis();
+            List<RawString> entries = cacheStatus.selectExpiredEntries(now, MAX_EXPIRATIONS_PER_RUN, expiringKeys::contains);
+            for (RawString key : entries) {
+                LOGGER.log(Level.FINER, "expiring entry {0}", key);
+                expiringKeys.add(key);
+                try {
+                    invalidateKey(key, "expire-timer", null, (result, error) -> {
+                        expiringKeys.remove(key);
+                        if (error != null) {
+                            LOGGER.log(Level.SEVERE, "expired entry {0} {1}", new Object[]{key, error});
+                        } else {
+                            LOGGER.log(Level.FINER, "expired entry {0} OK", key);
+                        }
+                    });
+                } catch (RuntimeException err) {
+                    // the invalidation has not been started, it will be retried on the next run
+                    expiringKeys.remove(key);
+                    throw err;
+                }
+            }
+        }
+    }
+
+    /**
+     * Checks pending broadcast replies deadlines, disconnecting slow clients and
+     * failing the operations waiting for them. Must never block on cache
+     * operations.
+     */
+    private class IdleConnectionsChecker implements Runnable {
+
+        @Override
+        public void run() {
+            while (!stopped) {
+                try {
+                    acceptor.processIdleConnections();
+                } catch (Throwable t) {
+                    // this thread must never die: it is the only one checking broadcast deadlines
+                    LOGGER.log(Level.SEVERE, "unexpected error while processing idle connections", t);
+                }
+
+                try {
+                    Thread.sleep(idleConnectionsCheckPeriod);
+                } catch (InterruptedException exit) {
+                    break;
+                }
+            }
+            LOGGER.log(Level.FINE, "idle connections thread stopped");
         }
     }
 
@@ -281,7 +345,9 @@ public class CacheServer implements AutoCloseable {
         }
         try {
             expireManager.interrupt();
+            idleConnectionsManager.interrupt();
             expireManager.join(60000);
+            idleConnectionsManager.join(60000);
         } catch (InterruptedException exit) {
         }
 
